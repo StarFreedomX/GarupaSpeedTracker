@@ -1,0 +1,19 @@
+# 忽略所有 node_modules 文件夹（无论在根目录还是子目录）
+**/node_modules
+
+# 忽略构建产物
+**/dist
+**/.next
+**/out
+
+# 忽略 Git 和 IDE 配置
+.git
+.gitignore
+.idea
+.vscode
+*.sublime-*
+
+# 忽略日志和临时文件
+*.log
+.eslintcache
+.cache

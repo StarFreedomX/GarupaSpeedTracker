@@ -1,0 +1,59 @@
+name: Docker Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+    workflow_dispatch:
+
+jobs:
+    docker-build-push:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    -   component: backend
+                        image_name: garupa-speed-tracker-backend
+                    -   component: frontend
+                        image_name: garupa-speed-tracker-frontend
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+
+            -   name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+
+            -   name: Login to GitHub Container Registry
+                uses: docker/login-action@v3
+                with:
+                    registry: ghcr.io
+                    username: ${{ github.actor }}
+                    password: ${{ secrets.GITHUB_TOKEN }}
+
+            -   name: Extract Metadata
+                id: meta
+                uses: docker/metadata-action@v5
+                with:
+                    images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image_name }}
+                    tags: |
+                        # 只有当推送 tag 时才生成版本号标签 (例如 v0.4.10)
+                        type=semver,pattern={{version}}
+                        # 总是生成一个 latest 标签
+                        type=raw,value=latest
+
+            -   name: Build and Push Docker Image
+                uses: docker/build-push-action@v5
+                with:
+                    context: .
+                    # 指定各自文件夹下的 Dockerfile
+                    file: ./${{ matrix.component }}/Dockerfile
+                    push: true
+                    tags: ${{ steps.meta.outputs.tags }}
+                    labels: ${{ steps.meta.outputs.labels }}
+                    # 使用 GitHub Actions 缓存加速构建
+                    cache-from: type=gha,scope=${{ matrix.component }}
+                    cache-to: type=gha,mode=max,scope=${{ matrix.component }}

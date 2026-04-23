@@ -1,0 +1,36 @@
+{
+    "name": "garupa-speed-tracker",
+    "description": "Garupa Speed Tracker Web",
+    "contributors": [
+        "StarFreedomX <starfreedomx@outlook.com>"
+    ],
+    "version": "0.1.0",
+    "license": "MIT",
+    "keywords": [
+        "garupa"
+    ],
+    "author": "",
+    "packageManager": "pnpm@10.28.2",
+    "scripts": {
+        "dev": "pnpm -r --parallel dev",
+        "dev:backend": "pnpm --filter ./backend dev",
+        "dev:frontend": "pnpm --filter ./frontend dev",
+        "start": "pnpm -r --parallel start",
+        "start:backend": "pnpm --filter ./backend start",
+        "start:frontend": "pnpm --filter ./frontend start",
+        "build": "pnpm -r --parallel build",
+        "build:backend": "pnpm --filter ./backend build",
+        "build:frontend": "pnpm --filter ./frontend build",
+        "typecheck": "pnpm -r --parallel typecheck",
+        "typecheck:backend": "pnpm --filter ./backend typecheck",
+        "typecheck:frontend": "pnpm --filter ./frontend typecheck",
+        "check": "pnpm -r --parallel check",
+        "check:backend": "pnpm --filter ./backend check",
+        "check:frontend": "pnpm --filter ./frontend check",
+        "docker-build": "docker-compose up -d --build --force-recreate --remove-orphans",
+        "docker-build-proxy": "cross-env HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 docker-compose up -d --build --force-recreate --remove-orphans"
+    },
+    "devDependencies": {
+        "cross-env": "^10.1.0"
+    }
+}

@@ -1,0 +1,45 @@
+{
+    "name": "garupa-speed-tracker-backend",
+    "version": "1.0.0",
+    "contributors": [
+        "StarFreedomX <starfreedomx@outlook.com>"
+    ],
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "nodemon --exec ts-node -r tsconfig-paths/register src/index.ts",
+        "build": "tsc && tsc-alias",
+        "typecheck": "tsc --noEmit",
+        "start": "node dist/index.js",
+        "check": "biome check --write .",
+        "format": "biome format --write .",
+        "lint": "biome lint ./src"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "packageManager": "pnpm@10.28.2",
+    "dependencies": {
+        "@koa/router": "^15.4.0",
+        "axios": "^1.15.1",
+        "dotenv": "^17.4.2",
+        "koa": "^3.2.0",
+        "koa-parameter": "^3.0.1"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.4.12",
+        "@types/koa": "^3.0.2",
+        "@types/koa__router": "^12.0.5",
+        "@types/node": "^25.6.0",
+        "@types/parameter": "^3.6.7",
+        "nodemon": "^3.1.14",
+        "ts-node": "^10.9.2",
+        "tsc-alias": "^1.8.16",
+        "tsconfig-paths": "^4.2.0",
+        "typescript": "^6.0.3",
+        "@types/fs-extra": "^11.0.4",
+        "@vercel/nft": "^1.5.0",
+        "backend": "^0.0.0",
+        "fs-extra": "^11.3.4"
+    }
+}

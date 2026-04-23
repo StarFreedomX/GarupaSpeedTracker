@@ -1,0 +1,30 @@
+server {
+    listen 5913;
+    server_name localhost;
+
+    # 静态资源根目录
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # 反向代理 /api
+    location /api/ {
+        proxy_pass ${BACKEND_API_URL}/;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # 静态托管 & 3. SPA 路由支持 (解决刷新 404 问题)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 开启 gzip 压缩 (可选，推荐)
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+}

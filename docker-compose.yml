@@ -1,0 +1,23 @@
+services:
+    # 后端服务
+    grp-speed-backend:
+        build:
+            context: .
+            dockerfile: backend/Dockerfile # 指向后端的 Dockerfile 路径
+        image: ghcr.io/starfreedomx/garupa-speed-tracker-backend:latest
+        container_name: garupa-speed-backend
+        restart: always
+
+    # 前端服务
+    grp-speed-frontend:
+        build:
+            context: .
+            dockerfile: frontend/Dockerfile # 指向前端的 Dockerfile 路径
+        image: ghcr.io/starfreedomx/garupa-speed-tracker-frontend:latest
+        container_name: garupa-speed-frontend
+        restart: always
+        ports:
+            - "5913:5913"
+        depends_on:
+            - grp-speed-backend
+

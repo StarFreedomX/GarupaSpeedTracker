@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": ["src/*"]
+        },
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "ignoreDeprecations": "6.0",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "typeRoots": ["./node_modules/@types", "./src/types"]
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
+}

@@ -1,0 +1,1 @@
+window.__GARUPA_RUNTIME_CONFIG__ = window.__GARUPA_RUNTIME_CONFIG__ || {};
