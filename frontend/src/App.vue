@@ -152,7 +152,7 @@ const startLenis = () => {
         wrapper,
         content,
         smoothWheel: true,
-        syncTouch: true,
+        syncTouch: false,
         allowNestedScroll: true,
     });
 
@@ -187,7 +187,9 @@ watch(
     () => activeMenu.value,
     async () => {
         await nextTick();
-        lenis?.resize();
+        if (lenis) {
+            lenis.resize();
+        }
     },
 );
 </script>

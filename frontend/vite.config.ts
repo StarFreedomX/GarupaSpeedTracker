@@ -14,25 +14,26 @@ export default defineConfig(({ mode, command }) => {
         console.log(`[Vite] Proxying /api to: ${backendApiUrl}`);
     }
 
-    const runtimeConfigPlugin = command === "serve"
-        ? {
-            name: "runtime-config-dev-inject",
-            apply: "serve" as const,
-            transformIndexHtml: {
-                order: "pre" as const,
-                handler: () => [
-                    {
-                        tag: "script",
-                        attrs: { type: "text/javascript" },
-                        children: `window.__GARUPA_RUNTIME_CONFIG__ = Object.assign(window.__GARUPA_RUNTIME_CONFIG__ || {}, ${JSON.stringify({
-                            API_BASE_DEFAULT: apiBaseDefault,
-                        })});`,
-                        injectTo: "head-prepend" as const,
-                    },
-                ],
-            },
-        }
-        : undefined;
+    const runtimeConfigPlugin =
+        command === "serve"
+            ? {
+                  name: "runtime-config-dev-inject",
+                  apply: "serve" as const,
+                  transformIndexHtml: {
+                      order: "pre" as const,
+                      handler: () => [
+                          {
+                              tag: "script",
+                              attrs: { type: "text/javascript" },
+                              children: `window.__GARUPA_RUNTIME_CONFIG__ = Object.assign(window.__GARUPA_RUNTIME_CONFIG__ || {}, ${JSON.stringify({
+                                  API_BASE_DEFAULT: apiBaseDefault,
+                              })});`,
+                              injectTo: "head-prepend" as const,
+                          },
+                      ],
+                  },
+              }
+            : undefined;
 
     return {
         plugins: [runtimeConfigPlugin, vue()].filter(Boolean),
