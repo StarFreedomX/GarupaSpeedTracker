@@ -4,7 +4,6 @@ GarupaSpeedTracker 是一个用于查看 Bestdori 榜线分速的全栈项目，
 
 - `backend/`：Koa + TypeScript 后端，负责转发 Bestdori API、做参数校验和数据整理
 - `frontend/`：Vue 3 + TypeScript + Tailwind CSS 前端，负责展示活动信息、分数表格和自动刷新
-- `docker-compose.yml`：前后端一键启动
 
 ## 默认端口与路径
 

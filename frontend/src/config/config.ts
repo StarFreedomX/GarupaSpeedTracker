@@ -1,3 +1,4 @@
+import { GITHUB_PAGES_BACKEND_API_URL } from "@/config/deploymentDefaults";
 import type { ServerKey } from "@/types/score";
 
 // Application configuration constants
@@ -19,10 +20,7 @@ type RuntimeConfig = Partial<{
     DEFAULT_API_BACKEND_BASE_URL: string;
 }>;
 
-type RuntimeStringKey = keyof Pick<
-    RuntimeConfig,
-    "API_BASE_DEFAULT" | "DEFAULT_REQUEST_MODE" | "DEFAULT_API_MODE" | "DEFAULT_API_BACKEND_BASE_URL"
->;
+type RuntimeStringKey = keyof Pick<RuntimeConfig, "API_BASE_DEFAULT" | "DEFAULT_REQUEST_MODE" | "DEFAULT_API_MODE" | "DEFAULT_API_BACKEND_BASE_URL">;
 
 type RuntimeNumberKey = keyof Pick<
     RuntimeConfig,
@@ -85,7 +83,8 @@ const readRuntimeServerKey = (fallback: ServerKey): ServerKey => {
 };
 
 // API
-export const API_BASE_DEFAULT = readRuntimeString("API_BASE_DEFAULT", "/api");
+const isGitHubPagesDeployment = (import.meta.env as { VITE_DEPLOY_TARGET?: string }).VITE_DEPLOY_TARGET === "github-pages";
+export const API_BASE_DEFAULT = readRuntimeString("API_BASE_DEFAULT", isGitHubPagesDeployment ? GITHUB_PAGES_BACKEND_API_URL : "/api");
 
 // User preferences defaults
 // Query defaults control the initial score polling behavior and settings page defaults.
