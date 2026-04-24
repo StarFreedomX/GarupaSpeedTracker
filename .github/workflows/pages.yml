@@ -3,6 +3,15 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["master"]
+    paths:
+      - 'frontend/**'
+      - '!frontend/Dockerfile'
+      - '!frontend/nginx.conf.template'
+      - '!frontend/docker-entrypoint.d/**'
+      - '!frontend/start-frontend.cjs'
+      - '!frontend/README.md'
+      - 'pnpm-workspace.yaml'
+
 
 permissions:
   contents: read

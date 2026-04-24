@@ -23,14 +23,19 @@ RUN export PROJECT_ROOT=/app/backend/ && \
 
 # --- 阶段 2: 运行 ---
 FROM caomeiyouren/alpine-nodejs-minimize:1.0.0 AS runner
+
 WORKDIR /app
+
+RUN adduser -D -u 1000 node || true
+
+# 拷贝阶段 2 的产物
+COPY --from=builder --chown=node:node /app/backend ./
+
+USER node
 
 # 设置环境变量
 ENV NODE_ENV=production \
     HOST=0.0.0.0
-
-# 拷贝阶段 2 的产物
-COPY --from=builder /app/backend ./
 
 EXPOSE 5519
 CMD ["node", "dist/index.js"]
