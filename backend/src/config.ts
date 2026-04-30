@@ -28,6 +28,12 @@ export const MIN_UPDATE_TIME = toNumber(process.env.MIN_UPDATE_TIME, 45);
 
 export const BESTDORI_TIMEOUT_MS = toNumber(process.env.BESTDORI_TIMEOUT_MS, 10_000);
 
+// Two-level cache limits.
+export const MEMORY_CACHE_MAX_ENTRIES = toNumber(process.env.MEMORY_CACHE_MAX_ENTRIES, 24);
+export const MEMORY_CACHE_MAX_BYTES = toNumber(process.env.MEMORY_CACHE_MAX_BYTES, 256 * 1024 * 1024);
+export const DISK_CACHE_MAX_BYTES = toNumber(process.env.DISK_CACHE_MAX_BYTES, 1024 * 1024 * 1024);
+export const DISK_CACHE_CLEANUP_INTERVAL_MS = toNumber(process.env.DISK_CACHE_CLEANUP_INTERVAL_MS, 5 * 60 * 1000);
+
 export const DEFAULT_INTERVAL = 30_000;
 
 export const ENABLE_CORS = toBoolean(process.env.ENABLE_CORS, false);

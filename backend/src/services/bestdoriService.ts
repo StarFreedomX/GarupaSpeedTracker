@@ -1,24 +1,20 @@
 import http from "node:http";
 import https from "node:https";
 import axios from "axios";
-import { BESTDORI_API, BESTDORI_TIMEOUT_MS, MIN_UPDATE_TIME } from "@/config";
+import { BESTDORI_API, BESTDORI_TIMEOUT_MS } from "@/config";
 import { logger } from "@/logger";
 import { BestdoriParser } from "@/parsers/BestdoriParser";
+import { BestdoriScoreCacheStorage } from "@/storage/BestdoriScoreCacheStorage";
 import type { BestdoriEventsAllRaw, BestdoriResponseRaw, EventListResponse, ScoreQueryParams, ScoreTrackResponse } from "@/types/bestdori";
-import { toMs } from "@/utils";
-
-interface CacheEntry {
-    maxTimestamp: number;
-    payload: BestdoriResponseRaw;
-}
 
 interface ParsedResult {
     payload: BestdoriResponseRaw;
     maxTimestamp: number;
+    payloadBytes: number;
 }
 
 const parser = new BestdoriParser();
-const cache = new Map<string, CacheEntry>();
+const scoreCacheStorage = new BestdoriScoreCacheStorage();
 const inFlight = new Map<string, Promise<ParsedResult>>();
 
 const axiosClient = axios.create({
@@ -48,20 +44,6 @@ const buildUrl = (params: Pick<ScoreQueryParams, "server" | "eventId" | "interva
 const buildEventsUrl = (): string => `${BESTDORI_API}events/all.5.json`;
 
 /**
- * Decide whether an existing cache entry is still reusable.
- * The decision is based on the newest data timestamp from upstream,
- * not local request arrival time.
- */
-const shouldReuseCache = (entry: CacheEntry): boolean => {
-    if (!entry.maxTimestamp) {
-        return false;
-    }
-
-    const ageMs = Date.now() - toMs(entry.maxTimestamp);
-    return ageMs < MIN_UPDATE_TIME * 1000;
-};
-
-/**
  * Fetch raw ranking payload from Bestdori and extract max timestamp.
  *
  * @throws Error & { status: 504 | 502 }
@@ -73,8 +55,13 @@ const fetchAndParse = async (params: ScoreQueryParams): Promise<ParsedResult> =>
 
     try {
         const response = await axiosClient.get<BestdoriResponseRaw>(url);
+        const payloadBytes = Buffer.byteLength(JSON.stringify(response.data), "utf8");
+        logger(
+            "bestdori",
+            `payload size=${BestdoriScoreCacheStorage.formatBytes(payloadBytes)}, points=${response.data.points.length}, users=${response.data.users.length}`,
+        );
         const maxTimestamp = parser.getMaxTimestamp(response.data);
-        return { payload: response.data, maxTimestamp };
+        return { payload: response.data, maxTimestamp, payloadBytes };
     } catch (error: unknown) {
         const axiosError = error as { code?: string; message?: string };
         logger("bestdori", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
@@ -116,11 +103,13 @@ const fetchEventListRaw = async (): Promise<BestdoriEventsAllRaw> => {
  */
 export const getScoreTrack = async (params: ScoreQueryParams): Promise<ScoreTrackResponse> => {
     const key = buildKey(params);
-    const cached = cache.get(key);
-
-    if (cached && shouldReuseCache(cached)) {
-        logger("cache", `hit ${key}`);
-        return parser.buildScoreTrack(cached.payload, params.time, params.lastTimeStamp);
+    const cached = await scoreCacheStorage.get(params, key);
+    if (cached) {
+        logger(
+            "cache",
+            `${cached.source} hit ${key} size=${BestdoriScoreCacheStorage.formatBytes(cached.entry.payloadBytes)} entries=${scoreCacheStorage.getMemoryEntryCount()}`,
+        );
+        return parser.buildScoreTrack(cached.entry.payload, params.time, params.lastTimeStamp);
     }
 
     const activeRequest = inFlight.get(key);
@@ -131,11 +120,13 @@ export const getScoreTrack = async (params: ScoreQueryParams): Promise<ScoreTrac
     }
 
     const requestPromise = fetchAndParse(params)
-        .then((result) => {
-            cache.set(key, {
-                maxTimestamp: result.maxTimestamp,
-                payload: result.payload,
-            });
+        .then(async (result) => {
+            const entry = await scoreCacheStorage.set(params, key, result);
+            logger(
+                "cache",
+                `store memory ${key} size=${BestdoriScoreCacheStorage.formatBytes(entry.payloadBytes)} entries=${scoreCacheStorage.getMemoryEntryCount()}`,
+            );
+
             return result;
         })
         .finally(() => {
