@@ -1,6 +1,6 @@
-import { calculateTolerance, getLatestTimeStamps } from "@/features/score/scoreMath";
+import { calculateTolerance, getLatestTimeStamps } from "@/features/points/pointsMath";
+import type { PlayerTrack } from "@/types/points";
 import type { QueryPreferences } from "@/types/preferences";
-import type { PlayerTrack } from "@/types/score";
 
 const clampInteger = (value: number, min: number, max?: number): number => {
     const next = Math.round(value);

@@ -1,10 +1,10 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { getNextRefreshAt } from "@/composables/useRequestRefreshSchedule";
-import { latestTimestamp, mergeTracks } from "@/features/score/scoreMath";
+import { latestTimestamp, mergeTracks } from "@/features/points/pointsMath";
 import { translate } from "@/i18n";
-import { fetchScores } from "@/services/scoreApi";
+import { fetchPoints } from "@/services/topPointsApi";
+import type { PlayerTrack, PointsQuery } from "@/types/points";
 import type { QueryPreferences } from "@/types/preferences";
-import type { PlayerTrack, ScoreQuery } from "@/types/score";
 
 const clampInteger = (value: number, min: number, max?: number): number => {
     const next = Math.round(value);
@@ -12,7 +12,7 @@ const clampInteger = (value: number, min: number, max?: number): number => {
     return max === undefined ? lower : Math.min(lower, max);
 };
 
-export const useScorePolling = (filters: () => QueryPreferences, enabled: () => boolean = () => true) => {
+export const usePointsPolling = (filters: () => QueryPreferences, enabled: () => boolean = () => true) => {
     const tracks = ref<PlayerTrack[]>([]);
     const isPaused = ref(false);
     const isLoading = ref(false);
@@ -39,7 +39,7 @@ export const useScorePolling = (filters: () => QueryPreferences, enabled: () => 
 
         const settings = filters();
 
-        const query: ScoreQuery = {
+        const query: PointsQuery = {
             server: settings.server,
             event: settings.event,
             time: settings.time,
@@ -48,7 +48,7 @@ export const useScorePolling = (filters: () => QueryPreferences, enabled: () => 
         };
 
         try {
-            const incoming = await fetchScores(query);
+            const incoming = await fetchPoints(query);
             tracks.value = fullRefresh ? incoming : mergeTracks(tracks.value, incoming);
             hasBooted.value = true;
             lastUpdated.value = Date.now();

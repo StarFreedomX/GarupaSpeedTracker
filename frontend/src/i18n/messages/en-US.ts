@@ -10,7 +10,7 @@ const enUS = {
         expand: "Expand",
     },
     topbar: {
-        title: "Score Velocity Viewer",
+        title: "Points Velocity Viewer",
         status: "Status",
         lastUpdate: "Last update",
         notSynced: "Not synced",
@@ -35,15 +35,15 @@ const enUS = {
         advancedInSettings: "Adjust advanced options in Settings",
     },
     table: {
-        title: "Score Delta Table",
+        title: "Points Delta Table",
         empty: "No data yet. Please check filter values or refresh.",
         time: "Time",
         headerUid: "Player UID",
         headerName: "Player Name",
-        headerScore: "Current Score",
-        totalScore: "Current Total Score",
+        headerPoint: "Current Points",
+        totalPoint: "Current Total Points",
         tooltipPlayerName: "Player Name: {name}",
-        tooltipTotalScore: "Total Score: {score}",
+        tooltipTotalPoint: "Total Points: {point}",
         paginationSummary: "Page {current} / {total}",
         paginationPage: "Page",
         paginationFirst: "First",
@@ -103,7 +103,7 @@ const enUS = {
     },
     about: {
         title: "About",
-        desc: "This page tracks score velocity with incremental syncing and time-aligned table rendering.",
+        desc: "This page tracks points velocity with incremental syncing and time-aligned table rendering.",
         source: "Data source: Bestdori ranking API through backend proxy.",
     },
     error: {

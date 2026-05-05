@@ -1,4 +1,4 @@
-import type { ServerKey } from "@/types/score";
+import type { ServerKey } from "@/types/points";
 
 export interface EventListItem {
     eventType: string | null;

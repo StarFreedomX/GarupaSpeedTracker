@@ -3,7 +3,7 @@ import Lenis from "lenis";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import TopStatusBar from "@/components/layout/TopStatusBar.vue";
 import SidebarMenu from "@/components/navigation/SidebarMenu.vue";
-import { useScorePolling } from "@/composables/useScorePolling";
+import { usePointsPolling } from "@/composables/usePointsPolling";
 import { useUserPreferences } from "@/composables/useUserPreferences";
 import { buildEventOptions, selectBestEventId } from "@/features/event/eventSelection";
 import { useI18n } from "@/i18n";
@@ -131,7 +131,7 @@ watch(
     },
 );
 
-const { tracks, statusText, isPaused, countdownSeconds, isLoading, error, lastUpdated, refreshFull } = useScorePolling(
+const { tracks, statusText, isPaused, countdownSeconds, isLoading, error, lastUpdated, refreshFull } = usePointsPolling(
     () => filters,
     () => activeMenu.value === "home" && eventReady.value,
 );

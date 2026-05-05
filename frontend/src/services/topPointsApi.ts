@@ -1,8 +1,8 @@
 import { translate } from "@/i18n";
 import { getApiBase } from "@/services/apiBase";
-import type { PlayerTrack, ScoreQuery, ScoreResponse } from "@/types/score";
+import type { PlayerTrack, PointsQuery, PointsResponse } from "@/types/points";
 
-const toPlayerArray = (data: ScoreResponse): PlayerTrack[] => {
+const toPlayerArray = (data: PointsResponse): PlayerTrack[] => {
     if (Array.isArray(data)) {
         return data;
     }
@@ -14,7 +14,7 @@ const toPlayerArray = (data: ScoreResponse): PlayerTrack[] => {
     }));
 };
 
-export const fetchScores = async (query: ScoreQuery): Promise<PlayerTrack[]> => {
+export const fetchPoints = async (query: PointsQuery): Promise<PlayerTrack[]> => {
     const search = new URLSearchParams({
         server: String(query.server),
         event: String(query.event),
@@ -29,11 +29,11 @@ export const fetchScores = async (query: ScoreQuery): Promise<PlayerTrack[]> => 
         search.set("lastTimeStamp", String(query.lastTimeStamp));
     }
 
-    const response = await fetch(`${getApiBase()}/scores?${search.toString()}`);
+    const response = await fetch(`${getApiBase()}/topPoints?${search.toString()}`);
     if (!response.ok) {
         throw new Error(translate("error.requestFailed", { status: response.status }));
     }
 
-    const data = (await response.json()) as ScoreResponse;
+    const data = (await response.json()) as PointsResponse;
     return toPlayerArray(data);
 };

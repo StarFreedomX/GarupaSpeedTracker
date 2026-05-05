@@ -1,4 +1,4 @@
-import type { ServerKey } from "@/types/score";
+import type { ServerKey } from "@/types/points";
 
 const bestdoriServerCodes = ["jp", "en", "tw", "cn", "kr"] as const;
 

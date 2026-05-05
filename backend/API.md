@@ -3,7 +3,7 @@
 ## Quick Navigation
 
 - [Base](#base)
-- [GET `/api/scores`](#get-apiscores)
+- [GET `/api/topPoints`](#get-apitoppoints)
 - [GET `/api/events`](#get-apievents)
 
 ## Base
@@ -12,9 +12,9 @@
 - Base path: `/api`
 - Content-Type: `application/json`
 
-## GET `/api/scores`
+## GET `/api/topPoints`
 
-Query Bestdori ranking track data and return aligned score points by player UID.
+Query Bestdori ranking track data and return aligned points by player UID.
 
 ### Query Parameters
 
@@ -29,13 +29,13 @@ Query Bestdori ranking track data and return aligned score points by player UID.
 Example:
 
 ```http
-GET /api/scores?server=0&event=321&interval=3600000&time=30
+GET /api/topPoints?server=0&event=321&interval=3600000&time=30
 ```
 
 Incremental example:
 
 ```http
-GET /api/scores?server=0&event=321&time=60&lastTimeStamp=1771394346326
+GET /api/topPoints?server=0&event=321&time=60&lastTimeStamp=1771394346326
 ```
 
 Upstream mapping:

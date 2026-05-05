@@ -1,5 +1,5 @@
 import { GITHUB_PAGES_BACKEND_API_URL } from "@/config/deploymentDefaults";
-import type { ServerKey } from "@/types/score";
+import type { ServerKey } from "@/types/points";
 
 // Application configuration constants
 
@@ -87,7 +87,7 @@ const isGitHubPagesDeployment = (import.meta.env as { VITE_DEPLOY_TARGET?: strin
 export const API_BASE_DEFAULT = readRuntimeString("API_BASE_DEFAULT", isGitHubPagesDeployment ? GITHUB_PAGES_BACKEND_API_URL : "/api");
 
 // User preferences defaults
-// Query defaults control the initial score polling behavior and settings page defaults.
+// Query defaults control the initial points polling behavior and settings page defaults.
 export const DEFAULT_SERVER = readRuntimeServerKey(0);
 export const DEFAULT_EVENT = readRuntimeNumber("DEFAULT_EVENT", 328, 1);
 // 数据采样间隔：请求时带给后端的采样步长，单位为秒。

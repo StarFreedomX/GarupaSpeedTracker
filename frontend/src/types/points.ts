@@ -1,6 +1,6 @@
 export type ServerKey = 0 | 1 | 2 | 3 | 4;
 
-export interface ScorePoint {
+export interface PointsWithTs {
     time: number;
     points: number;
 }
@@ -12,14 +12,14 @@ export interface PlayerInfo {
 
 export interface PlayerTrack {
     uid: number;
-    points: ScorePoint[];
+    points: PointsWithTs[];
     info: PlayerInfo;
 }
 
-export type LegacyScoreResponse = Record<number, Omit<PlayerTrack, "uid">>;
-export type ScoreResponse = PlayerTrack[] | LegacyScoreResponse;
+export type LegacyPointsResponse = Record<number, Omit<PlayerTrack, "uid">>;
+export type PointsResponse = PlayerTrack[] | LegacyPointsResponse;
 
-export interface ScoreQuery {
+export interface PointsQuery {
     server: ServerKey;
     event: number;
     time: number;

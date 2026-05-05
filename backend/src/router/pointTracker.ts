@@ -1,23 +1,23 @@
 import Router from "@koa/router";
 import { DEFAULT_INTERVAL } from "@/config";
 import { isServer, queryToNumber, queryToOptionalNumber, validationError } from "@/router/utils";
-import { getScoreTrack } from "@/services/bestdoriService";
-import type { ScoreQueryParams } from "@/types/bestdori";
+import { getPointTrack } from "@/services/bestdoriService";
+import type { PointsQueryParams } from "@/types/bestdori";
 
 /**
- * Router group for Bestdori score tracking endpoints.
+ * Router group for Bestdori points tracking endpoints.
  *
- * This router validates score polling parameters, enforces the local server
+ * This router validates points polling parameters, enforces the local server
  * index contract, and delegates the upstream fetch/caching work to the service
  * layer.
  */
 export const pointTrackerRouter = new Router();
 
 /**
- * GET /api/scores
+ * GET /api/topPoints
  *
  * Accepts the local numeric server index plus the event/time window parameters,
- * validates them, and returns aligned score tracks for the requested event.
+ * validates them, and returns aligned points tracks for the requested event.
  *
  * Query semantics:
  * - `server` must be an integer in the range 0..4
@@ -32,7 +32,7 @@ export const pointTrackerRouter = new Router();
  *
  * @param ctx Koa request context used to read query parameters and write the response body.
  */
-pointTrackerRouter.get("/scores", async (ctx) => {
+pointTrackerRouter.get("/topPoints", async (ctx) => {
     const lastTimeStamp = queryToOptionalNumber(ctx.query.lastTimeStamp);
 
     const validatedParams: Record<string, number> = {
@@ -61,7 +61,7 @@ pointTrackerRouter.get("/scores", async (ctx) => {
         throw validationError("server", "server must be one of 0,1,2,3,4");
     }
 
-    const params: ScoreQueryParams = {
+    const params: PointsQueryParams = {
         server: validatedParams.server,
         eventId: validatedParams.event,
         interval: validatedParams.interval,
@@ -69,7 +69,7 @@ pointTrackerRouter.get("/scores", async (ctx) => {
         lastTimeStamp,
     };
 
-    const result = await getScoreTrack(params);
+    const result = await getPointTrack(params);
     ctx.status = 200;
     ctx.body = result;
 });

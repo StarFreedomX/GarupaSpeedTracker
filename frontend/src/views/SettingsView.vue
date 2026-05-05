@@ -11,8 +11,8 @@ import {
 } from "@/config/config";
 import { useI18n } from "@/i18n";
 import { normalizeApiBase } from "@/services/apiBase";
+import type { ServerKey } from "@/types/points";
 import type { UserPreferences } from "@/types/preferences";
-import type { ServerKey } from "@/types/score";
 
 const { t } = useI18n();
 const model = defineModel<UserPreferences>({ required: true });

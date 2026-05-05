@@ -1,5 +1,5 @@
 import type { EventListResponse, EventOption } from "@/types/event";
-import type { ServerKey } from "@/types/score";
+import type { ServerKey } from "@/types/points";
 import { formatDateTime } from "@/utils/time";
 
 const toNumber = (value: string | null | undefined): number | undefined => {

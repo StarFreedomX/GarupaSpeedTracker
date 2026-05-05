@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toTableModel } from "@/features/score/scoreMath";
-import type { PlayerTrack } from "@/types/score";
+import { toTableModel } from "@/features/points/pointsMath";
+import type { PlayerTrack } from "@/types/points";
 
 describe("toTableModel", () => {
     it("computes fallback delta with parentheses when previous timestamp is missing", () => {

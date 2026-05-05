@@ -38,10 +38,10 @@ export interface I18nMessages {
         time: string;
         headerUid: string;
         headerName: string;
-        headerScore: string;
-        totalScore: string;
+        headerPoint: string;
+        totalPoint: string;
         tooltipPlayerName: string;
-        tooltipTotalScore: string;
+        tooltipTotalPoint: string;
         paginationSummary: string;
         paginationPage: string;
         paginationFirst: string;

@@ -1,4 +1,4 @@
-import type { PlayerTrack, ScorePoint, TableCell, TableModel, TableRow } from "@/types/score";
+import type { PlayerTrack, PointsWithTs, TableCell, TableModel, TableRow } from "@/types/points";
 import { formatHm, toMs } from "@/utils/time";
 
 /**
@@ -24,7 +24,7 @@ function getSortedTimesAsc(players: PlayerTrack[]): number[] {
  * @param points 按时间排列的积分点列表。
  * @returns 最后一个有效积分；没有则返回 `-1`。
  */
-function lastRecordedPoints(points: ScorePoint[]): number {
+function lastRecordedPoints(points: PointsWithTs[]): number {
     return points.findLast((p) => p.points !== -1)?.points ?? -1;
 }
 

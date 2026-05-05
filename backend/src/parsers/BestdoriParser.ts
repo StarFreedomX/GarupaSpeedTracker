@@ -1,11 +1,11 @@
 import type {
     BestdoriEventsAllRaw,
     BestdoriPointRaw,
-    BestdoriResponseRaw,
+    BestdoriTopPointsRaw,
     BestdoriUserRaw,
     EventListResponse,
-    PlayerScoreData,
-    ScoreTrackResponse,
+    PlayerPointsData,
+    PointsTrackResponse,
 } from "@/types/bestdori";
 import { groupPointsByTime, toMs } from "@/utils";
 
@@ -49,7 +49,7 @@ export class BestdoriParser {
         return points.filter((point) => validTimes.has(point.time));
     }
 
-    public buildScoreTrack(payload: BestdoriResponseRaw, windowMinutes: number, lastTimeStamp?: number): ScoreTrackResponse {
+    public buildPointTrack(payload: BestdoriTopPointsRaw, windowMinutes: number, lastTimeStamp?: number): PointsTrackResponse {
         const validPoints = this.sanitizePoints(payload.points);
         if (validPoints.length === 0) {
             return [];
@@ -75,7 +75,7 @@ export class BestdoriParser {
             pointsByUidTime.set(`${row.uid}-${row.time}`, row.value);
         }
 
-        const result: PlayerScoreData[] = [];
+        const result: PlayerPointsData[] = [];
 
         for (const uid of uidSet) {
             const user = usersMap.get(uid);
@@ -104,7 +104,7 @@ export class BestdoriParser {
         });
     }
 
-    public getMaxTimestamp(payload: BestdoriResponseRaw): number {
+    public getMaxTimestamp(payload: BestdoriTopPointsRaw): number {
         if (payload.points.length === 0) {
             return 0;
         }

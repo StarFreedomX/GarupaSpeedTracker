@@ -1,4 +1,4 @@
-import type { ServerKey } from "@/types/score";
+import type { ServerKey } from "@/types/points";
 
 export type RequestMode = "fixed-interval" | "fixed-minute" | "smart-refresh";
 export type ApiMode = "frontend" | "backend";

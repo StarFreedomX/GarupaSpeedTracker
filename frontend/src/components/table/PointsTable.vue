@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import Tooltip from "@/components/common/Tooltip.vue";
 import { useShiftWheelHorizontalScroll } from "@/composables/useShiftWheelHorizontalScroll";
 import { useI18n } from "@/i18n";
-import type { TableModel } from "@/types/score";
+import type { TableModel } from "@/types/points";
 import { formatDateTime, toMs } from "@/utils/time";
 
 const props = defineProps<{
@@ -23,7 +23,7 @@ const hasPagination = computed(() => props.model.rows.length > normalizedRowsPer
 const currentPage = ref(1);
 const pageJumpValue = ref("1");
 
-const getPlayerCurrentScore = (player: TableModel["players"][number]): string => {
+const getPlayerCurrentPoint = (player: TableModel["players"][number]): string => {
     for (let index = player.points.length - 1; index >= 0; index -= 1) {
         const point = player.points[index];
         if (point.points === -1) {
@@ -37,9 +37,9 @@ const getPlayerCurrentScore = (player: TableModel["players"][number]): string =>
     return "-";
 };
 
-const getPlayerTooltipContent = (player: TableModel["players"][number], score?: number | undefined): string => {
+const getPlayerTooltipContent = (player: TableModel["players"][number], point?: number | undefined): string => {
     const base = t("table.tooltipPlayerName", { name: player.info.name });
-    const suffix = score !== undefined ? t("table.tooltipTotalScore", { score }) : undefined;
+    const suffix = point !== undefined ? t("table.tooltipTotalPoint", { point }) : undefined;
     return suffix ? `${base}\n${suffix}` : base;
 };
 
@@ -282,20 +282,20 @@ onBeforeUnmount(() => {
                     </tr>
                     <tr>
                         <th class="sticky left-0 z-20 min-w-24 border-b border-r border-border/70 bg-appbg/85 px-2 py-1 text-left font-medium text-muted">
-                            <span class="block text-[11px] leading-tight md:text-xs">{{ t('table.headerScore') }}</span>
+                            <span class="block text-[11px] leading-tight md:text-xs">{{ t('table.headerPoint') }}</span>
                         </th>
                         <th
                             v-for="player in model.players"
-                            :key="`${player.uid}-score`"
+                            :key="`${player.uid}-point`"
                             class="min-w-24 max-w-28 border-b border-r border-border/70 px-2 py-1 text-center font-medium"
                         >
-                            <div class="truncate">{{ getPlayerCurrentScore(player) }}</div>
+                            <div class="truncate">{{ getPlayerCurrentPoint(player) }}</div>
                         </th>
                     </tr>
                     </thead>
 
                     <tbody>
-                    <tr v-for="row in visibleRows" :key="row.time" class="score-row hover:bg-primary/6">
+                    <tr v-for="row in visibleRows" :key="row.time" class="point-row hover:bg-primary/6">
                         <td class="sticky left-0 z-10 border-b border-r border-border/60 bg-surface px-2 py-2 font-medium">
                             <Tooltip :content="getTimeTooltipContent(row.time)" class="block w-full cursor-default">
                                 <span>{{ row.label }}</span>

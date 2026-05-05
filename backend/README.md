@@ -60,7 +60,7 @@ pnpm start
 `GET /api/events`
 
 
-`GET /api/scores?server=0&event=321&time=60`
+`GET /api/topPoints?server=0&event=321&time=60`
 
 - `server`: `0|1|2|3|4` -> `jp|en|tw|cn|kr`
 - `interval`: 可选，默认 `30000`

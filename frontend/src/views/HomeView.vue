@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import EventSummaryPanel from "@/components/event/EventSummaryPanel.vue";
-import ScoreFilters from "@/components/filters/ScoreFilters.vue";
-import ScoreTable from "@/components/table/ScoreTable.vue";
-import { toTableModel } from "@/features/score/scoreMath";
+import PointsFilters from "@/components/filters/PointsFilters.vue";
+import PointsTable from "@/components/table/PointsTable.vue";
+import { toTableModel } from "@/features/points/pointsMath";
 import { useI18n } from "@/i18n";
 import type { EventOption } from "@/types/event";
+import type { PlayerTrack } from "@/types/points";
 import type { QueryPreferences } from "@/types/preferences";
-import type { PlayerTrack } from "@/types/score";
 
 const props = defineProps<{
     filters: QueryPreferences;
@@ -41,7 +41,7 @@ const selectedEvent = computed(() => props.eventOptions.find((option) => option.
 <template>
     <div class="grid gap-3">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border/80 pb-2">
-            <ScoreFilters
+            <PointsFilters
                 v-model="filterModel"
                 :event-options="props.eventOptions"
                 :loading="props.eventLoading"
@@ -75,7 +75,7 @@ const selectedEvent = computed(() => props.eventOptions.find((option) => option.
             {{ props.error }}
         </p>
 
-        <ScoreTable :model="tableModel" :loading="props.loading" :rows-per-page="props.rowsPerPage"/>
+        <PointsTable :model="tableModel" :loading="props.loading" :rows-per-page="props.rowsPerPage"/>
         <!-- 页脚 -->
         <footer class="mt-10 text-center text-xs text-gray-400">
             <div class="text-center text-xs text-gray-400 mb-2 mt-4">
