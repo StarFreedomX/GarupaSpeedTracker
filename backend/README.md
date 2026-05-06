@@ -34,16 +34,16 @@ pnpm start
 ```
 
 ## 后端环境变量说明
-| 变量名                   | 默认值                                    | 作用                              |
-|-----------------------|----------------------------------------|---------------------------------|
-| `HOST`                | `127.0.0.1`（本地）<br/> `0.0.0.0`（Docker） | 后端监听地址                          |
-| `PORT`                | `5519`                                 | 后端监听端口                          |
-| `API_PREFIX`          | `/api`                                 | 后端 API 路由前缀                     |
-| `BESTDORI_API`        | `https://bestdori.com/api/`            | Bestdori 上游地址                   |
-| `MIN_UPDATE_TIME`     | `45`                                   | 最短更新间隔（秒）                       |
-| `BESTDORI_TIMEOUT_MS` | `10000`                                | 上游请求超时（毫秒）                      |
-| `ENABLE_CORS`         | `false`                                | 是否启用 CORS 响应头和 `OPTIONS` 预检处理   |
-| `APP_PROXY`           | `false`                                | 是否信任反向代理头，适用于部署在反代后面时获取真实客户端 IP |
+| 变量名                      | 默认值                                    | 作用                              |
+|--------------------------|----------------------------------------|---------------------------------|
+| `HOST`                   | `127.0.0.1`（本地）<br/> `0.0.0.0`（Docker） | 后端监听地址                          |
+| `PORT`                   | `5519`                                 | 后端监听端口                          |
+| `API_PREFIX`             | `/api`                                 | 后端 API 路由前缀                     |
+| `BESTDORI_API`           | `https://bestdori.com/api/`            | Bestdori 上游地址                   |
+| `MIN_POINTS_UPDATE_TIME` | `45`                                   | 最短更新间隔（秒）                       |
+| `BESTDORI_TIMEOUT_MS`    | `10000`                                | 上游请求超时（毫秒）                      |
+| `ENABLE_CORS`            | `false`                                | 是否启用 CORS 响应头和 `OPTIONS` 预检处理   |
+| `APP_PROXY`              | `false`                                | 是否信任反向代理头，适用于部署在反代后面时获取真实客户端 IP |
 
 ## 监听地址
 

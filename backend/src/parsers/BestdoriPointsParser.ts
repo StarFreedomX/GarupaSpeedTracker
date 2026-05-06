@@ -1,41 +1,7 @@
-import type {
-    BestdoriEventsAllRaw,
-    BestdoriPointRaw,
-    BestdoriTopPointsRaw,
-    BestdoriUserRaw,
-    EventListResponse,
-    PlayerPointsData,
-    PointsTrackResponse,
-} from "@/types/bestdori";
+import type { BestdoriPointRaw, BestdoriTopPointsRaw, BestdoriUserRaw, PlayerPointsData, PointsTrackResponse } from "@/types/bestdori";
 import { groupPointsByTime, toMs } from "@/utils";
 
-/**
- * Handles Bestdori payload normalization:
- * 1) removes abnormal timestamps (count !== 10)
- * 2) keeps points in requested recent window
- * 3) aligns all users on same timestamps and fills gaps with -1
- */
-export class BestdoriParser {
-    public buildEventList(payload: BestdoriEventsAllRaw): EventListResponse {
-        const result: EventListResponse = {};
-
-        for (const [eventId, event] of Object.entries(payload)) {
-            if (!event) {
-                continue;
-            }
-
-            result[eventId] = {
-                eventType: event.eventType ?? null,
-                eventName: event.eventName ?? [],
-                assetBundleName: event.assetBundleName ?? null,
-                startAt: event.startAt ?? [],
-                endAt: event.endAt ?? [],
-            };
-        }
-
-        return result;
-    }
-
+export class BestdoriPointsParser {
     public sanitizePoints(points: BestdoriPointRaw[]): BestdoriPointRaw[] {
         const grouped = groupPointsByTime(points);
         const validTimes = new Set<number>();
@@ -63,8 +29,8 @@ export class BestdoriParser {
         if (incrementalTimes.length === 0) {
             return [];
         }
-        const windowTimeSet = new Set(incrementalTimes);
 
+        const windowTimeSet = new Set(incrementalTimes);
         const filtered = validPoints.filter((point) => windowTimeSet.has(point.time));
         const usersMap = new Map<number, BestdoriUserRaw>(payload.users.map((user) => [user.uid, user]));
 

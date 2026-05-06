@@ -1,7 +1,7 @@
 import Router from "@koa/router";
 import { DEFAULT_INTERVAL } from "@/config";
 import { isServer, queryToNumber, queryToOptionalNumber, validationError } from "@/router/utils";
-import { getPointTrack } from "@/services/bestdoriService";
+import { getPointTrack } from "@/services/pointsService";
 import type { PointsQueryParams } from "@/types/bestdori";
 
 /**

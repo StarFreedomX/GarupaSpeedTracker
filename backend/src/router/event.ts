@@ -1,5 +1,5 @@
 import Router from "@koa/router";
-import { getEventList } from "@/services/bestdoriService";
+import { getEventList } from "@/services";
 
 /**
  * Router group for Bestdori event list endpoints.

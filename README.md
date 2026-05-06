@@ -64,7 +64,7 @@ grp-speed-backend:
         - HOST=0.0.0.0
         - API_PREFIX=/api
         - BESTDORI_API=https://bestdori.com/api/
-        - MIN_UPDATE_TIME=45
+        - MIN_POINTS_UPDATE_TIME=45
         - BESTDORI_TIMEOUT_MS=10000
         - ENABLE_CORS=false
         - APP_PROXY=false

@@ -24,8 +24,9 @@ export const PORT = toNumber(process.env.PORT, 5519);
 export const API_PREFIX = process.env.API_PREFIX ?? "/api";
 
 // Seconds: if newest Bestdori point is newer than this threshold, reuse cache.
-export const MIN_UPDATE_TIME = toNumber(process.env.MIN_UPDATE_TIME, 45);
+export const MIN_POINTS_UPDATE_TIME = toNumber(process.env.MIN_POINTS_UPDATE_TIME, 45);
 
+// 连接失败超时时间，单位ms
 export const BESTDORI_TIMEOUT_MS = toNumber(process.env.BESTDORI_TIMEOUT_MS, 10_000);
 
 // Two-level cache limits.
