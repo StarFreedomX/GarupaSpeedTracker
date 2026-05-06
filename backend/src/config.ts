@@ -35,6 +35,9 @@ export const MEMORY_CACHE_MAX_BYTES = toNumber(process.env.MEMORY_CACHE_MAX_BYTE
 export const DISK_CACHE_MAX_BYTES = toNumber(process.env.DISK_CACHE_MAX_BYTES, 1024 * 1024 * 1024);
 export const DISK_CACHE_CLEANUP_INTERVAL_MS = toNumber(process.env.DISK_CACHE_CLEANUP_INTERVAL_MS, 5 * 60 * 1000);
 
+export const BESTDORI_SONGS_CHECK_INTERVAL_MS = toNumber(process.env.BESTDORI_SONGS_CHECK_INTERVAL_MS, 24 * 60 * 60 * 1000);
+export const BESTDORI_STORE_RAW_CHARTS = toBoolean(process.env.BESTDORI_STORE_RAW_CHARTS, false);
+
 export const DEFAULT_INTERVAL = 30_000;
 
 export const ENABLE_CORS = toBoolean(process.env.ENABLE_CORS, false);

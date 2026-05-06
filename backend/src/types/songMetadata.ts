@@ -8,9 +8,7 @@ export type SkillDuration = "3.0" | "3.5" | "4.0" | "4.5" | "5.0" | "5.5" | "6.0
  * 基础歌曲元数据
  * 用于 Summary 索引表，支持全曲库快速排序
  */
-export interface SongSummary {
-    song_id: number;
-    level: number;
+export interface SongLevelSummary {
     /**
      * 谱面总note数
      */
@@ -20,7 +18,12 @@ export interface SongSummary {
      * Value: 长度为 6 的数组，对应 6 个技能窗口覆盖的 Note 数量
      */
     counts: Record<SkillDuration, number[]>;
+}
 
-    /** 用于数据版本管理，校验是否需要更新本地缓存 */
-    hash: string;
+export interface SongSummary {
+    [level: number]: SongLevelSummary;
+}
+
+export interface SongChartMeta {
+    [song_id: number]: SongSummary;
 }

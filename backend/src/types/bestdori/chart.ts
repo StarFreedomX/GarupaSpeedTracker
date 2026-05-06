@@ -19,6 +19,7 @@ export interface NotePoint {
      * 是否为fever充能
      */
     charge?: boolean;
+    skill?: boolean;
 }
 
 /** 1. 基础事件与设定 */

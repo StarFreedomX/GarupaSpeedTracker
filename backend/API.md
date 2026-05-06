@@ -5,6 +5,7 @@
 - [Base](#base)
 - [GET `/api/topPoints`](#get-apitoppoints)
 - [GET `/api/events`](#get-apievents)
+- [GET `/api/songMetadata.json`](#get-apisongmetadatajson)
 
 ## Base
 
@@ -209,5 +210,45 @@ https://bestdori.com/api/events/all.5.json
 }
 ```
 
+
+
+
+
+## GET `/api/songMetadata.json`
+
+Return the cached Bestdori chart distribution dataset (`SongChartMeta`) keyed by `song_id` then `level`.
+
+### Query Parameters
+
+- None
+
+Example:
+
+```http
+GET /api/songMetadata.json
+```
+
+Response is JSON and may be gzipped when the client sends `Accept-Encoding: gzip`.
+
+### Success Response `200`
+
+```json
+{
+  "1": {
+    "22": {
+      "total": 459,
+      "counts": {
+        "3.0": [11, 15, 16, 8, 9, 10]
+      }
+    }
+  }
+}
+```
+
+### Response Contract
+
+- The dataset is stored under `backend/data/bestdori-song-summaries.json` and reused until the configured check interval expires.
+- Raw chart storage is disabled by default and can be enabled via `BESTDORI_STORE_RAW_CHARTS`.
+- All available difficulties are fetched in upstream order (`easy`, `normal`, `hard`, `expert`, `special`) and stored as `{ [song_id]: { [level]: { total, counts } } }`.
 
 

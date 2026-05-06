@@ -1,23 +1,9 @@
 import type { Chart, ChartItem, ConnectionNote } from "@/types/bestdori/chart";
-import type { SkillDuration, SongSummary } from "@/types/songMetadata";
+import type { SkillDuration, SongLevelSummary, SongSummary } from "@/types/songMetadata";
 
 const SKILL_DURATIONS = ["3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0"] as const satisfies readonly SkillDuration[];
 const DEFAULT_BPM = 120;
 const TARGET_SKILL_COUNT = 6;
-
-const CRC32_TABLE = (() => {
-    const table = new Uint32Array(256);
-
-    for (let index = 0; index < 256; index += 1) {
-        let crc = index;
-        for (let bit = 0; bit < 8; bit += 1) {
-            crc = (crc & 1) !== 0 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-        }
-        table[index] = crc >>> 0;
-    }
-
-    return table;
-})();
 
 type BeatEvent = {
     beat: number;
@@ -36,25 +22,48 @@ interface NormalizedChart {
  * 将 Bestdori chart 原始数据归一化为 songMetadata 定义的 SongSummary。
  */
 export class BestdoriChartParser {
-    public buildSongSummary(songId: number, level: number, chart: Chart): SongSummary {
+    public buildLevelSummary(chart: Chart): SongLevelSummary {
         const normalized = this.normalizeChart(chart);
         const counts = this.buildCounts(normalized);
-        const summary = {
-            song_id: songId,
-            level,
+
+        return {
             total: normalized.total,
             counts,
         };
+    }
 
+    public buildSongSummary(level: number, chart: Chart): SongSummary {
         return {
-            ...summary,
-            hash: this.buildHash(summary),
+            [level]: this.buildLevelSummary(chart),
         };
     }
 
     private normalizeChart(chart: Chart): NormalizedChart {
         const bpmTimeline = this.buildBpmTimeline(this.extractBpmList(chart));
-        const skillEvents = chart.flatMap((item) => this.extractSkillEvents(item, bpmTimeline)).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+        let skillEvents = chart.flatMap((item) => this.extractSkillEvents(item, bpmTimeline)).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+
+        // Treat skill triggers that happen at the same beat/time as a single trigger.
+        // Some charts (e.g. special tracks) may contain multiple skill flags at the same beat
+        // (big-keys / multi-lane skills). Collapse those into one skill event to match
+        // in-game behavior where simultaneous skill taps count as one activation.
+        const deduped: BeatEvent[] = [];
+        const EPS = 1e-6;
+        for (const se of skillEvents) {
+            if (deduped.length === 0) {
+                deduped.push(se);
+                continue;
+            }
+
+            const prev = deduped[deduped.length - 1];
+            if (Math.abs(prev.beat - se.beat) <= EPS) {
+                // same beat/time -> ignore additional skill points
+                continue;
+            }
+
+            deduped.push(se);
+        }
+
+        skillEvents = deduped;
         const noteEvents = chart.flatMap((item) => this.extractNoteEvents(item, bpmTimeline)).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
 
         return {
@@ -74,7 +83,14 @@ export class BestdoriChartParser {
 
     private buildCounts(normalized: NormalizedChart): Record<SkillDuration, number[]> {
         const counts = {} as Record<SkillDuration, number[]>;
-        const skillEvents = normalized.skillEvents.slice(0, TARGET_SKILL_COUNT);
+        const skillEvents = normalized.skillEvents.slice();
+
+        // The game design requires exactly TARGET_SKILL_COUNT skill trigger points per chart.
+        // If the parsed chart does not contain exactly that many, fail fast so data issues
+        // (missing or extra skill markers) are surfaced instead of silently padding.
+        if (skillEvents.length !== TARGET_SKILL_COUNT) {
+            throw new Error(`Expected ${TARGET_SKILL_COUNT} skill events, but parsed ${skillEvents.length}.`);
+        }
 
         for (const duration of SKILL_DURATIONS) {
             const windowSeconds = Number(duration);
@@ -92,25 +108,11 @@ export class BestdoriChartParser {
                     return sum + 1;
                 }, 0);
             });
-
-            while (counts[duration].length < TARGET_SKILL_COUNT) {
-                counts[duration].push(0);
-            }
         }
 
         return counts;
     }
 
-    private buildHash(data: Omit<SongSummary, "hash">): string {
-        const input = JSON.stringify(data);
-        let hash = 0xffffffff;
-
-        for (let index = 0; index < input.length; index += 1) {
-            hash = CRC32_TABLE[(hash ^ input.charCodeAt(index)) & 0xff] ^ (hash >>> 8);
-        }
-
-        return ((hash ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
-    }
 
     private buildBpmTimeline(bpmList: BpmPoint[]): Array<{ beat: number; bpm: number; seconds: number }> {
         const sorted = bpmList.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -159,11 +161,21 @@ export class BestdoriChartParser {
     }
 
     private extractSkillEvents(item: ChartItem, timeline: Array<{ beat: number; bpm: number; seconds: number }>): BeatEvent[] {
-        if (item.type !== "Single" || !item.skill) {
-            return [];
+        // Skills can be triggered by different item types:
+        // - Single items with `skill: true`
+        // - Connection points inside Long/Slide items that have `skill: true` on the connection
+        // Collect all skill trigger points we can find.
+        if (item.type === "Single") {
+            return item.skill ? [{ beat: item.beat, seconds: this.beatToSeconds(item.beat, timeline) }] : [];
         }
 
-        return [{ beat: item.beat, seconds: this.beatToSeconds(item.beat, timeline) }];
+        if (item.type === "Long" || item.type === "Slide") {
+            // connection points may carry skill flag on the point itself
+            const points = (item as ConnectionNote).connections || [];
+            return points.filter((p) => (p as any).skill).map((p) => ({ beat: p.beat, seconds: this.beatToSeconds(p.beat, timeline) }));
+        }
+
+        return [];
     }
 
     private extractNoteEvents(item: ChartItem, timeline: Array<{ beat: number; bpm: number; seconds: number }>): BeatEvent[] {
@@ -181,6 +193,10 @@ export class BestdoriChartParser {
     }
 
     private extractConnectionNotes(item: ConnectionNote, timeline: Array<{ beat: number; bpm: number; seconds: number }>): BeatEvent[] {
-        return item.connections.filter((point) => !point.hidden).map((point) => ({ beat: point.beat, seconds: this.beatToSeconds(point.beat, timeline) }));
+        // Exclude hidden connection points and also exclude connection points that are skill triggers
+        // (they should be reported via extractSkillEvents instead of being considered normal notes).
+        return item.connections
+            .filter((point) => !point.hidden && !(point as any).skill)
+            .map((point) => ({ beat: point.beat, seconds: this.beatToSeconds(point.beat, timeline) }));
     }
 }

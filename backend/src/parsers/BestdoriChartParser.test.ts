@@ -5,14 +5,12 @@ import type { Chart } from "@/types/bestdori/chart";
 describe("BestdoriChartParser", () => {
     jest.setTimeout(30_000);
 
-    it("builds the expected SongSummary from the real expert chart", async () => {
+    it("builds the expected level summary from the real expert chart", async () => {
         const parser = new BestdoriChartParser();
         const chart = await downloader.download<Chart>("https://bestdori.com/api/charts/1/expert.json");
-        const summary = parser.buildSongSummary(1, 22, chart);
+        const levelSummary = parser.buildLevelSummary(chart);
 
-        expect(summary).toMatchObject({
-            song_id: 1,
-            level: 22,
+        expect(levelSummary).toMatchObject({
             total: 459,
             counts: {
                 "3.0": [11, 15, 16, 8, 9, 10],
@@ -27,7 +25,10 @@ describe("BestdoriChartParser", () => {
                 "7.5": [24, 41, 34, 26, 25, 28],
                 "8.0": [24, 43, 36, 30, 27, 31],
             },
-            hash: "5f2267f1",
+        });
+
+        expect(parser.buildSongSummary(22, chart)).toMatchObject({
+            22: levelSummary,
         });
     });
 });
