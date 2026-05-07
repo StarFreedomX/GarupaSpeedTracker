@@ -4,6 +4,8 @@
  */
 export type MusicDataResponse = Record<string, MusicItem>;
 
+export type DifficultyKey = "0" | "1" | "2" | "3" | "4";
+
 export interface MusicItem {
     tag: Tag;
     bandId: number;

@@ -8,7 +8,7 @@ import { BestdoriChartParser } from "@/parsers/BestdoriChartParser";
 import { BestdoriSongLevelParser } from "@/parsers/BestdoriSongLevelParser";
 import { type DownloadCacheOptions, downloader } from "@/storage/downloader";
 import type { Chart } from "@/types/bestdori/chart";
-import type { MusicDataResponse, MusicItem } from "@/types/bestdori/songs";
+import type { DifficultyKey, MusicDataResponse, MusicItem } from "@/types/bestdori/songs";
 import type { SongChartMeta, SongSummary } from "@/types/songMetadata";
 
 interface DownloaderLike {
@@ -22,8 +22,6 @@ interface Options {
     checkIntervalMs?: number;
     concurrency?: number;
 }
-
-type DifficultyKey = "0" | "1" | "2" | "3" | "4";
 
 interface State {
     chartMeta: SongChartMeta;
@@ -173,10 +171,7 @@ export class BestdoriSongMetadataService {
         if (this.state?.sourceHash === sourceHash) {
             this.state = { ...this.state, checkedAt: now };
             await this.persistState();
-            logger(
-                "bestdori",
-                `song summary already up to date: songs=${Object.keys(musicData).length}, charts=${this.state.chartCount}`,
-            );
+            logger("bestdori", `song summary already up to date: songs=${Object.keys(musicData).length}, charts=${this.state.chartCount}`);
             return this.state.chartMeta;
         }
 
@@ -210,15 +205,12 @@ export class BestdoriSongMetadataService {
 
         this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
         await this.persistState();
-        logger(
-            "bestdori",
-            `song summary updated: songs=${songIds.length}, charts=${chartCount}, raw=${this.rawChartStorage ? "on" : "off"}`,
-        );
+        logger("bestdori", `song summary updated: songs=${songIds.length}, charts=${chartCount}, raw=${this.rawChartStorage ? "on" : "off"}`);
         return chartMeta;
     }
 
     private async buildSongSummary(songId: number, music: MusicItem, levels: number[]): Promise<{ summary: SongSummary; chartCount: number }> {
-        const summary: SongSummary = {};
+        const summary = {} as SongSummary;
         let chartCount = 0;
 
         for (let index = 0; index < DIFFICULTY_ORDER.length; index += 1) {
@@ -241,7 +233,7 @@ export class BestdoriSongMetadataService {
             }
 
             const level = levels[index] ?? difficulty.playLevel;
-            summary[level] = this.chartParser.buildLevelSummary(chart);
+            summary[definition.key] = this.chartParser.buildLevelSummary(chart, level);
         }
 
         return { summary, chartCount };

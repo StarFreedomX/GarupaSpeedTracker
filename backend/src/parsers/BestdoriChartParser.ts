@@ -22,19 +22,14 @@ interface NormalizedChart {
  * 将 Bestdori chart 原始数据归一化为 songMetadata 定义的 SongSummary。
  */
 export class BestdoriChartParser {
-    public buildLevelSummary(chart: Chart): SongLevelSummary {
+    public buildLevelSummary(chart: Chart, level: number): SongLevelSummary {
         const normalized = this.normalizeChart(chart);
         const counts = this.buildCounts(normalized);
 
         return {
+            level,
             total: normalized.total,
             counts,
-        };
-    }
-
-    public buildSongSummary(level: number, chart: Chart): SongSummary {
-        return {
-            [level]: this.buildLevelSummary(chart),
         };
     }
 
@@ -112,7 +107,6 @@ export class BestdoriChartParser {
 
         return counts;
     }
-
 
     private buildBpmTimeline(bpmList: BpmPoint[]): Array<{ beat: number; bpm: number; seconds: number }> {
         const sorted = bpmList.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);

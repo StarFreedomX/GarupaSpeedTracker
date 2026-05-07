@@ -3,12 +3,12 @@
  * 覆盖 3.0s 到 8.0s，步长 0.5s
  */
 export type SkillDuration = "3.0" | "3.5" | "4.0" | "4.5" | "5.0" | "5.5" | "6.0" | "6.5" | "7.0" | "7.5" | "8.0";
-
 /**
  * 基础歌曲元数据
  * 用于 Summary 索引表，支持全曲库快速排序
  */
 export interface SongLevelSummary {
+    level: number;
     /**
      * 谱面总note数
      */
@@ -20,9 +20,13 @@ export interface SongLevelSummary {
     counts: Record<SkillDuration, number[]>;
 }
 
-export interface SongSummary {
-    [level: number]: SongLevelSummary;
-}
+export type SongSummary = {
+    "0": SongLevelSummary;
+    "1": SongLevelSummary;
+    "2": SongLevelSummary;
+    "3": SongLevelSummary;
+    "4"?: SongLevelSummary;
+};
 
 export interface SongChartMeta {
     [song_id: number]: SongSummary;

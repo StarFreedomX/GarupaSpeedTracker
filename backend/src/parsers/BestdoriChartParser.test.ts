@@ -8,9 +8,10 @@ describe("BestdoriChartParser", () => {
     it("builds the expected level summary from the real expert chart", async () => {
         const parser = new BestdoriChartParser();
         const chart = await downloader.download<Chart>("https://bestdori.com/api/charts/1/expert.json");
-        const levelSummary = parser.buildLevelSummary(chart);
+        const levelSummary = parser.buildLevelSummary(chart, 22);
 
         expect(levelSummary).toMatchObject({
+            level: 22,
             total: 459,
             counts: {
                 "3.0": [11, 15, 16, 8, 9, 10],
@@ -25,10 +26,6 @@ describe("BestdoriChartParser", () => {
                 "7.5": [24, 41, 34, 26, 25, 28],
                 "8.0": [24, 43, 36, 30, 27, 31],
             },
-        });
-
-        expect(parser.buildSongSummary(22, chart)).toMatchObject({
-            22: levelSummary,
         });
     });
 });
