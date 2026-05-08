@@ -56,9 +56,14 @@ const readEventIdFromUrl = (): number | undefined => {
 };
 
 const replaceEventInUrl = (eventId: number): void => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("event", String(eventId));
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // 使用 vue-router 的 replace 方法
+    // 它会自动保留当前的路径(path)和哈希(hash)，只更新查询参数(query)
+    router.replace({
+        query: {
+            ...route.query, // 保留现有的其他 query 参数
+            event: String(eventId),
+        },
+    });
 };
 
 const initialUrlEventId = readEventIdFromUrl();
