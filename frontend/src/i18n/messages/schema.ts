@@ -1,6 +1,7 @@
 export interface I18nMessages {
     menu: {
         home: string;
+        auto: string;
         settings: string;
         about: string;
         launcher: string;
@@ -48,6 +49,62 @@ export interface I18nMessages {
         paginationPrevious: string;
         paginationNext: string;
         paginationLast: string;
+    };
+    eventType: {
+        mission: string;
+        try: string;
+        versus: string;
+        challenge: string;
+        "5v5": string;
+        medley1: string;
+    };
+    common: {
+        calculate: string;
+        calculating: string;
+        resetAll: string;
+        resetDefault: string;
+        loading: string;
+        unitSecond: string;
+    };
+    auto: {
+        server: {
+            jp: string;
+            cn: string;
+            others: string;
+        };
+        config: {
+            eventParams: string;
+            eventType: string;
+            totalPower: string;
+            supportPower: string;
+            eventBonus: string;
+            autoRate: string;
+            rateLabel: string;
+            ratePlaceholder: string;
+            skillConfig: string;
+            filterFixedPt: string;
+            skillOrderHint: string;
+            skillRateLabel: string;
+            skillCenterHint: string;
+            skillNote: string;
+        };
+        table: {
+            songId: string;
+            songName: string;
+            difficulty: string;
+            minScore: string;
+            maxScore: string;
+            minPt: string;
+            maxPt: string;
+            emptyFiltered: string;
+            emptyPrompt: string;
+        };
+        error: {
+            loadMetadata: string;
+            metadataNotReady: string;
+            loadSongList: string;
+            calcFailed: string;
+        };
     };
     home: {
         manualRefresh: string;

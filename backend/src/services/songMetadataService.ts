@@ -38,7 +38,8 @@ interface PersistedDataset {
 }
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
-const DATASET_FILE = "bestdori-song-summaries.json";
+const METADATA_FILENAME = "songMetadata.json";
+const SONGS_FILENAME = "songs.json";
 const RAW_DIR = path.join("raw", "charts");
 const DIFFICULTY_ORDER: ReadonlyArray<{ key: DifficultyKey; name: string }> = [
     { key: "0", name: "easy" },
@@ -102,7 +103,8 @@ export class BestdoriSongMetadataService {
     private readonly chartParser: BestdoriChartParser;
     private readonly levelParser: BestdoriSongLevelParser;
     private readonly dataDir: string;
-    private readonly datasetPath: string;
+    private readonly metadataPath: string;
+    private readonly songsPath: string;
     private readonly rawDir: string;
     private readonly rawChartStorage: boolean;
     private readonly checkIntervalMs: number;
@@ -119,7 +121,8 @@ export class BestdoriSongMetadataService {
         this.chartParser = deps?.chartParser ?? new BestdoriChartParser();
         this.levelParser = deps?.levelParser ?? new BestdoriSongLevelParser();
         this.dataDir = options.dataDir ?? DATA_DIR;
-        this.datasetPath = path.join(this.dataDir, DATASET_FILE);
+        this.metadataPath = path.join(this.dataDir, METADATA_FILENAME);
+        this.songsPath = path.join(this.dataDir, SONGS_FILENAME);
         this.rawDir = path.join(this.dataDir, RAW_DIR);
         this.rawChartStorage = options.rawChartStorage ?? BESTDORI_STORE_RAW_CHARTS;
         this.checkIntervalMs = options.checkIntervalMs ?? BESTDORI_SONGS_CHECK_INTERVAL_MS;
@@ -134,7 +137,7 @@ export class BestdoriSongMetadataService {
 
     private async loadState(): Promise<void> {
         if (this.state) return;
-        const dataset = await readJson<PersistedDataset>(this.datasetPath);
+        const dataset = await readJson<PersistedDataset>(this.metadataPath);
         if (dataset) {
             this.state = {
                 chartMeta: dataset.chartMeta,
@@ -174,6 +177,7 @@ export class BestdoriSongMetadataService {
             logger("bestdori", `song summary already up to date: songs=${Object.keys(musicData).length}, charts=${this.state.chartCount}`);
             return this.state.chartMeta;
         }
+        await writeJson(this.songsPath, musicData);
 
         const levelsMap = this.levelParser.buildSongLevelMap(musicData);
         const limit = pLimit(Math.max(1, Math.floor(this.concurrency)));
@@ -206,6 +210,7 @@ export class BestdoriSongMetadataService {
         this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
         await this.persistState();
         logger("bestdori", `song summary updated: songs=${songIds.length}, charts=${chartCount}, raw=${this.rawChartStorage ? "on" : "off"}`);
+        await writeJson(this.metadataPath, chartMeta);
         return chartMeta;
     }
 
@@ -250,7 +255,7 @@ export class BestdoriSongMetadataService {
             chartCount: this.state.chartCount,
             chartMeta: this.state.chartMeta,
         };
-        await writeJson(this.datasetPath, payload);
+        await writeJson(this.metadataPath, payload);
     }
 }
 

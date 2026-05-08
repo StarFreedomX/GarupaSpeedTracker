@@ -247,7 +247,7 @@ Response is JSON and may be gzipped when the client sends `Accept-Encoding: gzip
 
 ### Response Contract
 
-- The dataset is stored under `backend/data/bestdori-song-summaries.json` and reused until the configured check interval expires.
+- The dataset is stored under `backend/data/songMetadata.json` and reused until the configured check interval expires.
 - Raw chart storage is disabled by default and can be enabled via `BESTDORI_STORE_RAW_CHARTS`.
 - All available difficulties are fetched in upstream order (`easy`, `normal`, `hard`, `expert`, `special`) and stored as `{ [song_id]: { [level]: { total, counts } } }`.
 

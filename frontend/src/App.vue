@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Lenis from "lenis";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router"; // 引入路由钩子
 import TopStatusBar from "@/components/layout/TopStatusBar.vue";
 import SidebarMenu from "@/components/navigation/SidebarMenu.vue";
 import { usePointsPolling } from "@/composables/usePointsPolling";
@@ -10,14 +11,14 @@ import { useI18n } from "@/i18n";
 import { setApiBase } from "@/services/apiBase";
 import { fetchEventList } from "@/services/eventApi";
 import type { EventOption } from "@/types/event";
-import AboutView from "@/views/AboutView.vue";
-import HomeView from "@/views/HomeView.vue";
-import SettingsView from "@/views/SettingsView.vue";
 
 const { t } = useI18n();
+const router = useRouter();
+const route = useRoute();
 
 const menuItems = computed(() => [
     { key: "home", label: t("menu.home") },
+    { key: "auto", label: t("menu.auto") },
     { key: "settings", label: t("menu.settings") },
     { key: "about", label: t("menu.about") },
 ]);
@@ -26,7 +27,8 @@ const { preferences, applyTheme, persist } = useUserPreferences();
 applyTheme(preferences.theme);
 setApiBase(preferences.api);
 
-const activeMenu = ref("home");
+// 使用当前路由名称作为激活状态
+const activeMenu = computed(() => (route.name as string) || "auto");
 const sidebarExpanded = ref(false);
 const pageScrollRef = ref<HTMLElement | null>(null);
 const pageContentRef = ref<HTMLElement | null>(null);
@@ -41,12 +43,14 @@ const eventReady = ref(false);
 const hasResolvedInitialEvent = ref(false);
 const eventBootstrapToken = ref(0);
 
+// 路由跳转处理
+const handleMenuSelect = (key: string) => {
+    router.push({ name: key });
+};
+
 const readEventIdFromUrl = (): number | undefined => {
     const raw = new URLSearchParams(window.location.search).get("event");
-    if (raw === null) {
-        return undefined;
-    }
-
+    if (raw === null) return undefined;
     const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
@@ -67,9 +71,7 @@ const bootstrapEventOptions = async (preferUrlEvent: boolean): Promise<void> => 
 
     try {
         const payload = await fetchEventList();
-        if (token !== eventBootstrapToken.value) {
-            return;
-        }
+        if (token !== eventBootstrapToken.value) return;
 
         const now = Date.now();
         const options = buildEventOptions(payload, filters.server, now);
@@ -79,12 +81,9 @@ const bootstrapEventOptions = async (preferUrlEvent: boolean): Promise<void> => 
         if (selectedEventId !== filters.event) {
             filters.event = selectedEventId;
         }
-
         replaceEventInUrl(selectedEventId);
     } catch {
-        if (token === eventBootstrapToken.value) {
-            eventOptions.value = [];
-        }
+        if (token === eventBootstrapToken.value) eventOptions.value = [];
     } finally {
         if (token === eventBootstrapToken.value) {
             eventLoading.value = false;
@@ -104,36 +103,28 @@ watch(
 
 watch(
     () => preferences.theme,
-    (next) => {
-        applyTheme(next);
-    },
+    (next) => applyTheme(next),
     { deep: true },
 );
-
 watch(
     () => preferences.api,
-    (next) => {
-        setApiBase(next);
-    },
+    (next) => setApiBase(next),
     { deep: true, immediate: true },
 );
-
 watch(preferences, () => persist(), { deep: true });
 
 watch(
     () => filters.event,
     (next, previous) => {
-        if (!eventReady.value || next === previous) {
-            return;
-        }
-
+        if (!eventReady.value || next === previous) return;
         replaceEventInUrl(next);
     },
 );
 
 const { tracks, statusText, isPaused, countdownSeconds, isLoading, error, lastUpdated, refreshFull } = usePointsPolling(
     () => filters,
-    () => activeMenu.value === "home" && eventReady.value,
+    // 只有在首页时才激活轮询逻辑
+    () => route.name === "home" && eventReady.value,
 );
 
 const togglePause = () => {
@@ -143,11 +134,7 @@ const togglePause = () => {
 const startLenis = () => {
     const wrapper = pageScrollRef.value;
     const content = pageContentRef.value;
-
-    if (!wrapper || !content) {
-        return;
-    }
-
+    if (!wrapper || !content) return;
     lenis = new Lenis({
         wrapper,
         content,
@@ -155,12 +142,10 @@ const startLenis = () => {
         syncTouch: false,
         allowNestedScroll: true,
     });
-
     const raf = (time: number) => {
         lenis?.raf(time);
         lenisFrame = requestAnimationFrame(raf);
     };
-
     lenisFrame = requestAnimationFrame(raf);
 };
 
@@ -169,7 +154,6 @@ const stopLenis = () => {
         cancelAnimationFrame(lenisFrame);
         lenisFrame = 0;
     }
-
     lenis?.destroy();
     lenis = undefined;
 };
@@ -179,17 +163,14 @@ onMounted(async () => {
     startLenis();
 });
 
-onBeforeUnmount(() => {
-    stopLenis();
-});
+onBeforeUnmount(() => stopLenis());
 
+// 监听路由路径变化以更新 Lenis
 watch(
-    () => activeMenu.value,
+    () => route.path,
     async () => {
         await nextTick();
-        if (lenis) {
-            lenis.resize();
-        }
+        if (lenis) lenis.resize();
     },
 );
 </script>
@@ -201,7 +182,7 @@ watch(
                 :items="menuItems"
                 :active="activeMenu"
                 :expanded="sidebarExpanded"
-                @select="activeMenu = $event"
+                @select="handleMenuSelect"
             />
 
             <button
@@ -226,35 +207,37 @@ watch(
 
                 <main ref="pageScrollRef" class="min-h-0 overflow-auto">
                     <div ref="pageContentRef">
-                        <Transition name="page-swap" mode="out-in">
-                            <div :key="activeMenu" class="content-flow py-3">
-                                <HomeView
-                                    v-if="activeMenu === 'home'"
-                                    :filters="filters"
-                                    :tracks="tracks"
-                                    :rows-per-page="preferences.table.rowsPerPage"
-                                    :loading="isLoading"
-                                    :event-loading="eventLoading"
-                                    :event-options="eventOptions"
-                                    :error="error"
-                                    :paused="isPaused"
-                                    :countdown-seconds="countdownSeconds"
-                                    @refresh="refreshFull"
-                                    @toggle-pause="togglePause"
-                                    @update:filters="Object.assign(filters, $event)"
-                                />
-                                <SettingsView v-else-if="activeMenu === 'settings'" v-model="preferences"/>
-                                <AboutView v-else/>
-                            </div>
-                        </Transition>
+                        <router-view v-slot="{ Component }">
+                            <Transition name="page-swap" mode="out-in">
+                                <div :key="route.path" class="content-flow py-3">
+                                    <component
+                                        :is="Component"
+                                        v-bind="
+                                            (route.name === 'home' || route.name === 'auto')
+                                            ? {
+                                                filters: filters,
+                                                tracks: tracks,
+                                                rowsPerPage: preferences.table.rowsPerPage,
+                                                loading: isLoading,
+                                                eventLoading: eventLoading,
+                                                eventOptions: eventOptions,
+                                                error: error,
+                                                paused: isPaused,
+                                                countdownSeconds: countdownSeconds
+                                            }
+                                            : (route.name === 'settings' ? { modelValue: preferences } : {})
+                                        "
+                                        @refresh="refreshFull"
+                                        @toggle-pause="togglePause"
+                                        @update:filters="Object.assign(filters, $event)"
+                                        @update:modelValue="Object.assign(preferences, $event)"
+                                    />
+                                </div>
+                            </Transition>
+                        </router-view>
                     </div>
                 </main>
             </div>
         </div>
     </div>
 </template>
-
-
-
-
-
