@@ -68,6 +68,20 @@ const zhCN = {
         loading: "加载中...",
         unitSecond: "秒",
     },
+    bonus: {
+        title: "加成控分配置",
+        targetPt: "目标 PT",
+        targetPtPlaceholder: "输入目标 PT",
+        supportPower: "副队综合力",
+        tableBonus: "加成 (%)",
+        tableScoreRange: "分数区间 (Min - Max)",
+        noResult: "在该目标下未找到可行加成方案",
+        inputPrompt: "请输入目标 PT 并点击计算",
+        theoryTitle: "原理",
+        theoryDesc: "根据活动 PT 公式，在固定加成下反推所需的 Live 分数区间。",
+        usageTitle: "使用",
+        usageDesc: "选择你当前队伍的加成，并确保结算分数落在对应的区间内即可。",
+    },
     auto: {
         server: {
             jp: "日服",

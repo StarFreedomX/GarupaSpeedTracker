@@ -1,15 +1,33 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import AboutView from "@/views/AboutView.vue";
-import AutoView from "@/views/AutoView.vue";
-import HomeView from "@/views/HomeView.vue";
-import SettingsView from "@/views/SettingsView.vue";
 
+// 统一使用动态导入 (Route-level code-splitting)
 const routes = [
-    { path: "/", redirect: "/auto" }, // 设置默认跳转到 auto
-    { path: "/home", name: "home", component: HomeView },
-    { path: "/auto", name: "auto", component: AutoView },
-    { path: "/settings", name: "settings", component: SettingsView },
-    { path: "/about", name: "about", component: AboutView },
+    { path: "/", redirect: "/auto" },
+    {
+        path: "/home",
+        name: "home",
+        component: () => import("@/views/HomeView.vue"),
+    },
+    {
+        path: "/auto",
+        name: "auto",
+        component: () => import("@/views/AutoView.vue"),
+    },
+    {
+        path: "/bonus",
+        name: "bonus",
+        component: () => import("@/views/BonusView.vue"),
+    },
+    {
+        path: "/settings",
+        name: "settings",
+        component: () => import("@/views/SettingsView.vue"),
+    },
+    {
+        path: "/about",
+        name: "about",
+        component: () => import("@/views/AboutView.vue"),
+    },
 ];
 
 const router = createRouter({

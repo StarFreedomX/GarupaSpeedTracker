@@ -89,6 +89,20 @@ const enUS = {
         loading: "Loading...",
         unitSecond: "s",
     },
+    bonus: {
+        title: "Bonus Scoring Config",
+        targetPt: "Target PT",
+        targetPtPlaceholder: "Enter target PT",
+        supportPower: "Support Power",
+        tableBonus: "Bonus (%)",
+        tableScoreRange: "Score Range (Min - Max)",
+        noResult: "No feasible bonus scheme found for this target",
+        inputPrompt: "Please enter target PT and click calculate",
+        theoryTitle: "Theory",
+        theoryDesc: "Calculates the required Live score range based on the PT formula and a fixed bonus.",
+        usageTitle: "Usage",
+        usageDesc: "Select your current team bonus and ensure your live score falls within the corresponding range.",
+    },
     auto: {
         server: {
             jp: "JP",

@@ -19,6 +19,7 @@ const route = useRoute();
 const menuItems = computed(() => [
     { key: "home", label: t("menu.home") },
     { key: "auto", label: t("menu.auto") },
+    { key: "bonus", label: "加成控分表" },
     { key: "settings", label: t("menu.settings") },
     { key: "about", label: t("menu.about") },
 ]);

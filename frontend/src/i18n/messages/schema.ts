@@ -66,6 +66,21 @@ export interface I18nMessages {
         loading: string;
         unitSecond: string;
     };
+    // 在 I18nMessages 中添加或确认以下内容
+    bonus: {
+        title: string;
+        targetPt: string;
+        targetPtPlaceholder: string;
+        supportPower: string;
+        tableBonus: string;
+        tableScoreRange: string;
+        noResult: string;
+        inputPrompt: string;
+        theoryTitle: string;
+        theoryDesc: string;
+        usageTitle: string;
+        usageDesc: string;
+    };
     auto: {
         server: {
             jp: string;

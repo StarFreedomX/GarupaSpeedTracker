@@ -1,5 +1,5 @@
 // 定义各活动类型的参数类型
-interface MissionParams {
+export interface MissionParams {
     type: "mission";
     supportBandPower: number;
     // 百分比，如175表示175%加成
@@ -251,7 +251,7 @@ function getMaxScoreByPT(targetPT: number, params: MissionParams | TryParams | C
 /**
  * 可行的加成值结果
  */
-interface FeasibleBonusResult {
+export interface FeasibleBonusResult {
     bonus: number; // 加成值（百分比整数，如175表示175%）
     scoreRange: {
         min: number;
@@ -259,16 +259,15 @@ interface FeasibleBonusResult {
     };
 }
 
+export type BonusParams = Omit<MissionParams, "eventBonus"> | Omit<TryParams, "eventBonus"> | Omit<ChallengeParams, "eventBonus">;
+
 /**
  * 通用：根据目标PT反推所有可行的加成值（仅支持有加成的活动类型）
  * @param targetPT 目标活动PT
  * @param params 活动参数（不包含eventBonus）
  * @returns 所有可行的加成值列表
  */
-function getFeasibleBonus(
-    targetPT: number,
-    params: Omit<MissionParams, "eventBonus"> | Omit<TryParams, "eventBonus"> | Omit<ChallengeParams, "eventBonus">,
-): FeasibleBonusResult[] {
+function getFeasibleBonus(targetPT: number, params: BonusParams): FeasibleBonusResult[] {
     // 获取活动配置
     let base: number;
     let divisor: number;
@@ -301,7 +300,11 @@ function getFeasibleBonus(
 
     // 从最大的 baseBeforeBonus 往下找（分数越高，需要的加成越低）
     // scoreDiv = baseBeforeBonus - base
+    let iterations = 0;
+    const MAX_ITERATIONS = 100000;
     for (let scoreDiv = Math.max(0, maxBaseBeforeBonus - base); scoreDiv >= 0; scoreDiv--) {
+        iterations++;
+        if (iterations > MAX_ITERATIONS) break;
         const baseBeforeBonus = base + scoreDiv;
 
         // 如果 baseBeforeBonus 太大，即使 bonus=0 也会超过目标PT
