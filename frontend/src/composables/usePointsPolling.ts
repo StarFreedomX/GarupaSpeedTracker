@@ -23,6 +23,7 @@ export const usePointsPolling = (filters: () => QueryPreferences, enabled: () =>
     const nextRefreshAt = ref<number | null>(null);
     let boundaryTimer: number | undefined;
     let countdownTimer: number | undefined;
+    let currentRequestId = 0;
 
     const reset = () => {
         tracks.value = [];
@@ -33,6 +34,8 @@ export const usePointsPolling = (filters: () => QueryPreferences, enabled: () =>
         if (!enabled()) {
             return;
         }
+
+        const requestId = ++currentRequestId;
 
         isLoading.value = true;
         error.value = "";
@@ -49,6 +52,10 @@ export const usePointsPolling = (filters: () => QueryPreferences, enabled: () =>
 
         try {
             const incoming = await fetchPoints(query);
+            if (requestId !== currentRequestId) {
+                console.log("丢弃过时的请求结果:", query.event);
+                return;
+            }
             tracks.value = fullRefresh ? incoming : mergeTracks(tracks.value, incoming);
             hasBooted.value = true;
             lastUpdated.value = Date.now();

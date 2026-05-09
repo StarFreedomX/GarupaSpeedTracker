@@ -48,7 +48,7 @@ const eventBootstrapToken = ref(0);
 const handleMenuSelect = (key: string) => {
     router.push({ name: key });
 };
-
+/*
 const readEventIdFromUrl = (): number | undefined => {
     const raw = new URLSearchParams(window.location.search).get("event");
     if (raw === null) return undefined;
@@ -68,8 +68,9 @@ const replaceEventInUrl = (eventId: number): void => {
 };
 
 const initialUrlEventId = readEventIdFromUrl();
+*/
 
-const bootstrapEventOptions = async (preferUrlEvent: boolean): Promise<void> => {
+const bootstrapEventOptions = async (_preferUrlEvent: boolean): Promise<void> => {
     const token = eventBootstrapToken.value + 1;
     eventBootstrapToken.value = token;
     eventLoading.value = true;
@@ -83,11 +84,17 @@ const bootstrapEventOptions = async (preferUrlEvent: boolean): Promise<void> => 
         const options = buildEventOptions(payload, filters.server, now);
         eventOptions.value = options;
 
-        const selectedEventId = selectBestEventId(options, now, preferUrlEvent ? initialUrlEventId : undefined) ?? filters.event;
-        if (selectedEventId !== filters.event) {
-            filters.event = selectedEventId;
+        // 检查当前 filters.event 是否还在当前服务器的可选列表中
+        const isCurrentEventValid = options.some((opt) => opt.eventId === filters.event);
+
+        // 如果当前没有选活动，或者之前选的活动在当前服务器列表中找不到了（比如换了服务器）
+        // 才自动计算并切换到“最佳/最新”活动
+        if (!filters.event || !isCurrentEventValid) {
+            const bestId = selectBestEventId(options, now);
+            if (bestId) {
+                filters.event = bestId;
+            }
         }
-        replaceEventInUrl(selectedEventId);
     } catch {
         if (token === eventBootstrapToken.value) eventOptions.value = [];
     } finally {
@@ -102,11 +109,11 @@ const bootstrapEventOptions = async (preferUrlEvent: boolean): Promise<void> => 
 watch(
     () => filters.server,
     () => {
-        void bootstrapEventOptions(!hasResolvedInitialEvent.value && initialUrlEventId !== undefined);
+        // 移除 URL 优先级的判断
+        void bootstrapEventOptions(false);
     },
     { immediate: true },
 );
-
 watch(
     () => preferences.theme,
     (next) => applyTheme(next),
@@ -118,14 +125,14 @@ watch(
     { deep: true, immediate: true },
 );
 watch(preferences, () => persist(), { deep: true });
-
+/*
 watch(
     () => filters.event,
     (next, previous) => {
         if (!eventReady.value || next === previous) return;
         replaceEventInUrl(next);
     },
-);
+);*/
 
 const { tracks, statusText, isPaused, countdownSeconds, isLoading, error, lastUpdated, refreshFull } = usePointsPolling(
     () => filters,
