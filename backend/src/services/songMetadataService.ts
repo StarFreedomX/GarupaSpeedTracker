@@ -138,13 +138,18 @@ export class BestdoriSongMetadataService {
     private async loadState(): Promise<void> {
         if (this.state) return;
         const dataset = await readJson<PersistedDataset>(this.metadataPath);
-        if (dataset) {
+        if (dataset?.chartMeta && dataset.checkedAt) {
             this.state = {
                 chartMeta: dataset.chartMeta,
                 sourceHash: dataset.sourceHash,
                 checkedAt: dataset.checkedAt,
                 chartCount: dataset.chartCount,
             };
+        } else {
+            if (dataset) {
+                logger("bestdori", `detected corrupted metadata file at ${this.metadataPath}, re-generating...`);
+            }
+            this.state = undefined;
         }
     }
 
@@ -210,7 +215,6 @@ export class BestdoriSongMetadataService {
         this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
         await this.persistState();
         logger("bestdori", `song summary updated: songs=${songIds.length}, charts=${chartCount}, raw=${this.rawChartStorage ? "on" : "off"}`);
-        await writeJson(this.metadataPath, chartMeta);
         return chartMeta;
     }
 
