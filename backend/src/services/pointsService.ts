@@ -1,23 +1,15 @@
-import { BESTDORI_API, MIN_POINTS_UPDATE_TIME } from "@/config";
+import { fetchBestdoriTopPoints } from "@/api/bestdori";
+import { MIN_POINTS_UPDATE_TIME } from "@/config";
 import { logger } from "@/logger";
 import { BestdoriPointsParser } from "@/parsers/BestdoriPointsParser";
 import { downloader } from "@/storage/downloader";
-import type { BestdoriTopPointsRaw, PointsQueryParams, PointsTrackResponse } from "@/types/bestdori";
+import type { PointsQueryParams, PointsTrackResponse } from "@/types/bestdori";
 import { toMs } from "@/utils";
 
 const parser = new BestdoriPointsParser();
 
-const buildTopPointsUrl = (params: Pick<PointsQueryParams, "server" | "eventId" | "interval">): string =>
-    `${BESTDORI_API}eventtop/data?${new URLSearchParams({
-        server: String(params.server),
-        event: String(params.eventId),
-        mid: "0",
-        interval: String(params.interval),
-    }).toString()}`;
-
 export const getPointTrack = async (params: PointsQueryParams): Promise<PointsTrackResponse> => {
-    const url = buildTopPointsUrl(params);
-    const payload = await downloader.downloadCache<BestdoriTopPointsRaw>(url, {
+    const payload = await fetchBestdoriTopPoints(params, {
         getExpireAt: (body) => {
             const maxTimestamp = parser.getMaxTimestamp(body);
             if (maxTimestamp === 0) {

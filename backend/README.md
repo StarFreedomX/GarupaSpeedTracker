@@ -34,16 +34,53 @@ pnpm start
 ```
 
 ## 后端环境变量说明
-| 变量名                      | 默认值                                    | 作用                              |
-|--------------------------|----------------------------------------|---------------------------------|
-| `HOST`                   | `127.0.0.1`（本地）<br/> `0.0.0.0`（Docker） | 后端监听地址                          |
-| `PORT`                   | `5519`                                 | 后端监听端口                          |
-| `API_PREFIX`             | `/api`                                 | 后端 API 路由前缀                     |
-| `BESTDORI_API`           | `https://bestdori.com/api/`            | Bestdori 上游地址                   |
-| `MIN_POINTS_UPDATE_TIME` | `45`                                   | 最短更新间隔（秒）                       |
-| `BESTDORI_TIMEOUT_MS`    | `10000`                                | 上游请求超时（毫秒）                      |
-| `ENABLE_CORS`            | `false`                                | 是否启用 CORS 响应头和 `OPTIONS` 预检处理   |
-| `APP_PROXY`              | `false`                                | 是否信任反向代理头，适用于部署在反代后面时获取真实客户端 IP |
+| 变量名                                               | 默认值                                    | 作用                                    |
+|---------------------------------------------------|----------------------------------------|---------------------------------------|
+| `HOST`                                            | `127.0.0.1`（本地）<br/> `0.0.0.0`（Docker） | 后端监听地址                                |
+| `PORT`                                            | `5519`                                 | 后端监听端口                                |
+| `API_PREFIX`                                      | `/api`                                 | 后端 API 路由前缀                           |
+| `BESTDORI_API`                                    | `https://bestdori.com/api/`            | Bestdori 上游地址                         |
+| `MIN_POINTS_UPDATE_TIME`                          | `45`                                   | 最短更新间隔（秒）                             |
+| `BESTDORI_TIMEOUT_MS`                             | `10000`                                | 上游请求超时（毫秒）                            |
+| `MEMORY_CACHE_MAX_ENTRIES`                        | `24`                                   | 内存缓存最大条目数                             |
+| `MEMORY_CACHE_MAX_BYTES`                          | `268435456`                            | 内存缓存最大字节数                             |
+| `DISK_CACHE_MAX_BYTES`                            | `1073741824`                           | 磁盘缓存最大字节数                             |
+| `DISK_CACHE_CLEANUP_INTERVAL_MS`                  | `300000`                               | 磁盘缓存清理周期（毫秒）                          |
+| `BESTDORI_SONGS_CHECK_INTERVAL_MS`                | `86400000`                             | Bestdori 歌曲列表检查周期（毫秒）                 |
+| `BESTDORI_STORE_RAW_CHARTS`                       | `false`                                | 是否保存原始谱面数据                            |
+| `DEFAULT_INTERVAL`                                | `30000`                                | 默认刷新间隔（毫秒）                            |
+| `ENABLE_CORS`                                     | `false`                                | 是否启用 CORS 响应头和 `OPTIONS` 预检处理         |
+| `APP_PROXY`                                       | `false`                                | 是否信任反向代理头，用于获取真实客户端 IP                |
+| `GARUPA_SERVER_BASES`                             | `api.garupa.jp,-,-,-`                  | Garupa 服务器基址列表（逗号分隔）                  |
+| `GARUPA_UIDS`                                     | `-,-,-,-`                              | 各服务器用户 UID（逗号分隔）                      |
+| `GARUPA_UUIDS`                                    | `-,-,-,-`                              | 各服务器 UUID（逗号分隔）                       |
+| `GARUPA_CLIENT_VERSIONS`                          | `10.1.1,-,-,-`                         | 客户端版本列表（逗号分隔）                         |
+| `GARUPA_CLIENT_VERSION`                           | 同上                                     | 单值回退配置（被 `GARUPA_CLIENT_VERSIONS` 覆盖） |
+| `GARUPA_UNITY_VERSIONS`                           | `2021.3.45f2`                          | Unity 版本列表（逗号分隔）                      |
+| `GARUPA_UNITY_VERSION`                            | 同上                                     | 单值回退配置                                |
+| `GARUPA_USER_AGENTS`                              | `UnityPlayer/...,-,-,-`                | User-Agent 列表（逗号分隔）                   |
+| `GARUPA_USER_AGENT`                               | 同上                                     | 单值回退配置                                |
+| `GARUPA_CLIENT_PLATFORMS`                         | `Android,-,-,-`                        | 客户端平台列表（逗号分隔）                         |
+| `GARUPA_CLIENT_PLATFORM`                          | 同上                                     | 单值回退配置                                |
+| `GARUPA_ENCRYPTION_KEYS`                          | `-,-,-,-`                              | AES Key 列表（16 字节）                     |
+| `GARUPA_ENCRYPTION_KEY`                           | 同上                                     | 单值回退配置                                |
+| `GARUPA_ENCRYPTION_IVS`                           | `-,-,-,-`                              | AES IV 列表（16 字节）                      |
+| `GARUPA_ENCRYPTION_IV`                            | 同上                                     | 单值回退配置                                |
+| `GARUPA_REFRESH_INTERVAL_SECONDS`                 | `60`                                   | Garupa 轮询基础间隔（秒）                      |
+| `GARUPA_REFRESH_AT_SECOND`                        | `0`                                    | Garupa 轮询触发秒（0-59）                    |
+| `GARUPA_PACKAGE_URLS`                             | `itunes...`                            | 自动获取客户端版本的包查询地址列表                     |
+| `MONTHLY_RANKING_VERSION_CHECK_TIMEOUT_MS`        | `2000`                                 | 客户端版本检查超时（毫秒）                         |
+| `MONTHLY_RANKING_STATUS_UNAVAILABILITY_THRESHOLD` | `3`                                    | 服务器不可用判定阈值                            |
+| `MONTHLY_RANKING_STATUS_POLL_INTERVAL_MS`         | `5000`                                 | 服务器可用性轮询间隔（毫秒）                        |
+| `MONTHLY_RANKING_INFO_POLL_INTERVAL_MS`           | `3600000`                              | 月榜信息轮询间隔（毫秒）                          |
+| `MONGODB_URI`                                     | `mongodb://127.0.0.1:27017`            | MongoDB 连接地址                          |
+| `MONGODB_DB`                                      | `garupa`                               | MongoDB 数据库名                          |
+| `MONGODB_CONNECTION_TIMEOUT_MS`                   | `10000`                                | MongoDB 连接超时（毫秒）                      |
+| `MONGODB_RECONNECT_INTERVAL_MS`                   | `5000`                                 | MongoDB 重连间隔（毫秒）                      |
+| `MONGODB_GARUPA_META_COLLECTION`                  | `GarupaMeta`                           | Garupa 元信息集合                          |
+| `MONGODB_MONTHLY_TOP_POINTS_COLLECTION`           | `monthly_top_points`                   | 月榜 Top 数据集合                           |
+| `MONGODB_MONTHLY_BORDER_POINTS_COLLECTION`        | `monthly_border_points`                | 月榜档线数据集合                              |
+| `MONGODB_MONTHLY_INFO_COLLECTION`                 | `monthly_ranking_info`                 | 月榜信息集合                                |
 
 ## 监听地址
 
@@ -83,9 +120,3 @@ pnpm start
   }
 ]
 ```
-
-
-
-
-
-

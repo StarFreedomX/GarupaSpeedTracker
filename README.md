@@ -35,6 +35,21 @@ services:
         image: ghcr.io/starfreedomx/garupa-speed-tracker-backend:latest
         container_name: garupa-speed-backend
         restart: always
+        environment:
+            - MONGODB_URI=mongodb://grp-speed-mongodb:27017
+            - MONGODB_DB=garupa
+        depends_on:
+            - grp-speed-mongodb
+
+    # MongoDB
+    grp-speed-mongodb:
+        image: mongo:7
+        container_name: garupa-speed-mongodb
+        restart: always
+        ports:
+            - "27017:27017"
+        volumes:
+            - mongo-data:/data/db
 
     # 前端服务
     grp-speed-frontend:
@@ -45,6 +60,10 @@ services:
             - "5913:5913"
         depends_on:
             - grp-speed-backend
+            - grp-speed-mongodb
+
+volumes:
+    mongo-data:
 ```
 
 启动
@@ -68,6 +87,8 @@ grp-speed-backend:
         - BESTDORI_TIMEOUT_MS=10000
         - ENABLE_CORS=false
         - APP_PROXY=false
+        - MONGODB_URI=mongodb://grp-speed-mongodb:27017
+        - MONGODB_DB=garupa
 grp-speed-frontend:
     # ......
     environment:

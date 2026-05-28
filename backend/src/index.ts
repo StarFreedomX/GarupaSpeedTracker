@@ -1,7 +1,7 @@
 import { createApp } from "@/app";
 import { HOST, PORT } from "@/config";
 import { logger } from "@/logger";
-import { songMetadataService } from "@/services";
+import { monthlyRankingInfoService, monthlyRankingService, songMetadataService } from "@/services";
 
 logger("mainAPI", "initializing...");
 
@@ -11,6 +11,9 @@ void songMetadataService.getSongMetadata().catch((error: unknown) => {
     const nodeError = error as { message?: string };
     logger("mainAPI", `song summary warmup failed: ${nodeError.message ?? "unknown error"}`);
 });
+
+monthlyRankingInfoService.start();
+monthlyRankingService.start();
 
 app.listen(PORT, HOST, () => {
     logger("mainAPI", `listening on ${HOST}:${PORT}`);

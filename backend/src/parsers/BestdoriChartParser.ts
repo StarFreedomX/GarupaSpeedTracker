@@ -1,5 +1,5 @@
 import type { Chart, ChartItem, ConnectionNote } from "@/types/bestdori/chart";
-import type { SkillDuration, SongLevelSummary, SongSummary } from "@/types/songMetadata";
+import type { SkillDuration, SongLevelSummary } from "@/types/songMetadata";
 
 const SKILL_DURATIONS = ["3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0"] as const satisfies readonly SkillDuration[];
 const DEFAULT_BPM = 120;
@@ -164,9 +164,8 @@ export class BestdoriChartParser {
         }
 
         if (item.type === "Long" || item.type === "Slide") {
-            // connection points may carry skill flag on the point itself
             const points = (item as ConnectionNote).connections || [];
-            return points.filter((p) => (p as any).skill).map((p) => ({ beat: p.beat, seconds: this.beatToSeconds(p.beat, timeline) }));
+            return points.filter((p) => p.skill).map((p) => ({ beat: p.beat, seconds: this.beatToSeconds(p.beat, timeline) }));
         }
 
         return [];
@@ -190,7 +189,7 @@ export class BestdoriChartParser {
         // Exclude hidden connection points and also exclude connection points that are skill triggers
         // (they should be reported via extractSkillEvents instead of being considered normal notes).
         return item.connections
-            .filter((point) => !point.hidden && !(point as any).skill)
+            .filter((point) => !point.hidden && !point.skill)
             .map((point) => ({ beat: point.beat, seconds: this.beatToSeconds(point.beat, timeline) }));
     }
 }

@@ -17,6 +17,18 @@ const toBoolean = (value: string | undefined, fallback: boolean): boolean => {
     return normalized === "true" || normalized === "1";
 };
 
+const toList = (value: string | undefined, fallback: string[]): string[] => {
+    if (!value) {
+        return fallback;
+    }
+
+    const entries = value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    return entries.length > 0 ? entries : fallback;
+};
+
 export const BESTDORI_API = process.env.BESTDORI_API ?? "https://bestdori.com/api/";
 
 export const HOST = process.env.HOST ?? "127.0.0.1";
@@ -42,3 +54,46 @@ export const DEFAULT_INTERVAL = 30_000;
 
 export const ENABLE_CORS = toBoolean(process.env.ENABLE_CORS, false);
 export const APP_PROXY = toBoolean(process.env.APP_PROXY, false);
+
+export const GARUPA_SERVER_BASES = toList(process.env.GARUPA_SERVER_BASES, ["api.garupa.jp", "-", "-", "-"]);
+export const GARUPA_UIDS = toList(process.env.GARUPA_UIDS, ["-", "-", "-", "-"]);
+export const GARUPA_UUIDS = toList(process.env.GARUPA_UUIDS, ["-", "-", "-", "-"]);
+export const GARUPA_CLIENT_VERSIONS = toList(process.env.GARUPA_CLIENT_VERSIONS ?? process.env.GARUPA_CLIENT_VERSION, ["10.1.1", "-", "-", "-"]);
+export const GARUPA_UNITY_VERSIONS = toList(process.env.GARUPA_UNITY_VERSIONS ?? process.env.GARUPA_UNITY_VERSION, ["2021.3.45f2"]);
+export const GARUPA_USER_AGENTS = toList(process.env.GARUPA_USER_AGENTS ?? process.env.GARUPA_USER_AGENT, [
+    "UnityPlayer/2021.3.45f2 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
+    "-",
+    "-",
+    "-",
+]);
+export const GARUPA_CLIENT_PLATFORMS = toList(process.env.GARUPA_CLIENT_PLATFORMS ?? process.env.GARUPA_CLIENT_PLATFORM, ["Android", "-", "-", "-"]);
+export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS ?? process.env.GARUPA_ENCRYPTION_KEY, ["-", "-", "-", "-"]);
+export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ?? process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
+export const GARUPA_REFRESH_INTERVAL_SECONDS = toNumber(process.env.GARUPA_REFRESH_INTERVAL_SECONDS, 60);
+export const GARUPA_REFRESH_AT_SECOND = toNumber(process.env.GARUPA_REFRESH_AT_SECOND, 0);
+
+// Package lookup URLs per server (used to auto-detect client version)
+export const GARUPA_PACKAGE_URLS = toList(process.env.GARUPA_PACKAGE_URLS, [
+    "https://itunes.apple.com/jp/lookup?bundleId=jp.co.craftegg.band",
+    "https://itunes.apple.com/us/lookup?bundleId=com.bushiroad.en.bangdreamgbp",
+    "https://itunes.apple.com/tw/lookup?bundleId=net.gamon.bdTW",
+    "https://itunes.apple.com/cn/lookup?bundleId=com.bilibili.star",
+]);
+
+// Auto-update game client version (triggered on startup and recovery only)
+export const GARUPA_VERSION_CHECK_TIMEOUT_MS = toNumber(process.env.MONTHLY_RANKING_VERSION_CHECK_TIMEOUT_MS, 2000);
+
+// Status/unavailability handling
+export const GARUPA_STATUS_UNAVAILABILITY_THRESHOLD = toNumber(process.env.MONTHLY_RANKING_STATUS_UNAVAILABILITY_THRESHOLD, 3);
+export const GARUPA_STATUS_POLL_INTERVAL_MS = toNumber(process.env.MONTHLY_RANKING_STATUS_POLL_INTERVAL_MS, 5_000);
+
+export const MONTHLY_RANKING_INFO_POLL_INTERVAL_MS = toNumber(process.env.MONTHLY_RANKING_INFO_POLL_INTERVAL_MS, 60 * 60 * 1000);
+
+export const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
+export const MONGODB_DB = process.env.MONGODB_DB ?? "garupa";
+export const MONGODB_CONNECTION_TIMEOUT_MS = toNumber(process.env.MONGODB_CONNECTION_TIMEOUT_MS, 10_000);
+export const MONGODB_RECONNECT_INTERVAL_MS = toNumber(process.env.MONGODB_RECONNECT_INTERVAL_MS, 5_000);
+export const MONGODB_GARUPA_META_COLLECTION = process.env.MONGODB_GARUPA_META_COLLECTION ?? "GarupaMeta";
+export const MONGODB_MONTHLY_TOP_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_TOP_POINTS_COLLECTION ?? "monthly_top_points";
+export const MONGODB_MONTHLY_BORDER_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_BORDER_POINTS_COLLECTION ?? "monthly_border_points";
+export const MONGODB_MONTHLY_INFO_COLLECTION = process.env.MONGODB_MONTHLY_INFO_COLLECTION ?? "monthly_ranking_info";

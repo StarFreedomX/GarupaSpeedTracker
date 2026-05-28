@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import fs from "fs-extra";
 import pLimit from "p-limit";
-import { BESTDORI_API, BESTDORI_SONGS_CHECK_INTERVAL_MS, BESTDORI_STORE_RAW_CHARTS } from "@/config";
+import { fetchBestdoriChart, fetchBestdoriSongs } from "@/api/bestdori";
+import { BESTDORI_SONGS_CHECK_INTERVAL_MS, BESTDORI_STORE_RAW_CHARTS } from "@/config";
 import { logger } from "@/logger";
 import { BestdoriChartParser } from "@/parsers/BestdoriChartParser";
 import { BestdoriSongLevelParser } from "@/parsers/BestdoriSongLevelParser";
@@ -48,9 +49,6 @@ const DIFFICULTY_ORDER: ReadonlyArray<{ key: DifficultyKey; name: string }> = [
     { key: "3", name: "expert" },
     { key: "4", name: "special" },
 ];
-
-const buildSongsUrl = (): string => `${BESTDORI_API}songs/all.5.json`;
-const buildChartUrl = (songId: number, difficultyName: string): string => `${BESTDORI_API}charts/${songId}/${difficultyName}.json`;
 
 const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
     tag: music.tag,
@@ -169,10 +167,13 @@ export class BestdoriSongMetadataService {
         await fs.ensureDir(this.dataDir);
         logger("bestdori", "checking Bestdori song summary source...");
 
-        const musicData = await this.downloader.downloadCache<MusicDataResponse>(buildSongsUrl(), {
-            getExpireAt: () => Date.now() + Math.max(this.checkIntervalMs, 0),
-            fallbackTtlMs: Math.max(this.checkIntervalMs, 0),
-        });
+        const musicData = await fetchBestdoriSongs(
+            {
+                getExpireAt: () => Date.now() + Math.max(this.checkIntervalMs, 0),
+                fallbackTtlMs: Math.max(this.checkIntervalMs, 0),
+            },
+            this.downloader,
+        );
         const sourceHash = hashSongs(musicData);
         const now = Date.now();
 
@@ -229,7 +230,7 @@ export class BestdoriSongMetadataService {
 
             let chart: Chart;
             try {
-                chart = await this.downloader.download<Chart>(buildChartUrl(songId, definition.name));
+                chart = await fetchBestdoriChart(songId, definition.name, this.downloader);
             } catch (error: unknown) {
                 const nodeError = error as { message?: string };
                 logger("bestdori", `chart fetch failed song=${songId} difficulty=${definition.name}: ${nodeError.message ?? "unknown error"}`);
