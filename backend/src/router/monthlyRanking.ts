@@ -4,13 +4,13 @@ import { monthlyRankingInfoService } from "@/services/monthlyRankingInfoService"
 import { getCurrentMonthlyId, getMonthlyRankingServerCount, isMonthlyRankingBorderTier, monthlyRankingService } from "@/services/monthlyRankingService";
 export const monthlyRankingRouter = new Router();
 
-monthlyRankingRouter.get("/monthlyRanking/info", async (ctx) => {
+monthlyRankingRouter.get(["/monthlyRanking/info", "/monthlyRanking/info.json"], async (ctx) => {
     const result = await monthlyRankingInfoService.getMonthlyRankingInfoList();
     ctx.status = 200;
     ctx.body = result;
 });
 
-monthlyRankingRouter.get("/monthlyRanking/top", async (ctx) => {
+monthlyRankingRouter.get(["/monthlyRanking/top", "/monthlyRanking/top.json"], async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const monthlyId = queryToOptionalNumber(ctx.query.monthlyId);
 
@@ -39,7 +39,7 @@ monthlyRankingRouter.get("/monthlyRanking/top", async (ctx) => {
     ctx.body = result;
 });
 
-monthlyRankingRouter.get("/monthlyRanking/border", async (ctx) => {
+monthlyRankingRouter.get(["/monthlyRanking/border", "/monthlyRanking/border.json"], async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const monthlyId = queryToOptionalNumber(ctx.query.monthlyId);
     const tier = queryToNumber(ctx.query.tier);
