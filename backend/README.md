@@ -92,6 +92,13 @@ pnpm start
 
 更多请求/响应结构和错误示例请查看 `API.md`。
 
+月榜相关接口概览：
+
+- `GET /api/monthlyRanking/info.json`：获取所有月榜期次的基础信息列表
+- `GET /api/monthlyRanking/info.{monthlyRankingId}.json`：获取单一期次月榜的详细信息
+- `GET /api/monthlyRanking/topPoints`：获取月榜 Top 追踪数据
+- `GET /api/monthlyRanking/border`：获取月榜档线数据
+
 快速查询示例：
 
 `GET /api/events`

@@ -10,6 +10,30 @@ monthlyRankingRouter.get(["/monthlyRanking/info", "/monthlyRanking/info.json"], 
     ctx.body = result;
 });
 
+monthlyRankingRouter.get("/monthlyRanking/info.:monthlyRankingId.json", async (ctx) => {
+    const monthlyRankingId = queryToNumber(ctx.params.monthlyRankingId);
+
+    ctx.verifyParams(
+        {
+            monthlyRankingId: { type: "int", required: true, min: 1 },
+        },
+        { monthlyRankingId },
+    );
+
+    const result = await monthlyRankingInfoService.getMonthlyRankingDetail(monthlyRankingId);
+    if (!result) {
+        ctx.status = 404;
+        ctx.body = {
+            status: 404,
+            message: `Monthly ranking detail not found: ${monthlyRankingId}`,
+        };
+        return;
+    }
+
+    ctx.status = 200;
+    ctx.body = result;
+});
+
 monthlyRankingRouter.get(["/monthlyRanking/top", "/monthlyRanking/top.json"], async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const monthlyId = queryToOptionalNumber(ctx.query.monthlyId);

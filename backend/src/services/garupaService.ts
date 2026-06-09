@@ -83,7 +83,7 @@ class GarupaService {
         this.start();
         await this.initializeClientVersions();
         const timeoutMs = options?.timeoutMs ?? 2000;
-        const status = await this.assessServerStatus(server, timeoutMs);
+        let status = await this.assessServerStatus(server, timeoutMs);
         if (status.disabled) {
             logger("garupaService", `skipping request for server=${server} due to repeated unavailability (${status.unavailabilityCount})`);
             return undefined;
@@ -92,6 +92,16 @@ class GarupaService {
         try {
             return await action();
         } catch (error) {
+            const errorMsg = String(error);
+
+            if (errorMsg.includes("426") || errorMsg.toLowerCase().includes("update_required")) {
+                logger(
+                    "garupaService",
+                    `[HTTP 426 Bypass] Server claims available, but business API rejected. Force refreshing version for server=${server}...`,
+                );
+                await this.refreshClientVersion(server, "business_426_fallback");
+            }
+            status = await this.assessServerStatus(server, timeoutMs);
             if (!status.available || status.thresholdReached || this.disabledServers.has(server)) {
                 await this.waitUntilAvailableWithLogging(server, timeoutMs);
                 return await action();
@@ -274,7 +284,13 @@ class GarupaService {
                 const tid = setTimeout(() => controller.abort(), getGarupaVersionCheckTimeoutMs());
                 let res: Response;
                 try {
-                    res = await fetch(url, { signal: controller.signal });
+                    res = await fetch(url, {
+                        signal: controller.signal,
+                        headers: {
+                            "User-Agent":
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+                        },
+                    });
                 } finally {
                     clearTimeout(tid);
                 }

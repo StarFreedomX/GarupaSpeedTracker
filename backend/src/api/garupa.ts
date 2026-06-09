@@ -195,6 +195,8 @@ export const checkGarupaGameStatus = async (server: number, clientVersion: strin
     try {
         const res = await fetch(url, { headers, signal: controller.signal });
         return res.ok;
+    } catch (_e) {
+        return false;
     } finally {
         clearTimeout(tid);
     }

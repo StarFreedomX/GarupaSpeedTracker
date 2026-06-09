@@ -5,6 +5,7 @@
 - [Base](#base)
 - [GET `/api/topPoints`](#get-apitoppoints)
 - [GET `/api/events`](#get-apievents)
+- [GET `/api/monthlyRanking/info.{monthlyRankingId}.json`](#get-apimonthlyrankinginfomonthlyrankingidjson)
 - [GET `/api/songMetadata.json`](#get-apisongmetadatajson)
 
 ## Base
@@ -118,6 +119,165 @@ https://bestdori.com/api/eventtop/data?server={server}&event={event}&mid=0&inter
   "message": "Route Not Found: GET /api/xxx"
 }
 ```
+
+## GET `/api/monthlyRanking/info.{monthlyRankingId}.json`
+
+Return the detailed metadata for a single monthly ranking period.
+
+This endpoint reuses the same cached monthly ranking information used by `/api/monthlyRanking/info.json`; it does not trigger an extra upstream fetch. The stored document contains the full detail payload, and the simpler info fields are derived from it.
+
+### Query Parameters
+
+- `monthlyRankingId` (`number`, required, integer, `>= 1`)
+
+Example:
+
+```http
+GET /api/monthlyRanking/info.21.json
+```
+
+### Success Response `200`
+
+```json
+{
+  "monthlyRankingId": 21,
+  "monthlyRankingName": [
+    "2026年6月度 月間ランキング",
+    null,
+    null,
+    null,
+    null
+  ],
+  "assetBundleName": "monthly_ranking_202606",
+  "bgmFileName": "bgm_monthly_202606",
+  "startAt": [
+    1780293600000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "endAt": [
+    1782831599000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "enableFlag": [
+    true,
+    null,
+    null,
+    null,
+    null
+  ],
+  "publicStartAt": [
+    1780293600000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "publicEndAt": [
+    1782885599000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "distributionStartAt": [
+    1782874800000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "distributionEndAt": [
+    1784084400000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "aggregateEndAt": [
+    1782833399000,
+    null,
+    null,
+    null,
+    null
+  ],
+  "receptionEndAt": [
+    1782832199000,
+    null,
+    null,
+    null,
+    null
+  ],
+    "rewards": [
+        [
+            {
+                "id": 1181,
+                "monthlyRankingId": 21,
+                "fromRank": 1,
+                "toRank": 1,
+                "rewardType": "degree",
+                "rewardId": 9696,
+                "rewardQuantity": 1
+            }
+        ],
+        null, null, null],
+    "grades": [
+        [
+            {
+                "id": 189,
+                "monthlyRankingId": 21,
+                "gradeAheadType": "GOLD_TO_PLATINUM",
+                "pt": 5000,
+                "rewardType": "limit_break_item",
+                "rewardId": 2,
+                "rewardQuantity": 1,
+                "rankingThresholdFlg": false
+            }
+        ],
+        null, null, null]
+}
+```
+
+### Response Contract
+
+- Returns one monthly ranking detail record keyed by the requested `monthlyRankingId`.
+- The response includes the full stored detail payload, not the list-style summary.
+- If the requested ID is not present in the local cache, the endpoint returns `404`.
+
+### Error Responses
+
+#### `422` Validation Failed
+
+```json
+{
+  "status": 422,
+  "message": "Validation Failed",
+  "details": [
+    {
+      "message": "should bigger than 1",
+      "code": "invalid",
+      "field": "monthlyRankingId"
+    }
+  ]
+}
+```
+
+#### `404` Monthly Ranking Not Found
+
+```json
+{
+  "status": 404,
+  "message": "Monthly ranking detail not found: 123"
+}
+```
+
+
+
 
 
 ## GET `/api/events`

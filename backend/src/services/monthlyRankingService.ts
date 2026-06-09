@@ -88,40 +88,25 @@ class MonthlyRankingService {
         await garupaService.runWithAvailability(
             server,
             async () => {
+                const currentVersion = getClientVersion(server);
+
                 try {
-                    const raw = await fetchMonthlyRanking(server, monthlyId, getClientVersion(server));
+                    const raw = await fetchMonthlyRanking(server, monthlyId, currentVersion);
                     const timestamp = Date.now();
                     await this.persistTopSnapshot(server, monthlyId, timestamp, raw);
                     await this.persistBorderByTier(server, monthlyId, timestamp, raw);
                     logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
                     return;
-                } catch (error: unknown) {
-                    const nodeError = error as { message?: string };
-                    logger("monthlyRanking", `refresh failed server=${server} monthly=${monthlyId}: ${nodeError.message ?? "unknown error"}`);
-                }
+                } catch (error) {
+                    try {
+                        const diag = await fetchMonthlyRankingBuffer(server, monthlyId, currentVersion);
+                        const prefix = diag.decrypted.subarray(0, 64).toString("hex");
+                        logger("monthlyRanking", `diagnostic fetch server=${server} status=${diag.status} prefix=${prefix}`);
+                    } catch {
+                        // 忽略诊断自身的错误
+                    }
 
-                try {
-                    const diag = await fetchMonthlyRankingBuffer(server, monthlyId, getClientVersion(server));
-                    const prefix = diag.decrypted.subarray(0, 64).toString("hex");
-                    logger(
-                        "monthlyRanking",
-                        `diagnostic fetch server=${server} monthly=${monthlyId} status=${diag.status} body_bytes=${diag.length} decrypted_prefix=${prefix}`,
-                    );
-                } catch (diagError: unknown) {
-                    const nodeError = diagError as { message?: string };
-                    logger("monthlyRanking", `diagnostic fetch failed: ${nodeError.message ?? "unknown error"}`);
-                }
-
-                try {
-                    const raw = await fetchMonthlyRanking(server, monthlyId, getClientVersion(server));
-                    const timestamp = Date.now();
-                    await this.persistTopSnapshot(server, monthlyId, timestamp, raw);
-                    await this.persistBorderByTier(server, monthlyId, timestamp, raw);
-                    logger("monthlyRanking", `stored monthly=${monthlyId} server=${server} (retry)`);
-                    return;
-                } catch (error: unknown) {
-                    const nodeError = error as { message?: string };
-                    logger("monthlyRanking", `refresh failed server=${server} monthly=${monthlyId} after retry: ${nodeError.message ?? "unknown error"}`);
+                    // 把原始错误扔出
                     throw error;
                 }
             },

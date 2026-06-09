@@ -1,3 +1,5 @@
+import type { GarupaMasterMonthlyRankingGrade, GarupaMasterMonthlyRankingReward } from "@/types/garupaSchema";
+
 export interface MonthlyRankingPlayer {
     uid: number;
     name: string;
@@ -59,6 +61,23 @@ export interface MonthlyRankingBorderResponse {
 export interface MonthlyRankingInfoList {
     [monthlyRankingId: string]: MonthlyRankingInfo;
 }
+
+export interface MonthlyRankingDetailList {
+    [monthlyRankingId: string]: MonthlyRankingDetail;
+}
+
+export interface MonthlyRankingDetail extends MonthlyRankingInfo {
+    monthlyRankingId: number;
+    enableFlag: Array<boolean | null>;
+    publicStartAt: Array<number | null>;
+    publicEndAt: Array<number | null>;
+    distributionStartAt: Array<number | null>;
+    distributionEndAt: Array<number | null>;
+    aggregateEndAt: Array<number | null>;
+    receptionEndAt: Array<number | null>;
+    rewards?: Array<GarupaMasterMonthlyRankingReward[] | null>;
+    grades?: Array<GarupaMasterMonthlyRankingGrade[] | null>;
+}
 ///=========================================
 
 ///================数据库====================
@@ -80,7 +99,12 @@ export interface MonthlyRankingBorderDocument extends MonthlyRankingBorderRespon
 
 export type MonthlyRankingBorderTier = 20 | 30 | 40 | 50 | 100 | 200 | 300 | 500 | 1000 | 2000 | 3000 | 4000 | 5000;
 
-export interface MonthlyRankingInfoDocument extends MonthlyRankingInfo {
-    monthlyRankingId: number;
+export interface MonthlyRankingDetailDocument extends MonthlyRankingDetail {
     updatedAt: number;
 }
+
+// 兼容历史命名：info collection 现在实际存的是完整 detail 文档
+export interface MonthlyRankingInfoDocument extends MonthlyRankingDetailDocument {
+    monthlyRankingId: number;
+}
+

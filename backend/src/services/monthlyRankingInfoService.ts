@@ -4,7 +4,7 @@ import { logger } from "@/logger";
 import { garupaMonthlyRankingInfoParser } from "@/parsers/GarupaMonthlyRankingInfoParser";
 import { garupaService } from "@/services/garupaService";
 import { database } from "@/storage/dataBaseAdapter/mongodb";
-import type { MonthlyRankingInfo, MonthlyRankingInfoDocument, MonthlyRankingInfoList } from "@/types/monthlyRanking";
+import type { MonthlyRankingDetail, MonthlyRankingDetailList, MonthlyRankingInfo, MonthlyRankingInfoDocument, MonthlyRankingInfoList } from "@/types/monthlyRanking";
 
 const infoCollection = database.collection<MonthlyRankingInfoDocument>(MONGODB_MONTHLY_INFO_COLLECTION);
 
@@ -19,37 +19,63 @@ const toNullableArray = <T>(input: Array<T | null> | undefined, length: number, 
     return out;
 };
 
-const mergeMonthlyRankingInfo = (
-    existing: MonthlyRankingInfo | undefined,
-    update: MonthlyRankingInfo,
-    server: number,
-    serverCount: number,
-): MonthlyRankingInfo => {
-    const monthlyRankingName = toNullableArray(existing?.monthlyRankingName, serverCount, null);
-    const startAt = toNullableArray(existing?.startAt, serverCount, null);
-    const endAt = toNullableArray(existing?.endAt, serverCount, null);
+const mergeNullableArray = <T>(existing: Array<T | null> | undefined, update: Array<T | null>, length: number): Array<T | null> => {
+    const merged = toNullableArray(existing, length, null);
+    for (let i = 0; i < Math.min(update.length, length); i++) {
+        if (update[i] !== null) {
+            merged[i] = update[i];
+        }
+    }
+    return merged;
+};
 
-    if (update.monthlyRankingName[server] !== null) {
-        monthlyRankingName[server] = update.monthlyRankingName[server];
-    }
-    if (update.startAt[server] !== null) {
-        startAt[server] = update.startAt[server];
-    }
-    if (update.endAt[server] !== null) {
-        endAt[server] = update.endAt[server];
-    }
+const mergeMonthlyRankingDetail = (
+    existing: MonthlyRankingInfoDocument | undefined,
+    update: MonthlyRankingDetail,
+    serverCount: number,
+): MonthlyRankingDetail => {
+    const monthlyRankingName = mergeNullableArray(existing?.monthlyRankingName, update.monthlyRankingName, serverCount);
+    const startAt = mergeNullableArray(existing?.startAt, update.startAt, serverCount);
+    const endAt = mergeNullableArray(existing?.endAt, update.endAt, serverCount);
+    const enableFlag = mergeNullableArray(existing?.enableFlag, update.enableFlag, serverCount);
+    const publicStartAt = mergeNullableArray(existing?.publicStartAt, update.publicStartAt, serverCount);
+    const publicEndAt = mergeNullableArray(existing?.publicEndAt, update.publicEndAt, serverCount);
+    const distributionStartAt = mergeNullableArray(existing?.distributionStartAt, update.distributionStartAt, serverCount);
+    const distributionEndAt = mergeNullableArray(existing?.distributionEndAt, update.distributionEndAt, serverCount);
+    const aggregateEndAt = mergeNullableArray(existing?.aggregateEndAt, update.aggregateEndAt, serverCount);
+    const receptionEndAt = mergeNullableArray(existing?.receptionEndAt, update.receptionEndAt, serverCount);
+    const rewards = mergeNullableArray(existing?.rewards, update.rewards ?? [], serverCount);
+    const grades = mergeNullableArray(existing?.grades, update.grades ?? [], serverCount);
 
     const assetBundleName = existing?.assetBundleName?.length ? existing.assetBundleName : update.assetBundleName;
     const bgmFileName = existing?.bgmFileName?.length ? existing.bgmFileName : update.bgmFileName;
 
     return {
+        monthlyRankingId: update.monthlyRankingId,
         monthlyRankingName,
         assetBundleName,
         bgmFileName,
         startAt,
         endAt,
+        enableFlag,
+        publicStartAt,
+        publicEndAt,
+        distributionStartAt,
+        distributionEndAt,
+        aggregateEndAt,
+        receptionEndAt,
+        rewards,
+        grades,
     };
 };
+
+const toMonthlyRankingInfo = ({ monthlyRankingName, assetBundleName, bgmFileName, startAt, endAt }: MonthlyRankingInfoDocument): MonthlyRankingInfo => ({
+    monthlyRankingName,
+    assetBundleName,
+    bgmFileName,
+    startAt,
+    endAt,
+});
 
 class MonthlyRankingInfoService {
     private refreshInFlight = false;
@@ -70,15 +96,20 @@ class MonthlyRankingInfoService {
         await this.ensureCacheLoaded();
         const out: MonthlyRankingInfoList = {};
         for (const [monthlyRankingId, info] of this.infoCache) {
-            out[String(monthlyRankingId)] = {
-                monthlyRankingName: info.monthlyRankingName,
-                assetBundleName: info.assetBundleName,
-                bgmFileName: info.bgmFileName,
-                startAt: info.startAt,
-                endAt: info.endAt,
-            };
+            out[String(monthlyRankingId)] = toMonthlyRankingInfo(info);
         }
         return out;
+    }
+
+    async getMonthlyRankingDetail(monthlyRankingId: number): Promise<MonthlyRankingDetail | undefined> {
+        await this.ensureCacheLoaded();
+        const record = this.infoCache.get(monthlyRankingId);
+        if (!record) {
+            return undefined;
+        }
+
+        const { updatedAt: _updatedAt, ...detail } = record;
+        return detail;
     }
 
     async getActiveMonthlyId(server: number, now: number = Date.now()): Promise<number | null> {
@@ -155,14 +186,14 @@ class MonthlyRankingInfoService {
                 }
 
                 const parsed = garupaMonthlyRankingInfoParser.parse(decrypted, server, serverCount);
-                await this.mergeAndPersist(server, parsed);
+                await this.mergeAndPersist(parsed);
                 logger("monthlyRankingInfo", `master list refreshed server=${server} entries=${Object.keys(parsed).length}`);
             },
             { timeoutMs: 2000 },
         );
     }
 
-    private async mergeAndPersist(server: number, updates: MonthlyRankingInfoList): Promise<void> {
+    private async mergeAndPersist(updates: MonthlyRankingDetailList): Promise<void> {
         const serverCount = garupaService.getServerCount();
         const now = Date.now();
 
@@ -173,7 +204,7 @@ class MonthlyRankingInfoService {
             }
 
             const existing = this.infoCache.get(monthlyRankingId);
-            const merged = mergeMonthlyRankingInfo(existing, update, server, serverCount);
+            const merged = mergeMonthlyRankingDetail(existing, update, serverCount);
             const document: MonthlyRankingInfoDocument = {
                 ...merged,
                 monthlyRankingId,
@@ -193,7 +224,7 @@ class MonthlyRankingInfoService {
         const query = await infoCollection.find({});
         const records = await query.toArray();
         for (const record of records) {
-            if (!record) {
+            if (!record || !Number.isFinite(record.monthlyRankingId) || record.monthlyRankingId <= 0) {
                 continue;
             }
             this.infoCache.set(record.monthlyRankingId, record);
