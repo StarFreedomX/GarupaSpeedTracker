@@ -58,7 +58,58 @@ class MonthlyRankingService {
     start(): void {
         garupaService.start();
 
+        // 异步触发启动检查：如果发现当前月榜没数据，立即抓取一次
+        this.bootstrapCheck().catch((err) => {
+            logger("monthlyRanking", `Bootstrap check failed: ${err?.message || err}`);
+        });
+
+        // 注册定时轮询
         garupaService.registerPoller("monthlyRanking", async () => this.refreshAll());
+    }
+
+    /**
+     * 启动时的前置检查
+     * 检查从 1 到当前 monthlyId 之间，数据库是否缺失了某些月份的数据
+     * 如果缺失，则在启动时立即且仅抓取一次
+     */
+    private async bootstrapCheck(): Promise<void> {
+        const servers = garupaService.getActiveServerIds();
+
+        await Promise.allSettled(
+            servers.map(async (server) => {
+                const currentMonthlyId = await monthlyRankingInfoService.getActiveMonthlyId(server);
+                if (!currentMonthlyId) {
+                    return;
+                }
+
+                const missingIds: number[] = [];
+
+                for (let id = 1; id <= currentMonthlyId; id++) {
+                    const exists = await topCollection.findOne({ server, monthlyId: id }, { projection: { _id: 1 } });
+
+                    if (!exists) {
+                        missingIds.push(id);
+                    }
+                }
+
+                if (missingIds.length > 0) {
+                    logger(
+                        "monthlyRanking",
+                        `Bootstrap: Server=${server} is missing data for monthlyIds: [${missingIds.join(", ")}]. Triggering immediate fetch.`,
+                    );
+
+                    for (const missingId of missingIds) {
+                        try {
+                            await this.refreshServer(server, missingId);
+                        } catch (err) {
+                            logger("monthlyRanking", `Bootstrap error: Failed to fetch server=${server} monthly=${missingId}: ${err}`);
+                        }
+                    }
+                } else {
+                    logger("monthlyRanking", `Bootstrap: Server=${server} has all data from 1 to ${currentMonthlyId}. Skipping bootstrap fetch.`);
+                }
+            }),
+        );
     }
 
     async refreshAll(): Promise<void> {
@@ -116,6 +167,7 @@ class MonthlyRankingService {
 
     async getTopSnapshot(server: number, monthlyId: number): Promise<MonthlyRankingTopResponse> {
         const query = await topCollection.find({ server, monthlyId });
+        // 按 bucket 从旧到新排序确保同一个用户如果有多次改名，后面新 bucket 里的最新名字能覆盖旧名字
         const records = await query.sort({ bucket: 1 }).toArray();
         if (records.length === 0) {
             return { points: [], users: [] };
@@ -123,27 +175,53 @@ class MonthlyRankingService {
 
         const points = records.flatMap((record) => record.points ?? []);
 
-        let latestUsers: MonthlyRankingPlayer[] = [];
-        let latestUpdatedAt = -1;
+        // 把所有 bucket 里的用户全部合并去重
+        const userMap = new Map<number, MonthlyRankingPlayer>();
+
         for (const record of records) {
-            if (record.updatedAt > latestUpdatedAt) {
-                latestUpdatedAt = record.updatedAt;
-                latestUsers = record.users ?? [];
+            if (Array.isArray(record.users)) {
+                record.users.forEach((user) => {
+                    // 因为 records 是按时间正序排列的
+                    // 如果同一个 uid 在 bucket 0 和 bucket 1 都存在，bucket 1 的最新信息会覆盖 bucket 0
+                    userMap.set(user.uid, user);
+                });
             }
         }
 
         return {
             points,
-            users: latestUsers,
+            users: Array.from(userMap.values()), // 所有 bucket 出现过的、且保持最新状态的用户
         };
     }
 
     //  持久化
     private async persistTopSnapshot(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const newPoints = raw.monthlyRankingPointTopUsers.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
-        const users: MonthlyRankingPlayer[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
+        const currentTopUsers: MonthlyRankingPlayer[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
+        // 先从数据库查出该分桶现存的记录
+        const existingDoc = await topCollection.findOne({ server, monthlyId, bucket });
+
+        // 利用 Map 进行去重和更新合并
+        const userMap = new Map<number, MonthlyRankingPlayer>();
+
+        // 如果原有记录里已经有 users 数组了，先放进 Map
+        if (existingDoc && Array.isArray(existingDoc.users)) {
+            existingDoc.users.forEach((user) => {
+                userMap.set(user.uid, user);
+            });
+        }
+
+        // 把本次抓取到的最新前十名塞进 Map。如果 uid 重复，最新的信息会直接覆盖旧信息；如果不重复，则会追加进去
+        currentTopUsers.forEach((user) => {
+            userMap.set(user.uid, user);
+        });
+
+        // 将合并后的 Map 还原为数组结构
+        const mergedUsersArray = Array.from(userMap.values());
+
+        // 写回数据库，继续沿用updateOne
         await topCollection.updateOne(
             { server, monthlyId, bucket },
             [
@@ -151,7 +229,7 @@ class MonthlyRankingService {
                     $set: {
                         points: { $concatArrays: [{ $ifNull: ["$points", []] }, newPoints] },
                         updatedAt: timestamp,
-                        users,
+                        users: mergedUsersArray,
                         server: { $ifNull: ["$server", server] },
                         monthlyId: { $ifNull: ["$monthlyId", monthlyId] },
                         bucket: { $ifNull: ["$bucket", bucket] },
@@ -161,7 +239,10 @@ class MonthlyRankingService {
             { upsert: true },
         );
 
-        logger("monthlyRanking", `top snapshot persisted server=${server} monthly=${monthlyId} bucket=${bucket} points_added=${newPoints.length}`);
+        logger(
+            "monthlyRanking",
+            `top snapshot persisted server=${server} monthly=${monthlyId} bucket=${bucket} points_added=${newPoints.length} total_users=${mergedUsersArray.length}`,
+        );
     }
 
     async getBorderPoints(server: number, monthlyId: number, tier: MonthlyRankingBorderTier): Promise<MonthlyRankingBorderResponse> {
