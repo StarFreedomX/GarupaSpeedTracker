@@ -143,7 +143,13 @@ class MonthlyRankingService {
 
                 try {
                     const raw = await fetchMonthlyRanking(server, monthlyId, currentVersion);
-                    const timestamp = Date.now();
+                    let timestamp = Date.now();
+                    const info = await monthlyRankingInfoService.getMonthlyRankingDetail(monthlyId);
+                    const endAt = info?.endAt?.[server];
+                    if (endAt && timestamp > endAt) {
+                        timestamp = endAt;
+                        logger("monthlyRanking", `monthly=${monthlyId} has ended. Clamping timestamp to endAt: ${new Date(timestamp).toISOString()}`);
+                    }
                     await this.persistTopSnapshot(server, monthlyId, timestamp, raw);
                     await this.persistBorderByTier(server, monthlyId, timestamp, raw);
                     logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
