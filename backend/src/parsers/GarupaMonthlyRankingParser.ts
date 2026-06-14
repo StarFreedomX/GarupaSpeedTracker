@@ -14,7 +14,7 @@ const buildDegrees = (user: GarupaRankingUser): number[] => {
 
 const parseUser = (user: GarupaRankingUser): MonthlyRankingTopUserRaw => {
     const profileSituation = user.userProfileSituation;
-    const strained = profileSituation?.viewProfileSituationStatus === "after_training" ? 1 : 0;
+    const strained = profileSituation?.illust === "after_training" ? 1 : 0;
 
     return {
         uid: toNumber(user.userId),
