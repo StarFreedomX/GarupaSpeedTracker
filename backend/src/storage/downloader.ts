@@ -58,8 +58,20 @@ const defaultTtlMs = MIN_POINTS_UPDATE_TIME * 1000;
 
 const axiosClient = axios.create({
     timeout: BESTDORI_TIMEOUT_MS,
-    httpAgent: new http.Agent({ keepAlive: true }),
-    httpsAgent: new https.Agent({ keepAlive: true }),
+    httpAgent: new http.Agent({
+        keepAlive: true,
+        keepAliveMsecs: 30_000, // 空闲 30s 后关闭 socket
+        maxSockets: 10, // 限制每个 host 最大连接数
+        maxFreeSockets: 5, // 限制空闲 socket 数量
+        timeout: 30_000, // socket 超时
+    }),
+    httpsAgent: new https.Agent({
+        keepAlive: true,
+        keepAliveMsecs: 30_000,
+        maxSockets: 10,
+        maxFreeSockets: 5,
+        timeout: 30_000,
+    }),
 });
 
 const toCacheKey = (url: string): string => {

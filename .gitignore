@@ -2,3 +2,4 @@
 example/
 .idea
 node_modules
+/.proxyai/
