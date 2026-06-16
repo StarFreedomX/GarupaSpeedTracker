@@ -93,6 +93,7 @@ export interface I18nMessages {
             eventParams: string;
             eventType: string;
             totalPower: string;
+            totalPowerNote: string;
             supportPower: string;
             eventBonus: string;
             autoRate: string;
@@ -182,12 +183,12 @@ export interface I18nMessages {
         title: string;
         step: string;
         step1: { title: string };
-        step2: {
+        step2: { title: string };
+        step3: {
             title: string;
             targetPt: string;
             placeholder: string;
         };
-        step3: { title: string };
         step4: {
             title: string;
             computing: string;
@@ -203,7 +204,6 @@ export interface I18nMessages {
             maxAchievable: string;
             adjustBonus: string;
             adjustBonusHint: string;
-            adjustPowerHint: string;
             bonusTableBonus: string;
             bonusTableScore: string;
             basePT: string;
@@ -214,6 +214,10 @@ export interface I18nMessages {
             altPlan: string;
             noSongsForStep: string;
             adjustConfigHint: string;
+            recommendPT: string;
+            windowPreview: string;
+            segmentLen: string;
+            playsLabel: string;
         };
         filter: {
             title: string;

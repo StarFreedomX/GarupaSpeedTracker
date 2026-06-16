@@ -93,7 +93,8 @@ const zhCN = {
         config: {
             eventParams: "活动参数",
             eventType: "活动类型",
-            totalPower: "综合力",
+            totalPower: "综合力*",
+            totalPowerNote: "5v5和对邦模式下，请填写活动综合力。",
             supportPower: "副队综合力",
             eventBonus: "加成(%)",
             autoRate: "Auto倍率",
@@ -183,12 +184,12 @@ const zhCN = {
         title: "交互式控分",
         step: "第 {current} / {total} 步",
         step1: { title: "选择活动类型" },
-        step2: {
+        step2: { title: "配置队伍" },
+        step3: {
             title: "输入目标 PT",
             targetPt: "目标PT",
             placeholder: "输入目标 PT",
         },
-        step3: { title: "配置队伍" },
         step4: {
             title: "分析结果",
             computing: "正在分析...",
@@ -204,7 +205,6 @@ const zhCN = {
             maxAchievable: "当前配置 5 次 3 火最多可达 {pt} PT",
             adjustBonus: "加成调整建议",
             adjustBonusHint: "以下加成值可以精确达到目标 PT：",
-            adjustPowerHint: "建议提高队伍综合力或调整技能配置，使单次最大 PT 达到 {need} 以上。",
             bonusTableBonus: "加成 (%)",
             bonusTableScore: "分数区间",
             basePT: "基础 PT",
@@ -215,6 +215,10 @@ const zhCN = {
             altPlan: "备选{index}",
             noSongsForStep: "暂无固定PT歌曲可供此步",
             adjustConfigHint: "请返回第 3 步调整队伍参数后重新分析，或参考下方的加成调整建议。",
+            recommendPT: "≤{plays} 次游玩最大连续可达区间：",
+            windowPreview: "💡 最大连续可达区间预览（区间内每个值均精确可达）：",
+            segmentLen: "中心 {center}，长度 {len}",
+            playsLabel: "≤{plays} 次游玩：",
         },
         filter: {
             title: "高级筛选",

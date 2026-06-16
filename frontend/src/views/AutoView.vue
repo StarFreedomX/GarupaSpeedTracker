@@ -451,6 +451,7 @@ const calculate = () => {
                             class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
                         />
                     </div>
+                    <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
 
                     <div v-if="showSupportBand" class="flex items-center gap-3">
                         <span class="w-20 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>

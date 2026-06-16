@@ -114,7 +114,8 @@ const enUS = {
         config: {
             eventParams: "Event Parameters",
             eventType: "Event Type",
-            totalPower: "Total Power",
+            totalPower: "Total Power*",
+            totalPowerNote: "For 5v5 and Versus modes, use the event total power.",
             supportPower: "Support Band Power",
             eventBonus: "Event Bonus (%)",
             autoRate: "Auto Rate",
@@ -183,12 +184,12 @@ const enUS = {
         title: "Interactive Score Control",
         step: "Step {current} / {total}",
         step1: { title: "Select Activity Type" },
-        step2: {
+        step2: { title: "Configure Team" },
+        step3: {
             title: "Enter Target PT",
             targetPt: "Target PT",
             placeholder: "Enter target PT",
         },
-        step3: { title: "Configure Team" },
         step4: {
             title: "Analysis Results",
             computing: "Analyzing...",
@@ -204,7 +205,6 @@ const enUS = {
             maxAchievable: "Max achievable with 5× 3-flame plays: {pt} PT",
             adjustBonus: "Bonus Adjustment Suggestions",
             adjustBonusHint: "The following bonus values can exactly achieve the target PT:",
-            adjustPowerHint: "Consider increasing total power or adjusting skills so max PT per play reaches {need}+.",
             bonusTableBonus: "Bonus (%)",
             bonusTableScore: "Score Range",
             basePT: "Base PT",
@@ -215,6 +215,10 @@ const enUS = {
             altPlan: "Alt {index}",
             noSongsForStep: "No fixed-PT songs for this step",
             adjustConfigHint: "Go back to Step 3 to adjust team config and re-analyze, or see bonus suggestions below.",
+            recommendPT: "≤{plays} plays largest contiguous windows:",
+            windowPreview: "💡 Contiguous reachable windows (every value inside is exactly reachable):",
+            segmentLen: "center {center}, len {len}",
+            playsLabel: "≤{plays} plays:",
         },
         filter: {
             title: "Advanced Filter",

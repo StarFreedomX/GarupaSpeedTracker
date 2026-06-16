@@ -101,4 +101,6 @@ export interface AnalysisResult {
     maxAchievablePT?: number;
     /** 不可行时：目标 PT 低于最小可达 basePT（无论如何都达不到这么低） */
     targetTooLow?: boolean;
+    /** 不可行时：各游玩次数下的连续可达区间（多段，按长度降序） */
+    contiguousWindows?: Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }> }>;
 }

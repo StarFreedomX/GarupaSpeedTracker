@@ -291,6 +291,78 @@ function findAllAllocations(
     }
 }
 
+// ─── largest contiguous achievable window ───
+
+/** 找出整个可行域中最长的连续可达 PT 区间 */
+export function findContiguousWindows(basePTs: number[]): Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }> }> {
+    const singlePlays = new Set<number>();
+    for (const bp of basePTs) {
+        for (const m of FLAME_MULTIPLIERS) singlePlays.add(bp * m);
+    }
+    const s1 = [...singlePlays].sort((a, b) => a - b);
+    if (s1.length === 0) return [];
+
+    const all = new Set(s1);
+
+    /** 从当前 all 集合中提取所有连续段，按长度降序 */
+    const collectSegments = (): Array<{ lo: number; hi: number; center: number }> => {
+        const sorted = [...all].sort((a, b) => a - b);
+        const segments: Array<{ lo: number; hi: number; center: number }> = [];
+        let runLo = sorted[0];
+        for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i] !== sorted[i - 1] + 1) {
+                segments.push({ lo: runLo, hi: sorted[i - 1], center: Math.round((runLo + sorted[i - 1]) / 2) });
+                runLo = sorted[i];
+            }
+        }
+        segments.push({ lo: runLo, hi: sorted[sorted.length - 1], center: Math.round((runLo + sorted[sorted.length - 1]) / 2) });
+        segments.sort((a, b) => b.hi - b.lo - (a.hi - a.lo));
+        return segments;
+    };
+
+    const tierResults: Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }>; bestLen: number }> = [];
+
+    // N=2
+    for (const a of s1) for (const b of s1) all.add(a + b);
+
+    // N=3
+    let prev = [...all];
+    for (const a of prev) for (const b of s1) all.add(a + b);
+    tierResults.push({ plays: 3, segments: collectSegments(), bestLen: 0 });
+
+    // N=4
+    prev = [...all];
+    for (const a of prev) for (const b of s1) all.add(a + b);
+    tierResults.push({ plays: 4, segments: collectSegments(), bestLen: 0 });
+
+    // N=5
+    prev = [...all];
+    for (const a of prev) for (const b of s1) all.add(a + b);
+    tierResults.push({ plays: 5, segments: collectSegments(), bestLen: 0 });
+
+    // 计算阈值：≤3 的累计需 ≥ ≤4 最长段的一半；≤4 需 ≥ ≤5 最长段的一半
+    for (let t = 0; t < tierResults.length; t++) {
+        const first = tierResults[t].segments[0];
+        tierResults[t].bestLen = first ? first.hi - first.lo + 1 : 0;
+    }
+
+    const results: Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }> }> = [];
+
+    for (let t = 0; t < tierResults.length; t++) {
+        const threshold = t < tierResults.length - 1 ? Math.ceil(tierResults[t + 1].bestLen / 2) : 0;
+        const kept: Array<{ lo: number; hi: number; center: number }> = [];
+        let total = 0;
+        for (const seg of tierResults[t].segments) {
+            kept.push(seg);
+            total += seg.hi - seg.lo + 1;
+            if (threshold === 0 || total >= threshold || kept.length >= 5) break;
+        }
+        results.push({ plays: tierResults[t].plays, segments: kept });
+    }
+
+    return results;
+}
+
 // ─── main entry ───
 
 const MAX_ALTERNATIVES = 100;
@@ -442,6 +514,9 @@ export function analyze(
         }
     }
 
+    // 找各游玩次数下的最大连续可达区间
+    const contiguousWindows = findContiguousWindows(achievableBasePTs);
+
     return {
         feasible: false,
         boostLevels,
@@ -449,5 +524,6 @@ export function analyze(
         alternatives: [],
         feasibleBonuses,
         maxAchievablePT,
+        contiguousWindows,
     };
 }

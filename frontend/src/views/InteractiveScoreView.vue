@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import SkillDurationPicker from "@/components/common/SkillDurationPicker.vue";
 import Tooltip from "@/components/common/Tooltip.vue";
-import { analyze } from "@/features/scoreControl/interactiveAnalysis";
+import { analyze, computeFixedBasePTs, findContiguousWindows } from "@/features/scoreControl/interactiveAnalysis";
 import type { ActivityType, AnalysisResult, PlayStep, SolutionFilter, TeamConfig } from "@/features/scoreControl/types";
 import { useI18n } from "@/i18n";
 import { fetchMetadata } from "@/services/songMetadataApi";
@@ -98,14 +98,27 @@ const teamConfig = computed<TeamConfig>(() => ({
     centerIndex: centerIndex.value,
 }));
 
+// 目标 PT 步骤的区间预览
+const previewWindows = computed(() => {
+    if (Object.keys(songMetadata.value).length === 0) return null;
+    if (Object.keys(songList.value).length === 0) return null;
+    try {
+        const { achievableBasePTs } = computeFixedBasePTs(teamConfig.value, formData.value.activityType, songMetadata.value, songList.value, filterData.value);
+        if (achievableBasePTs.length === 0) return null;
+        return findContiguousWindows(achievableBasePTs);
+    } catch {
+        return null;
+    }
+});
+
 const isStepValid = computed(() => {
     switch (currentStep.value) {
         case 1:
             return ACTIVITY_TYPES.some((t) => t.value === formData.value.activityType);
         case 2:
-            return formData.value.targetPT > 0 && formData.value.targetPT <= 10000000;
-        case 3:
             return formData.value.totalPower > 0 && skills.value.length === 5;
+        case 3:
+            return formData.value.targetPT > 0 && formData.value.targetPT <= 10000000;
         default:
             return true;
     }
@@ -414,22 +427,22 @@ const hasNoFixedSongs = computed(() => {
             </div>
         </div>
 
-        <!-- ═══════ Step 2: Target PT ═══════ -->
+        <!-- ═══════ Step 3: Target PT ═══════ -->
         <div
-            v-if="currentStep === 2"
+            v-if="currentStep === 3"
             class="rounded border border-border/80 bg-surface/50 p-3"
         >
-            <div class="mb-3 text-sm font-medium">{{ t('interactive.step2.title') }}</div>
+            <div class="mb-3 text-sm font-medium">{{ t('interactive.step3.title') }}</div>
             <div class="mx-auto max-w-md">
                 <div class="flex items-center gap-3">
-                    <span class="w-20 text-sm text-muted">{{ t('interactive.step2.targetPt') }}</span>
+                    <span class="w-20 text-sm text-muted">{{ t('interactive.step3.targetPt') }}</span>
                     <input
                         v-model.number="formData.targetPT"
                         type="number"
                         min="1"
                         max="10000000"
                         class="flex-1 rounded border border-border/80 bg-surface/90 px-3 py-2 text-lg text-text font-mono text-center"
-                        :placeholder="t('interactive.step2.placeholder')"
+                        :placeholder="t('interactive.step3.placeholder')"
                         @keyup.enter="nextStep"
                     />
                 </div>
@@ -514,11 +527,31 @@ const hasNoFixedSongs = computed(() => {
                         </button>
                     </div>
                 </div>
+
+                <!-- Contiguous windows preview -->
+                <div v-if="previewWindows && previewWindows.length > 0" class="mt-3 pt-3 border-t border-border/60">
+                    <p class="mb-2 text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
+                    <div class="space-y-2">
+                        <div v-for="w in previewWindows" :key="w.plays">
+                            <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
+                            <p
+                                v-for="(seg, si) in w.segments"
+                                :key="si"
+                                class="text-xs text-muted ml-3"
+                                :class="si === 0 ? '' : 'opacity-60'"
+                            >
+                                <span v-if="si === 0">★ </span><span v-else>  </span>
+                                <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
+                                （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- ═══════ Step 3: Team config ═══════ -->
-        <div v-if="currentStep === 3" class="grid gap-4 md:grid-cols-2">
+        <!-- ═══════ Step 2: Team config ═══════ -->
+        <div v-if="currentStep === 2" class="grid gap-4 md:grid-cols-2">
             <!-- Left: Event params -->
             <div class="rounded border border-border/80 bg-surface/50 p-3">
                 <div class="mb-2 text-sm font-medium">{{ t('auto.config.eventParams') }}</div>
@@ -538,6 +571,7 @@ const hasNoFixedSongs = computed(() => {
                             class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
                         />
                     </div>
+                    <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
 
                     <div v-if="showSupportBand" class="flex items-center gap-3">
                         <span class="w-20 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
@@ -818,71 +852,85 @@ const hasNoFixedSongs = computed(() => {
                         </p>
                     </div>
                     <!-- No solution found -->
-                    <div v-else class="rounded border border-border/80 bg-surface/50 p-3 mb-3">
-                        <p class="text-sm text-muted mb-2">
-                            ⚠️ {{ t('interactive.step4.noSolution') }}
-                        </p>
-                        <p class="text-xs text-muted">
-                            {{ t('interactive.step4.maxAchievable', { pt: (analysisResult.maxAchievablePT ?? 0).toLocaleString() }) }}
-                        </p>
-                        <p class="mt-2 text-xs text-muted">
-                            {{ t('interactive.step4.adjustConfigHint') }}
-                        </p>
-                    </div>
-
-                    <!-- Bonus adjustment suggestions -->
-                    <div
-                        v-if="analysisResult.feasibleBonuses && analysisResult.feasibleBonuses.length > 0"
-                        class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
-                    >
-                        <div class="mb-2 text-sm font-medium text-text">
-                            {{ t('interactive.step4.adjustBonus') }}
+                    <div v-else>
+                        <div class="rounded border border-border/80 bg-surface/50 p-3 mb-3">
+                            <p class="text-sm text-muted mb-2">
+                                ⚠️ {{ t('interactive.step4.noSolution') }}
+                            </p>
+                            <p class="text-xs text-muted">
+                                {{ t('interactive.step4.maxAchievable', { pt: (analysisResult.maxAchievablePT ?? 0).toLocaleString() }) }}
+                            </p>
+                            <p class="mt-2 text-xs text-muted">
+                                {{ t('interactive.step4.adjustConfigHint') }}
+                            </p>
                         </div>
-                        <p class="mb-2 text-xs text-muted">
-                            {{ t('interactive.step4.adjustBonusHint') }}
-                        </p>
-                        <div class="overflow-hidden rounded border border-border/60">
-                            <table class="w-full border-collapse text-sm">
-                                <thead>
-                                <tr class="border-b border-border/60 bg-surface/30">
-                                    <th class="px-3 py-1.5 text-left font-normal text-muted">
-                                        {{ t('interactive.step4.bonusTableBonus') }}
-                                    </th>
-                                    <th class="px-3 py-1.5 text-right font-normal text-muted">
-                                        {{ t('interactive.step4.bonusTableScore') }}
-                                    </th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr
-                                    v-for="res in analysisResult.feasibleBonuses.slice(0, 20)"
-                                    :key="res.bonus"
-                                    class="border-b border-border/40 hover:bg-surface/30"
-                                >
-                                    <td class="px-3 py-1.5 font-mono font-bold text-primary">
-                                        {{ res.bonus }}%
-                                    </td>
-                                    <td class="px-3 py-1.5 text-right font-mono">
-                                        <span class="text-text">{{ res.scoreRange.min.toLocaleString() }}</span>
-                                        <span class="mx-2 text-muted">-</span>
-                                        <span class="text-text">{{ res.scoreRange.max.toLocaleString() }}</span>
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
 
-                    <!-- Power adjustment hint -->
-                    <div
-                        v-if="!analysisResult.feasibleBonuses || analysisResult.feasibleBonuses.length === 0"
-                        class="rounded border border-border/80 bg-surface/50 p-3"
-                    >
-                        <p class="text-xs text-muted">
-                            {{ t('interactive.step4.adjustPowerHint', {
-                                need: Math.ceil((formData.targetPT / 5)).toLocaleString()
-                            }) }}
-                        </p>
+                        <!-- Contiguous windows -->
+                        <div
+                            v-if="analysisResult.contiguousWindows && analysisResult.contiguousWindows.length > 0"
+                            class="rounded border border-primary/30 bg-primary/5 p-3 mb-3"
+                        >
+                            <p class="mb-2 text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
+                            <div class="space-y-2">
+                                <div v-for="w in analysisResult.contiguousWindows" :key="w.plays">
+                                    <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
+                                    <p
+                                        v-for="(seg, si) in w.segments"
+                                        :key="si"
+                                        class="text-xs text-muted ml-3"
+                                        :class="si === 0 ? '' : 'opacity-60'"
+                                    >
+                                        <span v-if="si === 0">★ </span><span v-else>  </span>
+                                        <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
+                                        （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bonus adjustment suggestions -->
+                        <div
+                            v-if="analysisResult.feasibleBonuses && analysisResult.feasibleBonuses.length > 0"
+                            class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
+                        >
+                            <div class="mb-2 text-sm font-medium text-text">
+                                {{ t('interactive.step4.adjustBonus') }}
+                            </div>
+                            <p class="mb-2 text-xs text-muted">
+                                {{ t('interactive.step4.adjustBonusHint') }}
+                            </p>
+                            <div class="overflow-hidden rounded border border-border/60">
+                                <table class="w-full border-collapse text-sm">
+                                    <thead>
+                                    <tr class="border-b border-border/60 bg-surface/30">
+                                        <th class="px-3 py-1.5 text-left font-normal text-muted">
+                                            {{ t('interactive.step4.bonusTableBonus') }}
+                                        </th>
+                                        <th class="px-3 py-1.5 text-right font-normal text-muted">
+                                            {{ t('interactive.step4.bonusTableScore') }}
+                                        </th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr
+                                        v-for="res in analysisResult.feasibleBonuses.slice(0, 20)"
+                                        :key="res.bonus"
+                                        class="border-b border-border/40 hover:bg-surface/30"
+                                    >
+                                        <td class="px-3 py-1.5 font-mono font-bold text-primary">
+                                            {{ res.bonus }}%
+                                        </td>
+                                        <td class="px-3 py-1.5 text-right font-mono">
+                                            <span class="text-text">{{ res.scoreRange.min.toLocaleString() }}</span>
+                                            <span class="mx-2 text-muted">-</span>
+                                            <span class="text-text">{{ res.scoreRange.max.toLocaleString() }}</span>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </template>
             </template>
