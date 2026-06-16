@@ -232,7 +232,7 @@ function getScoreRangeByPT(targetPT: number, params: MissionParams | TryParams |
         }
 
         default:
-            throw new Error(`不支持的活动类型: ${(params as any).type}`);
+            throw new Error(`不支持的活动类型: ${(params as { type: string })?.type}`);
     }
 }
 

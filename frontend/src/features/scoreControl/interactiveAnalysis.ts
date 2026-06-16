@@ -1,4 +1,4 @@
-import { calcEventPT, type BonusParams, getFeasibleBonus } from "@/features/PT/calcSinglePT";
+import { type BonusParams, calcEventPT, getFeasibleBonus } from "@/features/PT/calcSinglePT";
 import { calcScore } from "@/features/songMeta/autoScoreMath";
 import type { Skill, SongChartMeta, SongLevelSummary } from "@/types/songMetadata";
 import type { MusicDataResponse } from "@/types/songs";
@@ -35,22 +35,33 @@ function calcBasePT(score: number, type: ActivityType, config: TeamConfig): numb
 
 function buildBonusParams(type: ActivityType, config: TeamConfig): BonusParams | null {
     switch (type) {
-        case "mission": return { type: "mission", supportBandPower: config.supportBandPower };
-        case "try": return { type: "try" };
-        case "challenge": return { type: "challenge" };
-        default: return null;
+        case "mission":
+            return { type: "mission", supportBandPower: config.supportBandPower };
+        case "try":
+            return { type: "try" };
+        case "challenge":
+            return { type: "challenge" };
+        default:
+            return null;
     }
 }
 
 const DIFFICULTY_LABELS: Record<string, string> = {
-    "0": "Easy", "1": "Normal", "2": "Hard", "3": "Expert", "4": "Special",
+    "0": "Easy",
+    "1": "Normal",
+    "2": "Hard",
+    "3": "Expert",
+    "4": "Special",
 };
 
 // ─── combination generator ───
 
 /** 生成非递减组合 (0..n-1 选 k，可重复)，消除火焰排列的对称性 */
 function* generateNonDecreasingCombos(n: number, k: number): Generator<number[]> {
-    if (k === 0) { yield []; return; }
+    if (k === 0) {
+        yield [];
+        return;
+    }
     const indices = new Array(k).fill(0);
     while (true) {
         yield [...indices];
@@ -98,7 +109,7 @@ export function computeFixedBasePTs(
         // 硬过滤：必须是某乐队（仅启用时）
         if (filter.bandEnabled && filter.bandMode === "all" && filter.bandId !== null && bandId !== filter.bandId) continue;
 
-        const matchesBoost = (filter.boostEnabled && filter.boostString) ? title.includes(filter.boostString) : false;
+        const matchesBoost = filter.boostEnabled && filter.boostString ? title.includes(filter.boostString) : false;
 
         for (let d = 0; d <= 4; d++) {
             const diffKey = String(d) as "0" | "1" | "2" | "3" | "4";
@@ -106,9 +117,7 @@ export function computeFixedBasePTs(
             if (!levelSummary) continue;
 
             try {
-                const scoreResult = calcScore(
-                    config.totalPower, config.skills, centerSkill, levelSummary, config.autoPara,
-                );
+                const scoreResult = calcScore(config.totalPower, config.skills, centerSkill, levelSummary, config.autoPara);
                 const minScore = Math.floor(scoreResult.minScore);
                 const maxScore = Math.floor(scoreResult.maxScore);
 
@@ -135,9 +144,7 @@ export function computeFixedBasePTs(
                         songMap.set(minBasePT, [song]);
                     }
                 }
-            } catch {
-                continue;
-            }
+            } catch {}
         }
     }
 
@@ -159,7 +166,8 @@ export function computeBoostLevelPTs(achievableBasePTs: number[]): BoostLevelPT[
 // ─── exact solution search (discrete set) ───
 
 function binarySearch(arr: number[], target: number): number {
-    let lo = 0, hi = arr.length - 1;
+    let lo = 0;
+    let hi = arr.length - 1;
     while (lo <= hi) {
         const mid = (lo + hi) >> 1;
         if (arr[mid] === target) return mid;
@@ -183,12 +191,7 @@ const arrayGcd = (arr: number[]): number => arr.reduce(gcd, 0);
 
 // ─── find all solutions for a given play count ───
 
-function findAllSolutionsForN(
-    targetPT: number,
-    n: number,
-    basePTs: number[],
-    maxSolutions: number,
-): Strategy[] {
+function findAllSolutionsForN(targetPT: number, n: number, basePTs: number[], maxSolutions: number): Strategy[] {
     const solutions: Strategy[] = [];
     const minBP = basePTs[0];
     const maxBP = basePTs[basePTs.length - 1];
@@ -272,9 +275,10 @@ function findAllAllocations(
     }
 
     // 对称剪枝：与前一位置火焰相同 ⇒ 起始 bp 不能小于前一 bp
-    const startIdx = (idx > 0 && multipliers[idx] === multipliers[idx - 1])
-        ? binarySearch(basePTs, current[idx - 1])  // 从 ≥ 前一 bp 开始
-        : basePTs.length - 1;                        // 否则从最大开始
+    const startIdx =
+        idx > 0 && multipliers[idx] === multipliers[idx - 1]
+            ? binarySearch(basePTs, current[idx - 1]) // 从 ≥ 前一 bp 开始
+            : basePTs.length - 1; // 否则从最大开始
     if (startIdx < 0) return; // 前一 bp 不在集合中，不应发生
 
     // 从大到小遍历 basePT，优先匹配高 basePT（非 FULL 曲通常 PT 更高）
@@ -283,12 +287,7 @@ function findAllAllocations(
         const contribution = bp * m;
         if (contribution + maxRest < remaining) break;
         if (contribution + minRest > remaining) continue;
-        findAllAllocations(
-            remaining - contribution,
-            flameIndices, multipliers, idx + 1,
-            [...current, bp],
-            basePTs, solutions, maxSolutions,
-        );
+        findAllAllocations(remaining - contribution, flameIndices, multipliers, idx + 1, [...current, bp], basePTs, solutions, maxSolutions);
     }
 }
 
@@ -363,11 +362,9 @@ export function analyze(
         const avgSongCount = (s: Strategy): number => {
             let product = 1;
             for (const bp of s.basePTs) {
-                product *= (songMap.get(bp)?.length ?? 1);
+                product *= songMap.get(bp)?.length ?? 1;
             }
-            return s.basePTs.length > 0
-                ? Math.pow(product, 1 / s.basePTs.length)
-                : 0;
+            return s.basePTs.length > 0 ? product ** (1 / s.basePTs.length) : 0;
         };
 
         // 排除不符合 band='contains' 的方案

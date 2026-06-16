@@ -5,9 +5,7 @@ const props = defineProps<{
     modelValue: string;
 }>();
 
-const emit = defineEmits<{
-    (e: "update:modelValue", value: string): void;
-}>();
+const emit = defineEmits<(e: "update:modelValue", value: string) => void>();
 
 const INTEGER_OPTIONS = [3, 4, 5, 6, 7, 8] as const;
 const DECIMAL_OPTIONS = Array.from({ length: 10 }, (_, i) => i);

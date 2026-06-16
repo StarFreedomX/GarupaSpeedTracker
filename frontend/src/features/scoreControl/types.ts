@@ -1,5 +1,5 @@
-import type { Skill } from "@/types/songMetadata";
 import type { FeasibleBonusResult } from "@/features/PT/calcSinglePT";
+import type { Skill } from "@/types/songMetadata";
 
 /** 支持的活动类型 */
 export type ActivityType = "mission" | "try" | "challenge" | "versus" | "5v5" | "medley1";
