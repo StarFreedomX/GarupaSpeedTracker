@@ -167,6 +167,9 @@ export class BestdoriSongMetadataService {
         await fs.ensureDir(this.dataDir);
         logger("bestdori", "checking Bestdori song summary source...");
 
+        // Load old songs data before overwriting, so we can detect changed songs
+        const oldMusicData = await readJson<MusicDataResponse>(this.songsPath);
+
         const musicData = await fetchBestdoriSongs(
             {
                 getExpireAt: () => Date.now() + Math.max(this.checkIntervalMs, 0),
@@ -185,12 +188,48 @@ export class BestdoriSongMetadataService {
         }
         await writeJson(this.songsPath, musicData);
 
+        // Detect which songs changed (new or modified) vs the old snapshot
+        const changedSongIds: string[] = [];
+        for (const songId of Object.keys(musicData)) {
+            if (!oldMusicData?.[songId]) {
+                changedSongIds.push(songId); // New song
+            } else {
+                const oldNorm = JSON.stringify(normalizeMusicItem(oldMusicData[songId]));
+                const newNorm = JSON.stringify(normalizeMusicItem(musicData[songId]));
+                if (oldNorm !== newNorm) {
+                    changedSongIds.push(songId); // Modified song
+                }
+            }
+        }
+
+        // Start from existing chart metadata to preserve unchanged songs
+        const chartMeta: SongChartMeta = { ...(this.state?.chartMeta ?? {}) };
+
+        // Remove songs that no longer exist in the new data
+        if (oldMusicData) {
+            for (const songId of Object.keys(oldMusicData)) {
+                if (!musicData[songId]) {
+                    delete chartMeta[Number(songId)];
+                }
+            }
+        }
+
+        if (changedSongIds.length === 0) {
+            // No songs changed — only deletions may have occurred; just update hash/time
+            const chartCount = Object.values(chartMeta).reduce((sum, s) => sum + Object.keys(s).length, 0);
+            this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
+            await this.persistState();
+            logger("bestdori", `song summary up to date (no chart changes): songs=${Object.keys(musicData).length}, charts=${chartCount}`);
+            return chartMeta;
+        }
+
         const levelsMap = this.levelParser.buildSongLevelMap(musicData);
         const limit = pLimit(Math.max(1, Math.floor(this.concurrency)));
-        const songIds = Object.keys(musicData).sort((a, b) => Number(a) - Number(b));
+
+        logger("bestdori", `incremental chart update: ${changedSongIds.length} song(s) changed out of ${Object.keys(musicData).length} total`);
 
         const items = await Promise.all(
-            songIds.map((songId) =>
+            changedSongIds.map((songId) =>
                 limit(async () => {
                     const music = musicData[songId];
                     const songNumericId = Number(songId);
@@ -206,16 +245,21 @@ export class BestdoriSongMetadataService {
             ),
         );
 
-        let chartCount = 0;
-        const chartMeta: SongChartMeta = {};
+        // Start from existing chart count and adjust for changes
+        let chartCount = this.state?.chartCount ?? 0;
         for (const item of items) {
+            // Subtract old chart count for this song if it had one
+            const oldSummary = chartMeta[item.songId];
+            if (oldSummary) {
+                chartCount -= Object.keys(oldSummary).length;
+            }
             chartCount += item.chartCount;
             chartMeta[item.songId] = item.summary;
         }
 
         this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
         await this.persistState();
-        logger("bestdori", `song summary updated: songs=${songIds.length}, charts=${chartCount}, raw=${this.rawChartStorage ? "on" : "off"}`);
+        logger("bestdori", `song summary updated: songs=${Object.keys(musicData).length}, charts=${chartCount}, changed=${changedSongIds.length}, raw=${this.rawChartStorage ? "on" : "off"}`);
         return chartMeta;
     }
 
