@@ -2,6 +2,8 @@ export interface I18nMessages {
     menu: {
         home: string;
         auto: string;
+        bonus: string;
+        interactive: string;
         settings: string;
         about: string;
         launcher: string;
@@ -175,6 +177,70 @@ export interface I18nMessages {
         title: string;
         desc: string;
         source: string;
+    };
+    interactive: {
+        title: string;
+        step: string;
+        step1: { title: string };
+        step2: {
+            title: string;
+            targetPt: string;
+            placeholder: string;
+        };
+        step3: { title: string };
+        step4: {
+            title: string;
+            computing: string;
+            solution: string;
+            playsCount: string;
+            flameCount: string;
+            ptRange: string;
+            recommendSongs: string;
+            songColName: string;
+            songColDifficulty: string;
+            songColPtRange: string;
+            noSolution: string;
+            maxAchievable: string;
+            adjustBonus: string;
+            adjustBonusHint: string;
+            adjustPowerHint: string;
+            bonusTableBonus: string;
+            bonusTableScore: string;
+            basePT: string;
+            totalPT: string;
+            songsAvailable: string;
+            scoreRange: string;
+            mainPlan: string;
+            altPlan: string;
+            noSongsForStep: string;
+            adjustConfigHint: string;
+        };
+        filter: {
+            title: string;
+            allowFull: string;
+            bandFilter: string;
+            bandModeContains: string;
+            bandModeAll: string;
+            boostString: string;
+            boostPlaceholder: string;
+            reset: string;
+        };
+        status: {
+            noFixedSongs: string;
+            noFixedSongsHint: string;
+            targetTooLow: string;
+            targetTooLowHint: string;
+        };
+        btn: {
+            prev: string;
+            next: string;
+            analyze: string;
+            recalc: string;
+        };
+        error: {
+            invalidPt: string;
+            noMetadata: string;
+        };
     };
     error: {
         requestFailed: string;

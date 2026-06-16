@@ -2,11 +2,16 @@ import { createRouter, createWebHashHistory } from "vue-router";
 
 // 统一使用动态导入 (Route-level code-splitting)
 const routes = [
-    { path: "/", redirect: "/auto" },
+    { path: "/", redirect: "/home" },
     {
         path: "/home",
         name: "home",
         component: () => import("@/views/HomeView.vue"),
+    },
+    {
+        path: "/interactive",
+        name: "interactive",
+        component: () => import("@/views/InteractiveScoreView.vue"),
     },
     {
         path: "/auto",
