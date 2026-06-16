@@ -21,8 +21,8 @@ const ACTIVITY_TYPES = [
 
 type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
 
-// 技能时长选项
-const DURATION_OPTIONS = ["3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0"] as const;
+// 技能时长选项：3.0 到 8.0，步长 0.1，共 51 个值
+const DURATION_OPTIONS = Array.from({ length: 51 }, (_, i) => ((30 + i) / 10).toFixed(1));
 
 // localStorage key
 const STORAGE_KEYS = {
