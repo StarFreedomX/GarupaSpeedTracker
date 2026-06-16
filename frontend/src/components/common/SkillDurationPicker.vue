@@ -1,0 +1,120 @@
+<script setup lang="ts">
+import { computed, ref, watch } from "vue";
+
+const props = defineProps<{
+    modelValue: string;
+}>();
+
+const emit = defineEmits<{
+    (e: "update:modelValue", value: string): void;
+}>();
+
+const INTEGER_OPTIONS = [3, 4, 5, 6, 7, 8] as const;
+const DECIMAL_OPTIONS = Array.from({ length: 10 }, (_, i) => i);
+
+const open = ref(false);
+const triggerRef = ref<HTMLElement | null>(null);
+
+const parsed = computed(() => {
+    const parts = props.modelValue.split(".");
+    return {
+        integer: Number.parseInt(parts[0] ?? "7", 10),
+        decimal: Number.parseInt(parts[1] ?? "0", 10),
+    };
+});
+
+// 面板内暂选的个位（点击小数位才确认）
+const pendingInteger = ref(parsed.value.integer);
+
+// 打开时同步 pendingInteger
+const toggle = () => {
+    if (!open.value) {
+        pendingInteger.value = parsed.value.integer;
+    }
+    open.value = !open.value;
+};
+
+const availableDecimals = computed(() => {
+    if (pendingInteger.value >= 8) return [0];
+    return DECIMAL_OPTIONS;
+});
+
+const selectInteger = (int: number) => {
+    pendingInteger.value = int;
+};
+
+const selectDecimal = (dec: number) => {
+    emit("update:modelValue", `${pendingInteger.value}.${dec}`);
+    open.value = false;
+};
+
+const closeOnClickOutside = (event: MouseEvent) => {
+    if (triggerRef.value && !triggerRef.value.contains(event.target as Node)) {
+        open.value = false;
+    }
+};
+
+watch(open, (isOpen) => {
+    if (isOpen) {
+        document.addEventListener("click", closeOnClickOutside);
+    } else {
+        document.removeEventListener("click", closeOnClickOutside);
+    }
+});
+</script>
+
+<template>
+    <div ref="triggerRef" class="relative">
+        <!-- 触发器：外观类似原生 select -->
+        <button
+            type="button"
+            class="flex w-full items-center justify-between rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text transition-colors hover:bg-surface"
+            @click.stop="toggle"
+        >
+            <span>{{ modelValue }}</span>
+            <span class="ml-1 text-xs text-muted transition-transform" :class="open ? 'rotate-180' : ''">▼</span>
+        </button>
+
+        <!-- 下拉面板 -->
+        <div
+            v-if="open"
+            class="absolute left-0 z-50 mt-1 rounded border border-border/80 bg-surface/95 shadow-lg"
+        >
+            <div class="flex">
+                <!-- 左栏：个位（点击仅高亮，不关闭） -->
+                <div class="flex max-h-48 flex-col overflow-y-auto border-r border-border/60 py-1">
+                    <button
+                        v-for="int in INTEGER_OPTIONS"
+                        :key="int"
+                        type="button"
+                        class="min-w-[2.5rem] px-4 py-1.5 text-left text-sm transition-colors hover:bg-primary/20"
+                        :class="int === pendingInteger ? 'bg-primary/15 text-primary font-medium' : 'text-text'"
+                        @click.stop="selectInteger(int)"
+                    >
+                        {{ int }}
+                    </button>
+                </div>
+                <!-- 右栏：小数位（点击确认并关闭） -->
+                <div class="flex max-h-48 flex-col overflow-y-auto py-1">
+                    <button
+                        v-for="dec in DECIMAL_OPTIONS"
+                        :key="dec"
+                        type="button"
+                        class="min-w-[2.5rem] px-4 py-1.5 text-left text-sm transition-colors"
+                        :class="[
+                            !availableDecimals.includes(dec)
+                                ? 'cursor-not-allowed text-muted/40'
+                                : dec === parsed.decimal && pendingInteger === parsed.integer
+                                  ? 'bg-primary/15 text-primary font-medium'
+                                  : 'text-text hover:bg-primary/20',
+                        ]"
+                        :disabled="!availableDecimals.includes(dec)"
+                        @click.stop="availableDecimals.includes(dec) && selectDecimal(dec)"
+                    >
+                        .{{ dec }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

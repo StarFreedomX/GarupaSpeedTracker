@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import SkillDurationPicker from "@/components/common/SkillDurationPicker.vue";
 import { calcEventPT } from "@/features/PT/calcSinglePT";
 import { calcScore } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
@@ -21,8 +22,7 @@ const ACTIVITY_TYPES = [
 
 type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
 
-// 技能时长选项：3.0 到 8.0，步长 0.1，共 51 个值
-const DURATION_OPTIONS = Array.from({ length: 51 }, (_, i) => ((30 + i) / 10).toFixed(1));
+// 技能时长选项：使用 SkillDurationPicker 组件（双栏下拉）
 
 // localStorage key
 const STORAGE_KEYS = {
@@ -554,20 +554,19 @@ const calculate = () => {
                                     {{ idx + 1 }}
                                 </span>
                             </div>
-                            <select
-                                :value="skill.duration"
-                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm"
-                                @change="updateSkill(idx, 'duration', ($event.target as HTMLSelectElement).value)"
-                            >
-                                <option v-for="opt in DURATION_OPTIONS" :key="opt" :value="opt">
-                                    {{ opt }}{{ t('common.unitSecond') }}
-                                </option>
-                            </select>
+                            <div class="flex items-center gap-1">
+                                <SkillDurationPicker
+                                    :model-value="skill.duration"
+                                    class="w-28"
+                                    @update:model-value="updateSkill(idx, 'duration', $event)"
+                                />
+                                <span class="text-xs text-muted">{{ t('common.unitSecond') }}</span>
+                            </div>
                             <input
                                 :value="skill.scoreUp"
                                 type="number"
                                 step="0.01"
-                                class="w-24 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-left"
+                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-left"
                                 @input="updateSkill(idx, 'scoreUp', parseFloat(($event.target as HTMLInputElement).value))"
                             />
                             <span class="w-8 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
