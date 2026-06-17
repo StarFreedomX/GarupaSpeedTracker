@@ -150,6 +150,9 @@ export interface I18nMessages {
         queryTitle: string;
         tableTitle: string;
         rowsPerPage: string;
+        calculatorTitle: string;
+        minRecPower: string;
+        maxRecPower: string;
         hue: string;
         apiTitle: string;
         apiMode: string;
@@ -206,6 +209,7 @@ export interface I18nMessages {
             adjustBonusHint: string;
             bonusTableBonus: string;
             bonusTableScore: string;
+            bonusTablePower: string;
             basePT: string;
             totalPT: string;
             songsAvailable: string;

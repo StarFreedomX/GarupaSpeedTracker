@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import SkillDurationPicker from "@/components/common/SkillDurationPicker.vue";
+import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
+import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import Tooltip from "@/components/common/Tooltip.vue";
+import { useUserPreferences } from "@/composables/useUserPreferences";
 import { analyze, computeFixedBasePTs, findContiguousWindows } from "@/features/scoreControl/interactiveAnalysis";
 import type { ActivityType, AnalysisResult, PlayStep, SolutionFilter, TeamConfig } from "@/features/scoreControl/types";
+import { calcExactScoreInTurns, calcScore } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
 import { fetchMetadata } from "@/services/songMetadataApi";
 import { fetchSongList } from "@/services/songsApi";
@@ -14,9 +17,9 @@ const { t } = useI18n();
 
 // ─── localStorage keys ───
 const STORAGE_KEYS = {
-    FORM_DATA: "interactive_formData",
-    SKILLS: "interactive_skills",
-    CENTER_INDEX: "interactive_centerIndex",
+    FORM_DATA: "scoreCalc_formData",
+    SKILLS: "scoreCalc_skills",
+    CENTER_INDEX: "scoreCalc_centerIndex",
 } as const;
 
 // ─── activity type options ───
@@ -114,10 +117,8 @@ const previewWindows = computed(() => {
 const isStepValid = computed(() => {
     switch (currentStep.value) {
         case 1:
-            return ACTIVITY_TYPES.some((t) => t.value === formData.value.activityType);
-        case 2:
             return formData.value.totalPower > 0 && skills.value.length === 5;
-        case 3:
+        case 2:
             return formData.value.targetPT > 0 && formData.value.targetPT <= 10000000;
         default:
             return true;
@@ -126,9 +127,9 @@ const isStepValid = computed(() => {
 
 // ─── step navigation ───
 const nextStep = () => {
-    if (currentStep.value < 4 && isStepValid.value) {
+    if (currentStep.value < 3 && isStepValid.value) {
         currentStep.value++;
-        if (currentStep.value === 4) {
+        if (currentStep.value === 3) {
             runAnalysis();
         }
     }
@@ -138,7 +139,7 @@ const prevStep = () => {
     if (currentStep.value > 1) {
         currentStep.value--;
         // 回到配置步骤时清除旧结果
-        if (currentStep.value < 4) {
+        if (currentStep.value < 3) {
             analysisResult.value = null;
         }
     }
@@ -146,7 +147,7 @@ const prevStep = () => {
 
 const goToStep = (step: number) => {
     currentStep.value = step;
-    if (step === 4) {
+    if (step === 3) {
         runAnalysis();
     } else {
         analysisResult.value = null;
@@ -154,13 +155,6 @@ const goToStep = (step: number) => {
 };
 
 // ─── auto preset logic ───
-const handleAutoPresetChange = () => {
-    const preset = AUTO_PRESETS.find((p) => p.id === autoPreset.value);
-    if (preset?.value !== null && preset?.value !== undefined) {
-        formData.value.autoPara = preset.value;
-    }
-};
-
 watch(
     () => formData.value.autoPara,
     () => {
@@ -271,7 +265,7 @@ const goToMain = () => {
 
 // 键盘导航：左右方向键切换方案
 const handleKeydown = (e: KeyboardEvent) => {
-    if (currentStep.value !== 4) return;
+    if (currentStep.value !== 3) return;
     if (e.key === "ArrowRight") {
         e.preventDefault();
         goNextAlternative();
@@ -311,7 +305,7 @@ const saveCenterIndex = () => {
     localStorage.setItem(STORAGE_KEYS.CENTER_INDEX, String(centerIndex.value));
 };
 const saveFilter = () => {
-    localStorage.setItem("interactive_filter", JSON.stringify(filterData.value));
+    localStorage.setItem("scoreCalc_filter", JSON.stringify(filterData.value));
 };
 
 const loadFromStorage = () => {
@@ -331,7 +325,7 @@ const loadFromStorage = () => {
         if (savedCenter !== null) {
             centerIndex.value = Number.parseInt(savedCenter, 10);
         }
-        const savedFilter = localStorage.getItem("interactive_filter");
+        const savedFilter = localStorage.getItem("scoreCalc_filter");
         if (savedFilter) {
             filterData.value = { ...defaultFilter, ...JSON.parse(savedFilter) };
         }
@@ -367,6 +361,92 @@ const hasNoFixedSongs = computed(() => {
     if (!bl || bl.length === 0) return false;
     return bl[0].achievableBasePTs.length === 0;
 });
+
+/** 筛选 feasibleBonuses：始终展示全部加成建议 */
+const filteredFeasibleBonuses = computed(() => {
+    return analysisResult.value?.feasibleBonuses ?? [];
+});
+
+// ─── bonus → recommended total power ───
+/** 二分反推：给定目标分数，计算所需综合力 */
+function reverseCalcPower(
+    targetScore: number,
+    orderedSkills: Skill[],
+    centerSkill: Skill,
+    songLevelSummary: { level: number; total: number; counts: Record<string, number[]> },
+    autoPara: number,
+): number {
+    const skills = [...orderedSkills, centerSkill];
+    let lo = 1;
+    let hi = 500_000;
+    for (let i = 0; i < 32; i++) {
+        const mid = Math.floor((lo + hi) / 2);
+        const score = calcExactScoreInTurns(mid, skills, songLevelSummary, autoPara);
+        if (score < targetScore) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return Math.floor((lo + hi) / 2);
+}
+
+/** 加成行（含推荐综合力） */
+const { preferences: appPreferences } = useUserPreferences();
+
+const bonusRows = computed(() => {
+    const bonuses = filteredFeasibleBonuses.value;
+    if (bonuses.length === 0) return [];
+
+    // 获取固定PT歌曲列表
+    const meta = songMetadata.value;
+    if (!meta || Object.keys(meta).length === 0) return [];
+    const cfg = teamConfig.value;
+    const center = skills.value[cfg.centerIndex];
+    if (!center) return [];
+
+    try {
+        const { songMap } = computeFixedBasePTs(cfg, formData.value.activityType, meta, songList.value, filterData.value);
+        const allSongs: { songId: number; difficultyKey: string; basePT: number }[] = [];
+        for (const songs of songMap.values()) {
+            for (const s of songs) {
+                allSongs.push({ songId: s.songId, difficultyKey: s.difficultyKey, basePT: s.basePT });
+            }
+        }
+        if (allSongs.length === 0) return [];
+
+        // 按 basePT 排序取中位数
+        allSongs.sort((a, b) => a.basePT - b.basePT);
+        const median = allSongs[Math.floor(allSongs.length / 2)];
+
+        // 找到对应谱面数据
+        const songSummary = meta[median.songId];
+        const levelSummary = songSummary?.[median.difficultyKey as "0" | "1" | "2" | "3" | "4"];
+        if (!levelSummary) return [];
+
+        // 计算最优技能顺序
+        const { maxPath } = calcScore(cfg.totalPower, cfg.skills, center, levelSummary, cfg.autoPara);
+        const orderedSkills = new Array<Skill>(5);
+        maxPath.forEach((posIdx, skillIdx) => {
+            orderedSkills[posIdx] = cfg.skills[skillIdx];
+        });
+
+        // 为每个加成反推综合力，按设置中的推荐综合力范围过滤
+        const minPower = appPreferences.calculator.minRecPower;
+        const maxPower = appPreferences.calculator.maxRecPower;
+        const rows: { bonus: number; recommendedPower: number }[] = [];
+        for (const b of bonuses) {
+            const avgScore = Math.floor((b.scoreRange.min + b.scoreRange.max) / 2);
+            const power = reverseCalcPower(avgScore, orderedSkills, center, levelSummary, cfg.autoPara);
+            if (power >= minPower && power <= maxPower) {
+                rows.push({ bonus: b.bonus, recommendedPower: power });
+            }
+        }
+        return rows;
+    } catch {
+        return [];
+    }
+});
 </script>
 
 <template>
@@ -375,11 +455,11 @@ const hasNoFixedSongs = computed(() => {
         <div class="rounded border border-border/80 bg-surface/50 p-3">
             <div class="flex items-center gap-4">
                 <span class="text-sm font-medium text-text">
-                    {{ t('interactive.step', { current: currentStep, total: 4 }) }}
+                    {{ t('interactive.step', { current: currentStep, total: 3 }) }}
                 </span>
                 <div class="flex gap-1.5">
                     <button
-                        v-for="s in 4"
+                        v-for="s in 3"
                         :key="s"
                         type="button"
                         class="h-2 rounded-full transition-all duration-300"
@@ -391,45 +471,16 @@ const hasNoFixedSongs = computed(() => {
                     />
                 </div>
                 <span class="ml-auto text-xs text-muted">
-                    {{ currentStep === 1 ? t('interactive.step1.title')
-                        : currentStep === 2 ? t('interactive.step2.title')
-                        : currentStep === 3 ? t('interactive.step3.title')
+                    {{ currentStep === 1 ? t('interactive.step2.title')
+                        : currentStep === 2 ? t('interactive.step3.title')
                         : t('interactive.step4.title') }}
                 </span>
             </div>
         </div>
 
-        <!-- ═══════ Step 1: Select activity type ═══════ -->
+        <!-- ═══════ Step 2: Target PT ═══════ -->
         <div
-            v-if="currentStep === 1"
-            class="rounded border border-border/80 bg-surface/50 p-3"
-        >
-            <div class="mb-3 text-sm font-medium">{{ t('interactive.step1.title') }}</div>
-            <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                <button
-                    v-for="type in ACTIVITY_TYPES"
-                    :key="type.value"
-                    type="button"
-                    class="cursor-pointer rounded border p-4 text-center transition-all duration-200"
-                    :class="formData.activityType === type.value
-                        ? 'border-primary/40 bg-primary/10 shadow-sm shadow-primary/10'
-                        : 'border-border/80 hover:border-border hover:bg-surface/70'"
-                    @click="formData.activityType = type.value"
-                >
-                    <div class="text-2xl mb-1">{{ type.icon }}</div>
-                    <div
-                        class="text-sm font-medium"
-                        :class="formData.activityType === type.value ? 'text-primary' : 'text-text'"
-                    >
-                        {{ type.label }}
-                    </div>
-                </button>
-            </div>
-        </div>
-
-        <!-- ═══════ Step 3: Target PT ═══════ -->
-        <div
-            v-if="currentStep === 3"
+            v-if="currentStep === 2"
             class="rounded border border-border/80 bg-surface/50 p-3"
         >
             <div class="mb-3 text-sm font-medium">{{ t('interactive.step3.title') }}</div>
@@ -550,142 +601,38 @@ const hasNoFixedSongs = computed(() => {
             </div>
         </div>
 
-        <!-- ═══════ Step 2: Team config ═══════ -->
-        <div v-if="currentStep === 2" class="grid gap-4 md:grid-cols-2">
-            <!-- Left: Event params -->
-            <div class="rounded border border-border/80 bg-surface/50 p-3">
-                <div class="mb-2 text-sm font-medium">{{ t('auto.config.eventParams') }}</div>
-                <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.eventType') }}</span>
-                        <span class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text">
-                            {{ ACTIVITY_TYPES.find(t => t.value === formData.activityType)?.label }}
-                        </span>
-                    </div>
+        <!-- ═══════ Step 1: Team config ═══════ -->
+        <div v-if="currentStep === 1" class="grid gap-4 md:grid-cols-2">
+            <EventParamsPanel
+                :activity-type="formData.activityType"
+                :total-power="formData.totalPower"
+                :support-band-power="formData.supportBandPower"
+                :event-bonus="formData.eventBonus"
+                :auto-para="formData.autoPara"
+                :auto-preset="autoPreset"
+                :show-support-band="showSupportBand"
+                :show-event-bonus="showEventBonus"
+                :activity-type-editable="true"
+                :activity-type-options="ACTIVITY_TYPES"
+                @update:activity-type="formData.activityType = $event"
+                @update:total-power="formData.totalPower = $event"
+                @update:support-band-power="formData.supportBandPower = $event"
+                @update:event-bonus="formData.eventBonus = $event"
+                @update:auto-para="formData.autoPara = $event"
+                @update:auto-preset="autoPreset = $event"
+            />
 
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.totalPower') }}</span>
-                        <input
-                            v-model.number="formData.totalPower"
-                            type="number"
-                            min="0"
-                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-                    <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
-
-                    <div v-if="showSupportBand" class="flex items-center gap-3">
-                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
-                        <input
-                            v-model.number="formData.supportBandPower"
-                            type="number"
-                            min="0"
-                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-
-                    <div v-if="showEventBonus" class="flex items-center gap-3">
-                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.eventBonus') }}</span>
-                        <input
-                            v-model.number="formData.eventBonus"
-                            type="number"
-                            min="0"
-                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.autoRate') }}</span>
-                        <div class="flex min-w-0 gap-2">
-                            <select
-                                v-model="autoPreset"
-                                class="w-24 sm:w-28 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
-                                @change="handleAutoPresetChange"
-                            >
-                                <option value="cn">{{ t('auto.server.cn') }}</option>
-                                <option value="jp">{{ t('auto.server.jp') }}</option>
-                                <option value="others">{{ t('auto.server.others') }}</option>
-                            </select>
-                            <input
-                                v-if="autoPreset === 'others'"
-                                v-model.number="formData.autoPara"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                class="no-spin w-24 sm:w-28 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
-                                :placeholder="t('auto.config.ratePlaceholder')"
-                            />
-                            <span
-                                v-else
-                                class="w-24 sm:w-28 truncate rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
-                            >
-                                {{ t('auto.config.rateLabel') }} {{ formData.autoPara }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: Skill config -->
-            <div class="rounded border border-border/80 bg-surface/50 p-3">
-                <div class="mb-2 flex items-center justify-between">
-                    <span class="text-sm font-medium">{{ t('auto.config.skillConfig') }}</span>
-                    <button
-                        type="button"
-                        class="text-xs text-muted hover:text-text"
-                        @click="resetSkills"
-                    >
-                        {{ t('common.resetDefault') }}
-                    </button>
-                </div>
-
-                <div class="space-y-2">
-                    <div class="text-xs font-medium text-muted">{{ t('auto.config.skillOrderHint') }}</div>
-                    <div class="grid gap-2">
-                        <div v-for="(skill, idx) in skills" :key="idx" class="flex items-center gap-1.5 min-w-0">
-                            <div class="flex items-center gap-1 shrink-0">
-                                <input
-                                    type="radio"
-                                    :checked="centerIndex === idx"
-                                    class="h-3.5 w-3.5"
-                                    @change="centerIndex = idx"
-                                />
-                                <span
-                                    class="w-6 text-xs"
-                                    :class="centerIndex === idx ? 'text-primary' : 'text-muted'"
-                                >
-                                    {{ idx + 1 }}
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-1 shrink-0">
-                                <SkillDurationPicker
-                                    :model-value="skill.duration"
-                                    class="w-24 sm:w-28"
-                                    @update:model-value="updateSkill(idx, 'duration', $event)"
-                                />
-                                <span class="hidden sm:inline text-xs text-muted">{{ t('common.unitSecond') }}</span>
-                            </div>
-                            <input
-                                :value="skill.scoreUp"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                class="no-spin w-20 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
-                                @input="updateSkill(idx, 'scoreUp', parseFloat(($event.target as HTMLInputElement).value))"
-                            />
-                            <span class="shrink-0 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-2 text-xs text-muted">
-                    <span class="text-primary">● {{ t('auto.config.skillCenterHint') }}</span>
-                </div>
-            </div>
+            <SkillConfigPanel
+                :skills="skills"
+                :center-index="centerIndex"
+                @update:skill="updateSkill"
+                @update:center-index="centerIndex = $event"
+                @reset="resetSkills"
+            />
         </div>
 
-        <!-- ═══════ Step 4: Results ═══════ -->
-        <div v-if="currentStep === 4">
+        <!-- ═══════ Step 3: Results ═══════ -->
+        <div v-if="currentStep === 3">
             <!-- Loading -->
             <div
                 v-if="computing"
@@ -844,9 +791,10 @@ const hasNoFixedSongs = computed(() => {
                             {{ t('interactive.status.noFixedSongsHint') }}
                         </p>
                     </div>
-                    <!-- Target too low -->
+
+                    <!-- Target too low warning -->
                     <div
-                        v-else-if="analysisResult.targetTooLow"
+                        v-if="analysisResult.targetTooLow"
                         class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
                     >
                         <p class="text-sm text-muted mb-1">
@@ -856,86 +804,85 @@ const hasNoFixedSongs = computed(() => {
                             {{ t('interactive.status.targetTooLowHint', { min: (analysisResult.boostLevels[0]?.achievableBasePTs?.[0] ?? 0).toLocaleString() }) }}
                         </p>
                     </div>
-                    <!-- No solution found -->
-                    <div v-else>
-                        <div class="rounded border border-border/80 bg-surface/50 p-3 mb-3">
-                            <p class="text-sm text-muted mb-2">
-                                ⚠️ {{ t('interactive.step4.noSolution') }}
-                            </p>
-                            <p class="text-xs text-muted">
-                                {{ t('interactive.step4.maxAchievable', { pt: (analysisResult.maxAchievablePT ?? 0).toLocaleString() }) }}
-                            </p>
-                            <p class="mt-2 text-xs text-muted">
-                                {{ t('interactive.step4.adjustConfigHint') }}
-                            </p>
-                        </div>
 
-                        <!-- Contiguous windows -->
-                        <div
-                            v-if="analysisResult.contiguousWindows && analysisResult.contiguousWindows.length > 0"
-                            class="rounded border border-primary/30 bg-primary/5 p-3 mb-3"
-                        >
-                            <p class="mb-2 text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
-                            <div class="space-y-2">
-                                <div v-for="w in analysisResult.contiguousWindows" :key="w.plays">
-                                    <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
-                                    <p
-                                        v-for="(seg, si) in w.segments"
-                                        :key="si"
-                                        class="text-xs text-muted ml-3"
-                                        :class="si === 0 ? '' : 'opacity-60'"
-                                    >
-                                        <span v-if="si === 0">★ </span><span v-else>  </span>
-                                        <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
-                                        （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
-                                    </p>
-                                </div>
+                    <!-- No solution general info -->
+                    <div
+                        v-if="!hasNoFixedSongs && !analysisResult.targetTooLow"
+                        class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
+                    >
+                        <p class="text-sm text-muted mb-2">
+                            ⚠️ {{ t('interactive.step4.noSolution') }}
+                        </p>
+                        <p class="text-xs text-muted">
+                            {{ t('interactive.step4.maxAchievable', { pt: (analysisResult.maxAchievablePT ?? 0).toLocaleString() }) }}
+                        </p>
+                        <p class="mt-2 text-xs text-muted">
+                            {{ t('interactive.step4.adjustConfigHint') }}
+                        </p>
+                    </div>
+
+                    <!-- Contiguous windows -->
+                    <div
+                        v-if="analysisResult.contiguousWindows && analysisResult.contiguousWindows.length > 0"
+                        class="rounded border border-primary/30 bg-primary/5 p-3 mb-3"
+                    >
+                        <p class="mb-2 text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
+                        <div class="space-y-2">
+                            <div v-for="w in analysisResult.contiguousWindows" :key="w.plays">
+                                <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
+                                <p
+                                    v-for="(seg, si) in w.segments"
+                                    :key="si"
+                                    class="text-xs text-muted ml-3"
+                                    :class="si === 0 ? '' : 'opacity-60'"
+                                >
+                                    <span v-if="si === 0">★ </span><span v-else>  </span>
+                                    <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
+                                    （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
+                                </p>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Bonus adjustment suggestions -->
-                        <div
-                            v-if="analysisResult.feasibleBonuses && analysisResult.feasibleBonuses.length > 0"
-                            class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
-                        >
-                            <div class="mb-2 text-sm font-medium text-text">
-                                {{ t('interactive.step4.adjustBonus') }}
-                            </div>
-                            <p class="mb-2 text-xs text-muted">
-                                {{ t('interactive.step4.adjustBonusHint') }}
-                            </p>
-                            <div class="overflow-hidden rounded border border-border/60">
-                                <table class="w-full border-collapse text-sm">
-                                    <thead>
-                                    <tr class="border-b border-border/60 bg-surface/30">
-                                        <th class="px-3 py-1.5 text-left font-normal text-muted">
-                                            {{ t('interactive.step4.bonusTableBonus') }}
-                                        </th>
-                                        <th class="px-3 py-1.5 text-right font-normal text-muted">
-                                            {{ t('interactive.step4.bonusTableScore') }}
-                                        </th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    <tr
-                                        v-for="res in analysisResult.feasibleBonuses.slice(0, 20)"
-                                        :key="res.bonus"
-                                        class="border-b border-border/40 hover:bg-surface/30"
-                                    >
-                                        <td class="px-3 py-1.5 font-mono font-bold text-primary">
-                                            {{ res.bonus }}%
-                                        </td>
-                                        <td class="px-3 py-1.5 text-right font-mono">
-                                            <span class="text-text">{{ res.scoreRange.min.toLocaleString() }}</span>
-                                            <span class="mx-2 text-muted">-</span>
-                                            <span class="text-text">{{ res.scoreRange.max.toLocaleString() }}</span>
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <!-- Bonus adjustment suggestions (always shown when available) -->
+                    <div
+                        v-if="bonusRows.length > 0"
+                        class="rounded border border-border/80 bg-surface/50 p-3 mb-3"
+                    >
+                        <div class="mb-2 text-sm font-medium text-text">
+                            {{ t('interactive.step4.adjustBonus') }}
                         </div>
-
+                        <p class="mb-2 text-xs text-muted">
+                            {{ t('interactive.step4.adjustBonusHint') }}
+                        </p>
+                        <div class="overflow-hidden rounded border border-border/60">
+                            <table class="w-full border-collapse text-sm">
+                                <thead>
+                                <tr class="border-b border-border/60 bg-surface/30">
+                                    <th class="px-3 py-1.5 text-left font-normal text-muted">
+                                        {{ t('interactive.step4.bonusTableBonus') }}
+                                    </th>
+                                    <th class="px-3 py-1.5 text-right font-normal text-muted">
+                                        {{ t('interactive.step4.bonusTablePower') }}
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr
+                                    v-for="row in bonusRows"
+                                    :key="row.bonus"
+                                    class="border-b border-border/40 hover:bg-surface/30"
+                                >
+                                    <td class="px-3 py-1.5 font-mono font-bold text-primary">
+                                        {{ row.bonus }}%
+                                    </td>
+                                    <td class="px-3 py-1.5 text-right font-mono text-text">
+                                        {{ row.recommendedPower.toLocaleString() }}
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </template>
             </template>
@@ -954,7 +901,7 @@ const hasNoFixedSongs = computed(() => {
             <div v-else class="flex-1" />
 
             <button
-                v-if="currentStep < 3"
+                v-if="currentStep < 2"
                 type="button"
                 class="app-btn border border-border/80 bg-surface/90 px-4 py-1.5 text-sm text-text transition-colors hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="!isStepValid"
@@ -964,11 +911,11 @@ const hasNoFixedSongs = computed(() => {
             </button>
 
             <button
-                v-if="currentStep === 3"
+                v-if="currentStep === 2"
                 type="button"
                 class="app-btn border border-primary/40 bg-primary/15 px-4 py-1.5 text-sm text-primary transition-colors hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="!isStepValid || computing"
-                @click="goToStep(4)"
+                @click="goToStep(3)"
             >
                 🔍 {{ t('interactive.btn.analyze') }}
             </button>

@@ -2,6 +2,7 @@ import { reactive } from "vue";
 import {
     DEFAULT_API_PREFERENCES,
     DEFAULT_AUTO_RETRY_DELAY_SECONDS,
+    DEFAULT_CALCULATOR_PREFERENCES,
     DEFAULT_EVENT,
     DEFAULT_PRIMARY_HUE,
     DEFAULT_REQUEST_INTERVAL_SECONDS,
@@ -14,7 +15,15 @@ import {
     DEFAULT_TIME_MINUTES,
     PREFERENCES_STORAGE_KEY,
 } from "@/config/config";
-import type { ApiPreferences, QueryPreferences, RequestMode, TablePreferences, ThemePreferences, UserPreferences } from "@/types/preferences";
+import type {
+    ApiPreferences,
+    CalculatorPreferences,
+    QueryPreferences,
+    RequestMode,
+    TablePreferences,
+    ThemePreferences,
+    UserPreferences,
+} from "@/types/preferences";
 
 export const normalizeHue = (value: number): number => {
     const normalized = value % 360;
@@ -58,6 +67,9 @@ export const createDefaultPreferences = (): UserPreferences => ({
     theme: {
         primaryHue: DEFAULT_PRIMARY_HUE,
     },
+    calculator: {
+        ...DEFAULT_CALCULATOR_PREFERENCES,
+    },
 });
 
 export const clonePreferences = (preferences: UserPreferences): UserPreferences => ({
@@ -72,6 +84,9 @@ export const clonePreferences = (preferences: UserPreferences): UserPreferences 
     },
     theme: {
         ...preferences.theme,
+    },
+    calculator: {
+        ...preferences.calculator,
     },
 });
 
@@ -107,6 +122,11 @@ const normalizeApiPreferences = (api: Record<string, unknown> | undefined): ApiP
     backendBaseUrl: typeof api?.backendBaseUrl === "string" ? api.backendBaseUrl.trim() : DEFAULT_API_PREFERENCES.backendBaseUrl,
 });
 
+const normalizeCalculatorPreferences = (calc: Record<string, unknown> | undefined): CalculatorPreferences => ({
+    minRecPower: clampInteger(calc?.minRecPower, DEFAULT_CALCULATOR_PREFERENCES.minRecPower, 0),
+    maxRecPower: clampInteger(calc?.maxRecPower, DEFAULT_CALCULATOR_PREFERENCES.maxRecPower, 0),
+});
+
 const loadPreferences = (): UserPreferences => {
     try {
         const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
@@ -122,6 +142,7 @@ const loadPreferences = (): UserPreferences => {
             theme: {
                 primaryHue: normalizeHue(clampInteger(parsed.theme?.primaryHue, defaultPreferences.theme.primaryHue, 0, 359)),
             },
+            calculator: normalizeCalculatorPreferences(parsed.calculator as Record<string, unknown> | undefined),
         };
     } catch {
         return createDefaultPreferences();

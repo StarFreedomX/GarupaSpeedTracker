@@ -393,6 +393,20 @@ export function analyze(
     const minBasePT = achievableBasePTs[0];
     const maxBasePT = achievableBasePTs[achievableBasePTs.length - 1];
 
+    // 加成建议：提前计算，targetTooLow 和 no-solution 场景都需要
+    let feasibleBonuses: AnalysisResult["feasibleBonuses"];
+    const bonusParams = buildBonusParams(activityType, config);
+    if (bonusParams && targetPT <= maxBasePT * FLAME_MULTIPLIERS[3]) {
+        try {
+            const bonuses = getFeasibleBonus(targetPT, bonusParams);
+            if (bonuses.length > 0) {
+                feasibleBonuses = bonuses;
+            }
+        } catch {
+            // skip
+        }
+    }
+
     // 目标 PT 低于最小可达 basePT → 无论如何都达不到这么低
     if (targetPT < minBasePT) {
         return {
@@ -402,6 +416,7 @@ export function analyze(
             alternatives: [],
             maxAchievablePT: maxBasePT * FLAME_MULTIPLIERS[3] * 5,
             targetTooLow: true,
+            feasibleBonuses,
         };
     }
 
@@ -498,21 +513,6 @@ export function analyze(
 
     // ─── 不可行 ───
     const maxAchievablePT = maxBasePT * FLAME_MULTIPLIERS[3] * 5;
-
-    // 加成建议：仅当 targetPT 在单局可达范围时（≤ 当前最大 basePT × 3火）展示
-    // 因为加成控分表本质是"1局游戏的 PT 在什么加成下能打出来"
-    let feasibleBonuses: AnalysisResult["feasibleBonuses"];
-    const bonusParams = buildBonusParams(activityType, config);
-    if (bonusParams && targetPT <= maxBasePT * FLAME_MULTIPLIERS[3]) {
-        try {
-            const bonuses = getFeasibleBonus(targetPT, bonusParams);
-            if (bonuses.length > 0) {
-                feasibleBonuses = bonuses;
-            }
-        } catch {
-            // skip
-        }
-    }
 
     // 找各游玩次数下的最大连续可达区间
     const contiguousWindows = findContiguousWindows(achievableBasePTs);

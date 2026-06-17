@@ -118,6 +118,11 @@ export const DEFAULT_API_PREFERENCES = {
 } as const;
 export const DEFAULT_PRIMARY_HUE = readRuntimeNumber("DEFAULT_PRIMARY_HUE", 340, 0, 359);
 
+export const DEFAULT_CALCULATOR_PREFERENCES = {
+    minRecPower: 30_000,
+    maxRecPower: 450_000,
+} as const;
+
 // Storage
 export const PREFERENCES_STORAGE_KEY = "garupa-speed-tracker:preferences";
 

@@ -28,9 +28,15 @@ export interface ThemePreferences {
     primaryHue: number;
 }
 
+export interface CalculatorPreferences {
+    minRecPower: number;
+    maxRecPower: number;
+}
+
 export interface UserPreferences {
     api: ApiPreferences;
     query: QueryPreferences;
     table: TablePreferences;
     theme: ThemePreferences;
+    calculator: CalculatorPreferences;
 }

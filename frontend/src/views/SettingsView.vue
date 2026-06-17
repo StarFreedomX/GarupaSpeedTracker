@@ -35,6 +35,7 @@ const syncDraft = (next: UserPreferences) => {
     Object.assign(draft.query, copy.query);
     Object.assign(draft.table, copy.table);
     Object.assign(draft.theme, copy.theme);
+    Object.assign(draft.calculator, copy.calculator);
 };
 
 watch(
@@ -107,6 +108,20 @@ const rowsPerPage = computed({
     },
 });
 
+const minRecPower = computed({
+    get: () => draft.calculator.minRecPower,
+    set: (value: number) => {
+        draft.calculator.minRecPower = clampNumber(value, 30_000, 0);
+    },
+});
+
+const maxRecPower = computed({
+    get: () => draft.calculator.maxRecPower,
+    set: (value: number) => {
+        draft.calculator.maxRecPower = clampNumber(value, 450_000, 0);
+    },
+});
+
 const queryTime = computed({
     get: () => draft.query.time,
     set: (value: number) => {
@@ -126,6 +141,7 @@ const save = () => {
     Object.assign(model.value.query, next.query);
     Object.assign(model.value.table, next.table);
     Object.assign(model.value.theme, next.theme);
+    Object.assign(model.value.calculator, next.calculator);
 };
 
 const onHueChange = (event: Event) => {
@@ -297,6 +313,21 @@ const onHueChange = (event: Event) => {
                 {{ t('settings.rowsPerPage') }}
                 <input v-model.number="rowsPerPage" type="number" min="1"
                        class="rounded-app border-border bg-surface text-sm text-text"/>
+            </label>
+        </section>
+
+        <section class="app-panel grid grid-cols-1 gap-4 p-4">
+            <h2 class="text-base font-semibold">{{ t('settings.calculatorTitle') }}</h2>
+
+            <label class="grid gap-1 text-sm text-muted max-w-xs">
+                {{ t('settings.minRecPower') }}
+                <input v-model.number="minRecPower" type="number" min="0"
+                       class="no-spin rounded-app border-border bg-surface text-sm text-text"/>
+            </label>
+            <label class="grid gap-1 text-sm text-muted max-w-xs">
+                {{ t('settings.maxRecPower') }}
+                <input v-model.number="maxRecPower" type="number" min="0"
+                       class="no-spin rounded-app border-border bg-surface text-sm text-text"/>
             </label>
         </section>
 

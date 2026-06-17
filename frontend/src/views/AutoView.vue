@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import SkillDurationPicker from "@/components/common/SkillDurationPicker.vue";
+import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
+import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import { calcEventPT } from "@/features/PT/calcSinglePT";
 import { calcScore } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
@@ -26,9 +27,9 @@ type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
 
 // localStorage key
 const STORAGE_KEYS = {
-    FORM_DATA: "autoView_formData",
-    SKILLS: "autoView_skills",
-    CENTER_INDEX: "autoView_centerIndex",
+    FORM_DATA: "scoreCalc_formData",
+    SKILLS: "scoreCalc_skills",
+    CENTER_INDEX: "scoreCalc_centerIndex",
     FILTER_OPTIONS: "autoView_filterOptions",
 } as const;
 
@@ -262,14 +263,7 @@ const resetSkills = () => {
     centerIndex.value = defaultCenterIndex;
 };
 
-// 监听预设变化，自动填充 autoPara
-const handleAutoPresetChange = () => {
-    const preset = AUTO_PRESETS.find((p) => p.id === autoPreset.value);
-    if (preset && preset.value !== null) {
-        formData.value.autoPara = preset.value;
-    }
-};
-
+// 监听预设变化，自动填充 autoPara —— 由 EventParamsPanel 内部处理
 // 监听 autoPara 变化，如果是预设值则自动切换到对应的预设
 const updateAutoPreset = () => {
     if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "cn")?.value) {
@@ -288,11 +282,6 @@ watch(
         updateAutoPreset();
     },
 );
-
-// 监听预设变化
-watch(autoPreset, () => {
-    handleAutoPresetChange();
-});
 
 // 重置所有设置
 const resetAllSettings = () => {
@@ -428,75 +417,25 @@ const calculate = () => {
 <template>
     <div class="grid gap-3">
         <div class="grid gap-4 md:grid-cols-2">
-            <div class="rounded border border-border/80 bg-surface/50 p-3">
-                <div class="mb-2 text-sm font-medium">{{ t('auto.config.eventParams') }}</div>
-                <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.eventType') }}</span>
-                        <select
-                            v-model="formData.activityType"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        >
-                            <option v-for="type in ACTIVITY_TYPES" :key="type.value" :value="type.value">
-                                {{ type.label }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.totalPower') }}</span>
-                        <input
-                            v-model.number="formData.totalPower"
-                            type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-                    <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
-
-                    <div v-if="showSupportBand" class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
-                        <input
-                            v-model.number="formData.supportBandPower"
-                            type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-
-                    <div v-if="showEventBonus" class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.eventBonus') }}</span>
-                        <input
-                            v-model.number="formData.eventBonus"
-                            type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                        />
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.autoRate') }}</span>
-                        <div class="flex flex-1 gap-2">
-                            <select
-                                v-model="autoPreset"
-                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                                @change="handleAutoPresetChange"
-                            >
-                                <option value="cn">{{ t('auto.server.cn') }}</option>
-                                <option value="jp">{{ t('auto.server.jp') }}</option>
-                                <option value="others">{{ t('auto.server.others') }}</option>
-                            </select>
-                            <input
-                                v-if="autoPreset === 'others'"
-                                v-model.number="formData.autoPara"
-                                type="number"
-                                step="0.01"
-                                class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                                :placeholder="t('auto.config.ratePlaceholder')"
-                            />
-                            <span v-else class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text">
-                                {{ t('auto.config.rateLabel') }} {{ formData.autoPara }}
-                            </span>
-                        </div>
-                    </div>
-
+            <EventParamsPanel
+                :activity-type="formData.activityType"
+                :total-power="formData.totalPower"
+                :support-band-power="formData.supportBandPower"
+                :event-bonus="formData.eventBonus"
+                :auto-para="formData.autoPara"
+                :auto-preset="autoPreset"
+                :show-support-band="showSupportBand"
+                :show-event-bonus="showEventBonus"
+                :activity-type-editable="true"
+                :activity-type-options="ACTIVITY_TYPES"
+                @update:activity-type="formData.activityType = $event"
+                @update:total-power="formData.totalPower = $event"
+                @update:support-band-power="formData.supportBandPower = $event"
+                @update:event-bonus="formData.eventBonus = $event"
+                @update:auto-para="formData.autoPara = $event"
+                @update:auto-preset="autoPreset = $event"
+            >
+                <template #actions>
                     <div class="flex gap-2 pt-2">
                         <button
                             type="button"
@@ -514,72 +453,29 @@ const calculate = () => {
                             {{ t('common.resetAll') }}
                         </button>
                     </div>
-                </div>
-            </div>
+                </template>
+            </EventParamsPanel>
 
-            <div class="rounded border border-border/80 bg-surface/50 p-3">
-                <div class="mb-2 flex items-center justify-between">
-                    <span class="text-sm font-medium">{{ t('auto.config.skillConfig') }}</span>
-                    <button
-                        type="button"
-                        class="text-xs text-muted hover:text-text"
-                        @click="resetSkills"
-                    >
-                        {{ t('common.resetDefault') }}
-                    </button>
-                </div>
-
-                <div class="mb-3 flex items-center gap-3 pb-2">
-                    <label class="flex items-center gap-2 text-sm text-muted">
-                        <input
-                            v-model="filterOptions.showOnlyFixedPT"
-                            type="checkbox"
-                            class="h-4 w-4 rounded border-border/80"
-                        />
-                        <span>{{ t('auto.config.filterFixedPt') }}</span>
-                    </label>
-                </div>
-
-                <div class="space-y-2">
-                    <div class="text-xs font-medium text-muted">{{ t('auto.config.skillOrderHint') }}</div>
-                    <div class="grid gap-2">
-                        <div v-for="(skill, idx) in skills" :key="idx" class="flex items-center gap-2">
-                            <div class="flex items-center gap-1">
-                                <input
-                                    type="radio"
-                                    :checked="centerIndex === idx"
-                                    class="h-3.5 w-3.5"
-                                    @change="centerIndex = idx"
-                                />
-                                <span class="w-8 text-xs" :class="centerIndex === idx ? 'text-primary' : 'text-muted'">
-                                    {{ idx + 1 }}
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-1">
-                                <SkillDurationPicker
-                                    :model-value="skill.duration"
-                                    class="w-28"
-                                    @update:model-value="updateSkill(idx, 'duration', $event)"
-                                />
-                                <span class="text-xs text-muted">{{ t('common.unitSecond') }}</span>
-                            </div>
+            <SkillConfigPanel
+                :skills="skills"
+                :center-index="centerIndex"
+                @update:skill="updateSkill"
+                @update:center-index="centerIndex = $event"
+                @reset="resetSkills"
+            >
+                <template #extra-options>
+                    <div class="mb-3 flex items-center gap-3 pb-2">
+                        <label class="flex items-center gap-2 text-sm text-muted">
                             <input
-                                :value="skill.scoreUp"
-                                type="number"
-                                step="0.01"
-                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-left"
-                                @input="updateSkill(idx, 'scoreUp', parseFloat(($event.target as HTMLInputElement).value))"
+                                v-model="filterOptions.showOnlyFixedPT"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-border/80"
                             />
-                            <span class="w-8 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
-                        </div>
+                            <span>{{ t('auto.config.filterFixedPt') }}</span>
+                        </label>
                     </div>
-                </div>
-
-                <div class="mt-2 text-xs text-muted">
-                    <p>{{ t('auto.config.skillNote') }}</p>
-                    <span class="text-primary">● {{ t('auto.config.skillCenterHint') }}</span>
-                </div>
-            </div>
+                </template>
+            </SkillConfigPanel>
         </div>
 
         <p v-if="error" class="border border-border/80 bg-surface px-3 py-2 text-sm text-muted">
