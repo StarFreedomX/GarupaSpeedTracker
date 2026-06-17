@@ -3,3 +3,4 @@ example/
 .idea
 node_modules
 /.proxyai/
+/.playwright-mcp/

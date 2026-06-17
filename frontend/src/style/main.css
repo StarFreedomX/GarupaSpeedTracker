@@ -193,3 +193,13 @@ body {
     opacity: 0;
     transform: translateY(-4px);
 }
+
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.no-spin {
+    -moz-appearance: textfield;
+}

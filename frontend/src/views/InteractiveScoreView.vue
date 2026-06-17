@@ -564,39 +564,42 @@ const hasNoFixedSongs = computed(() => {
                     </div>
 
                     <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.totalPower') }}</span>
+                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.totalPower') }}</span>
                         <input
                             v-model.number="formData.totalPower"
                             type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                            min="0"
+                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
                         />
                     </div>
                     <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
 
                     <div v-if="showSupportBand" class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
+                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
                         <input
                             v-model.number="formData.supportBandPower"
                             type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                            min="0"
+                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
                         />
                     </div>
 
                     <div v-if="showEventBonus" class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.eventBonus') }}</span>
+                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.eventBonus') }}</span>
                         <input
                             v-model.number="formData.eventBonus"
                             type="number"
-                            class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                            min="0"
+                            class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
                         />
                     </div>
 
                     <div class="flex items-center gap-3">
-                        <span class="w-20 text-sm text-muted">{{ t('auto.config.autoRate') }}</span>
-                        <div class="flex flex-1 gap-2">
+                        <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.autoRate') }}</span>
+                        <div class="flex min-w-0 gap-2">
                             <select
                                 v-model="autoPreset"
-                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                                class="w-24 sm:w-28 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                                 @change="handleAutoPresetChange"
                             >
                                 <option value="cn">{{ t('auto.server.cn') }}</option>
@@ -607,13 +610,14 @@ const hasNoFixedSongs = computed(() => {
                                 v-if="autoPreset === 'others'"
                                 v-model.number="formData.autoPara"
                                 type="number"
+                                min="0"
                                 step="0.01"
-                                class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                                class="no-spin w-24 sm:w-28 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                                 :placeholder="t('auto.config.ratePlaceholder')"
                             />
                             <span
                                 v-else
-                                class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                                class="w-24 sm:w-28 truncate rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                             >
                                 {{ t('auto.config.rateLabel') }} {{ formData.autoPara }}
                             </span>
@@ -638,8 +642,8 @@ const hasNoFixedSongs = computed(() => {
                 <div class="space-y-2">
                     <div class="text-xs font-medium text-muted">{{ t('auto.config.skillOrderHint') }}</div>
                     <div class="grid gap-2">
-                        <div v-for="(skill, idx) in skills" :key="idx" class="flex items-center gap-2">
-                            <div class="flex items-center gap-1">
+                        <div v-for="(skill, idx) in skills" :key="idx" class="flex items-center gap-1.5 min-w-0">
+                            <div class="flex items-center gap-1 shrink-0">
                                 <input
                                     type="radio"
                                     :checked="centerIndex === idx"
@@ -647,28 +651,29 @@ const hasNoFixedSongs = computed(() => {
                                     @change="centerIndex = idx"
                                 />
                                 <span
-                                    class="w-8 text-xs"
+                                    class="w-6 text-xs"
                                     :class="centerIndex === idx ? 'text-primary' : 'text-muted'"
                                 >
                                     {{ idx + 1 }}
                                 </span>
                             </div>
-                            <div class="flex items-center gap-1">
+                            <div class="flex items-center gap-1 shrink-0">
                                 <SkillDurationPicker
                                     :model-value="skill.duration"
-                                    class="w-28"
+                                    class="w-24 sm:w-28"
                                     @update:model-value="updateSkill(idx, 'duration', $event)"
                                 />
-                                <span class="text-xs text-muted">{{ t('common.unitSecond') }}</span>
+                                <span class="hidden sm:inline text-xs text-muted">{{ t('common.unitSecond') }}</span>
                             </div>
                             <input
                                 :value="skill.scoreUp"
                                 type="number"
+                                min="0"
                                 step="0.01"
-                                class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-left"
+                                class="no-spin w-20 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
                                 @input="updateSkill(idx, 'scoreUp', parseFloat(($event.target as HTMLInputElement).value))"
                             />
-                            <span class="w-8 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
+                            <span class="shrink-0 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
                         </div>
                     </div>
                 </div>

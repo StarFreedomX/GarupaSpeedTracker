@@ -123,7 +123,7 @@ const enUS = {
             ratePlaceholder: "Enter rate",
             skillConfig: "Skill Configuration",
             filterFixedPt: "Show Fixed PT Only (Min=Max)",
-            skillOrderHint: "Team Skills (Order will be optimized)",
+            skillOrderHint: "Team Skills",
             skillRateLabel: "Rate",
             skillCenterHint: "Use radio to select Center Skill (Fixed 6th trigger)",
             skillNote: "Note: Skill rate 1.55 means +155% (2.55x total). The system automatically optimizes the sequence of 5 skills to find min/max scores.",

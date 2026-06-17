@@ -102,7 +102,7 @@ const zhCN = {
             ratePlaceholder: "输入倍率",
             skillConfig: "技能配置",
             filterFixedPt: "仅展示最低PT=最高PT",
-            skillOrderHint: "编队技能（顺序可优化）",
+            skillOrderHint: "编队技能",
             skillRateLabel: "倍率",
             skillCenterHint: "单选按钮选择队长技能（第6位固定触发）",
             skillNote: "提示：技能倍率如 1.55 表示 +155% (即总倍率 2.55倍)；程序会自动优化5个编队技能的触发顺序，找到最高/最低分。",
