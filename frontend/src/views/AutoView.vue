@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
+import PlayerDeckFetcher from "@/components/common/PlayerDeckFetcher.vue";
 import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import { calcEventPT } from "@/features/PT/calcSinglePT";
 import { calcScore } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
 import { fetchMetadata } from "@/services/songMetadataApi";
 import { fetchSongList } from "@/services/songsApi";
+import type { ServerKey } from "@/types/points";
 import type { Skill, SongChartMeta, SongLevelSummary } from "@/types/songMetadata";
 import { MusicDataResponse } from "@/types/songs";
 
@@ -282,6 +284,24 @@ const resetSkills = () => {
     centerIndex.value = defaultCenterIndex;
 };
 
+// ─── 从玩家数据填充队伍配置 ───
+const onDeckFetched = (data: {
+    totalPower: number;
+    eventBonus: number;
+    activityType: ActivityType;
+    skills: Skill[];
+    server: ServerKey;
+    eventId: number;
+    eventName: string;
+    warnings: string[];
+}) => {
+    formData.value.totalPower = data.totalPower;
+    formData.value.eventBonus = data.eventBonus;
+    formData.value.activityType = data.activityType;
+    skills.value = data.skills;
+    centerIndex.value = 2;
+};
+
 // 监听预设变化，自动填充 autoPara —— 由 EventParamsPanel 内部处理
 // 监听 autoPara 变化，如果是预设值则自动切换到对应的预设
 const updateAutoPreset = () => {
@@ -435,6 +455,8 @@ const calculate = () => {
 </script>
 <template>
     <div class="grid gap-3">
+        <PlayerDeckFetcher @deck-fetched="onDeckFetched" />
+
         <div class="grid gap-4 md:grid-cols-2">
             <EventParamsPanel
                 :activity-type="formData.activityType"

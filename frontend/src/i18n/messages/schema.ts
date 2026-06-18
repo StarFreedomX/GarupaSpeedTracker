@@ -253,6 +253,18 @@ export interface I18nMessages {
             noMetadata: string;
         };
     };
+    playerDeck: {
+        title: string;
+        server: string;
+        event: string;
+        playerId: string;
+        fetch: string;
+        success: string;
+        warnPowerNotPublic: string;
+        warnMissionSupport: string;
+        warnMedleyCheck: string;
+        error: string;
+    };
     error: {
         requestFailed: string;
         unknown: string;

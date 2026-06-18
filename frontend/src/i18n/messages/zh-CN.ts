@@ -254,6 +254,18 @@ const zhCN = {
             noMetadata: "歌曲数据未加载，请刷新页面重试",
         },
     },
+    playerDeck: {
+        title: "从玩家数据获取",
+        server: "服务器",
+        event: "活动",
+        playerId: "玩家ID",
+        fetch: "获取数据",
+        success: "数据获取成功！活动：{eventName}",
+        warnPowerNotPublic: "综合力未公开，请自行配置实际综合力",
+        warnMissionSupport: "任务live活动，请自行配置副队综合力",
+        warnMedleyCheck: "组曲活动，请确认组曲1曲编成是否与个人信息展示编成一致",
+        error: "获取失败：{message}",
+    },
     error: {
         requestFailed: "请求失败（{status}）",
         unknown: "未知请求错误",

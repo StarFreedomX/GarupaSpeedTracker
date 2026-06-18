@@ -91,7 +91,7 @@ const emit = defineEmits<{
                             :value="skill.progressive.stepRate"
                             type="text"
                             inputmode="decimal"
-                            class="no-spin w-18 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
+                            class="no-spin w-20 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
                             @input="sanitizeDecimalInput"
                             @blur="(e) => {
                                 const num = parseFloat((e.target as HTMLInputElement).value);
@@ -103,7 +103,7 @@ const emit = defineEmits<{
                             :value="skill.progressive.maxCap"
                             type="text"
                             inputmode="decimal"
-                            class="no-spin w-18 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
+                            class="no-spin w-20 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
                             @input="sanitizeDecimalInput"
                             @blur="(e) => {
                                 const num = parseFloat((e.target as HTMLInputElement).value);

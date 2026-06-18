@@ -254,6 +254,18 @@ const enUS = {
             noMetadata: "Song data not loaded. Please refresh the page.",
         },
     },
+    playerDeck: {
+        title: "Fetch from Player Data",
+        server: "Server",
+        event: "Event",
+        playerId: "Player ID",
+        fetch: "Fetch",
+        success: "Data fetched! Event: {eventName}",
+        warnPowerNotPublic: "Total power not public, please configure actual total power manually",
+        warnMissionSupport: "Mission live event, please configure support band power manually",
+        warnMedleyCheck: "Medley event, please verify group song 1 formation matches profile display formation",
+        error: "Fetch failed: {message}",
+    },
     error: {
         requestFailed: "Request failed ({status})",
         unknown: "Unknown request error",

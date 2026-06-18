@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
+import PlayerDeckFetcher from "@/components/common/PlayerDeckFetcher.vue";
 import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import Tooltip from "@/components/common/Tooltip.vue";
 import { sanitizeIntInput } from "@/composables/inputFilters";
@@ -11,6 +12,7 @@ import { calcExactScoreInTurns, calcScore } from "@/features/songMeta/autoScoreM
 import { useI18n } from "@/i18n";
 import { fetchMetadata } from "@/services/songMetadataApi";
 import { fetchSongList } from "@/services/songsApi";
+import type { ServerKey } from "@/types/points";
 import type { Skill, SongChartMeta } from "@/types/songMetadata";
 import type { MusicDataResponse } from "@/types/songs";
 
@@ -196,6 +198,24 @@ const updateSkillProgressive = (index: number, field: "stepRate" | "maxCap", val
 const resetSkills = () => {
     skills.value = JSON.parse(JSON.stringify(defaultSkills));
     centerIndex.value = defaultCenterIndex;
+};
+
+// ─── 从玩家数据填充队伍配置 ───
+const onDeckFetched = (data: {
+    totalPower: number;
+    eventBonus: number;
+    activityType: ActivityType;
+    skills: Skill[];
+    server: ServerKey;
+    eventId: number;
+    eventName: string;
+    warnings: string[];
+}) => {
+    formData.value.totalPower = data.totalPower;
+    formData.value.eventBonus = data.eventBonus;
+    formData.value.activityType = data.activityType;
+    skills.value = data.skills;
+    centerIndex.value = 2; // 默认中间为队长
 };
 
 // ─── metadata loading ───
@@ -627,7 +647,10 @@ const bonusRows = computed(() => {
         </div>
 
         <!-- ═══════ Step 1: Team config ═══════ -->
-        <div v-if="currentStep === 1" class="grid gap-4 md:grid-cols-2">
+        <div v-if="currentStep === 1" class="grid gap-4">
+            <PlayerDeckFetcher @deck-fetched="onDeckFetched" />
+
+            <div class="grid gap-4 md:grid-cols-2">
             <EventParamsPanel
                 :activity-type="formData.activityType"
                 :total-power="formData.totalPower"
@@ -656,6 +679,7 @@ const bonusRows = computed(() => {
                 @update:skill-progressive="updateSkillProgressive"
                 @reset="resetSkills"
             />
+        </div>
         </div>
 
         <!-- ═══════ Step 3: Results ═══════ -->
