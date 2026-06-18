@@ -259,7 +259,10 @@ export class BestdoriSongMetadataService {
 
         this.state = { chartMeta, sourceHash, checkedAt: now, chartCount };
         await this.persistState();
-        logger("bestdori", `song summary updated: songs=${Object.keys(musicData).length}, charts=${chartCount}, changed=${changedSongIds.length}, raw=${this.rawChartStorage ? "on" : "off"}`);
+        logger(
+            "bestdori",
+            `song summary updated: songs=${Object.keys(musicData).length}, charts=${chartCount}, changed=${changedSongIds.length}, raw=${this.rawChartStorage ? "on" : "off"}`,
+        );
         return chartMeta;
     }
 

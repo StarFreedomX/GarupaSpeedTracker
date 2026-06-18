@@ -4,7 +4,13 @@ import { logger } from "@/logger";
 import { garupaMonthlyRankingInfoParser } from "@/parsers/GarupaMonthlyRankingInfoParser";
 import { garupaService } from "@/services/garupaService";
 import { database } from "@/storage/dataBaseAdapter/mongodb";
-import type { MonthlyRankingDetail, MonthlyRankingDetailList, MonthlyRankingInfo, MonthlyRankingInfoDocument, MonthlyRankingInfoList } from "@/types/monthlyRanking";
+import type {
+    MonthlyRankingDetail,
+    MonthlyRankingDetailList,
+    MonthlyRankingInfo,
+    MonthlyRankingInfoDocument,
+    MonthlyRankingInfoList,
+} from "@/types/monthlyRanking";
 
 const infoCollection = database.collection<MonthlyRankingInfoDocument>(MONGODB_MONTHLY_INFO_COLLECTION);
 

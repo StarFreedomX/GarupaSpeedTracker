@@ -107,4 +107,3 @@ export interface MonthlyRankingDetailDocument extends MonthlyRankingDetail {
 export interface MonthlyRankingInfoDocument extends MonthlyRankingDetailDocument {
     monthlyRankingId: number;
 }
-
