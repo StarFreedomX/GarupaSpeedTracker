@@ -190,8 +190,8 @@ function getItemClass(displayIdx: number) {
         <span class="w-10 shrink-0 text-xs text-text">{{ skills[skillIdx].duration }}s</span>
 
         <!-- ScoreUp multiplier -->
-        <span class="w-14 shrink-0 text-right text-xs font-mono text-text">
-          x{{ skills[skillIdx].scoreUp.toFixed(2) }}
+        <span class="w-16 shrink-0 text-right text-xs font-mono text-text">
+          x{{ (skills[skillIdx].scoreUp * 100).toFixed(0) }}%
         </span>
 
         <!-- Progressive badge -->
@@ -199,7 +199,7 @@ function getItemClass(displayIdx: number) {
           v-if="skills[skillIdx].progressive"
           class="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600"
         >
-          P {{ skills[skillIdx].progressive!.stepRate }}/{{ skills[skillIdx].progressive!.maxCap }}
+          P {{ (skills[skillIdx].progressive!.stepRate * 100).toFixed(1) }}%/{{ (skills[skillIdx].progressive!.maxCap * 100).toFixed(0) }}%
         </span>
 
         <!-- Center badge -->
