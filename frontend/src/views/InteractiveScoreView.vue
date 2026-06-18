@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
 import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import Tooltip from "@/components/common/Tooltip.vue";
+import { sanitizeIntInput } from "@/composables/inputFilters";
 import { useUserPreferences } from "@/composables/useUserPreferences";
 import { analyze, computeFixedBasePTs, findContiguousWindows } from "@/features/scoreControl/interactiveAnalysis";
 import type { ActivityType, AnalysisResult, PlayStep, SolutionFilter, TeamConfig } from "@/features/scoreControl/types";
@@ -508,11 +509,13 @@ const bonusRows = computed(() => {
                     <span class="w-20 text-sm text-muted">{{ t('interactive.step3.targetPt') }}</span>
                     <input
                         v-model.number="formData.targetPT"
-                        type="number"
+                        type="text"
+                        inputmode="numeric"
                         min="1"
                         max="10000000"
                         class="flex-1 rounded border border-border/80 bg-surface/90 px-3 py-2 text-lg text-text font-mono text-center"
                         :placeholder="t('interactive.step3.placeholder')"
+                        @input="sanitizeIntInput"
                         @keyup.enter="nextStep"
                     />
                 </div>
@@ -556,9 +559,12 @@ const bonusRows = computed(() => {
                             <input
                                 v-model.number="filterData.bandId"
                                 :disabled="!filterData.bandEnabled"
-                                type="number"
+                                type="text"
+                                inputmode="numeric"
                                 class="w-20 rounded border border-border/80 bg-surface/90 px-1.5 py-1 text-xs text-text disabled:opacity-40"
                                 placeholder="ID"
+                                @keydown="filterIntKeydown"
+                                @input="sanitizeIntInput"
                             />
                             <select
                                 v-model="filterData.bandMode"

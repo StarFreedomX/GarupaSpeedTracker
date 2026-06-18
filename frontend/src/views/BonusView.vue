@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { sanitizeIntInput } from "@/composables/inputFilters";
 import { BonusParams, FeasibleBonusResult, getFeasibleBonus, MissionParams } from "@/features/PT/calcSinglePT";
 import { useI18n } from "@/i18n";
 
@@ -94,9 +95,11 @@ watch(
                         <span class="w-20 text-sm text-muted">{{ t('bonus.targetPt') }}</span>
                         <input
                             v-model.number="formData.targetPT"
-                            type="number"
+                            type="text"
+                            inputmode="numeric"
                             class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text font-mono"
                             :placeholder="t('bonus.targetPtPlaceholder')"
+                            @input="sanitizeIntInput"
                             @keyup.enter="calculate"
                         />
                     </div>
@@ -117,8 +120,10 @@ watch(
                         <span class="w-20 text-sm text-muted">{{ t('bonus.supportPower') }}</span>
                         <input
                             v-model.number="formData.supportBandPower"
-                            type="number"
+                            type="text"
+                            inputmode="numeric"
                             class="flex-1 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text font-mono"
+                            @input="sanitizeIntInput"
                             @keyup.enter="calculate"
                         />
                     </div>

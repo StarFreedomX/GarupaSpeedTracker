@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeDecimalInput, sanitizeIntInput } from "@/composables/inputFilters";
 import type { ActivityType } from "@/features/scoreControl/types";
 import { useI18n } from "@/i18n";
 
@@ -79,10 +80,14 @@ const onAutoPresetChange = () => {
                 <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.totalPower') }}</span>
                 <input
                     :value="totalPower"
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputmode="numeric"
                     class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                    @input="emit('update:totalPower', Number(($event.target as HTMLInputElement).value))"
+                    @input="sanitizeIntInput"
+                    @blur="(e) => {
+                        const num = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(num)) emit('update:totalPower', num);
+                    }"
                 />
             </div>
             <p class="mt-1 ml-[5.5rem] text-[10px] leading-none text-muted/60">{{ t('auto.config.totalPowerNote') }}</p>
@@ -92,10 +97,14 @@ const onAutoPresetChange = () => {
                 <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.supportPower') }}</span>
                 <input
                     :value="supportBandPower"
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputmode="numeric"
                     class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                    @input="emit('update:supportBandPower', Number(($event.target as HTMLInputElement).value))"
+                    @input="sanitizeIntInput"
+                    @blur="(e) => {
+                        const num = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(num)) emit('update:supportBandPower', num);
+                    }"
                 />
             </div>
 
@@ -104,10 +113,14 @@ const onAutoPresetChange = () => {
                 <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.eventBonus') }}</span>
                 <input
                     :value="eventBonus"
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputmode="numeric"
                     class="no-spin flex-1 min-w-0 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
-                    @input="emit('update:eventBonus', Number(($event.target as HTMLInputElement).value))"
+                    @input="sanitizeIntInput"
+                    @blur="(e) => {
+                        const num = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(num)) emit('update:eventBonus', num);
+                    }"
                 />
             </div>
 
@@ -127,12 +140,15 @@ const onAutoPresetChange = () => {
                     <input
                         v-if="autoPreset === 'others'"
                         :value="autoPara"
-                        type="number"
-                        min="0"
-                        step="0.01"
+                        type="text"
+                        inputmode="decimal"
                         class="no-spin w-24 sm:w-28 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                         :placeholder="t('auto.config.ratePlaceholder')"
-                        @input="emit('update:autoPara', Number(($event.target as HTMLInputElement).value))"
+                        @input="sanitizeDecimalInput"
+                        @blur="(e) => {
+                            const num = parseFloat((e.target as HTMLInputElement).value);
+                            if (!isNaN(num)) emit('update:autoPara', num);
+                        }"
                     />
                     <span
                         v-else

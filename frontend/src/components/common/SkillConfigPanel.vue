@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeDecimalInput } from "@/composables/inputFilters";
 import { useI18n } from "@/i18n";
 import type { Skill } from "@/types/songMetadata";
 import SkillDurationPicker from "./SkillDurationPicker.vue";
@@ -64,11 +65,14 @@ const emit = defineEmits<{
                         </div>
                         <input
                             :value="skill.scoreUp"
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputmode="decimal"
                             class="no-spin w-20 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
-                            @input="emit('update:skill', idx, 'scoreUp', parseFloat(($event.target as HTMLInputElement).value))"
+                            @input="sanitizeDecimalInput"
+                            @blur="(e) => {
+                                const num = parseFloat((e.target as HTMLInputElement).value);
+                                if (!isNaN(num)) emit('update:skill', idx, 'scoreUp', num);
+                            }"
                         />
                         <span class="shrink-0 text-xs text-muted">{{ t('auto.config.skillRateLabel') }}</span>
                         <label class="flex shrink-0 items-center gap-1 text-xs text-muted cursor-pointer select-none">
@@ -85,20 +89,26 @@ const emit = defineEmits<{
                         <span class="shrink-0 text-xs text-muted">{{ t('auto.config.progressiveStepRate') }}</span>
                         <input
                             :value="skill.progressive.stepRate"
-                            type="number"
-                            min="0"
-                            step="0.001"
+                            type="text"
+                            inputmode="decimal"
                             class="no-spin w-18 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
-                            @input="emit('update:skillProgressive', idx, 'stepRate', parseFloat(($event.target as HTMLInputElement).value))"
+                            @input="sanitizeDecimalInput"
+                            @blur="(e) => {
+                                const num = parseFloat((e.target as HTMLInputElement).value);
+                                if (!isNaN(num)) emit('update:skillProgressive', idx, 'stepRate', num);
+                            }"
                         />
                         <span class="shrink-0 text-xs text-muted">{{ t('auto.config.progressiveMaxCap') }}</span>
                         <input
                             :value="skill.progressive.maxCap"
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputmode="decimal"
                             class="no-spin w-18 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 py-1.5 text-sm text-left"
-                            @input="emit('update:skillProgressive', idx, 'maxCap', parseFloat(($event.target as HTMLInputElement).value))"
+                            @input="sanitizeDecimalInput"
+                            @blur="(e) => {
+                                const num = parseFloat((e.target as HTMLInputElement).value);
+                                if (!isNaN(num)) emit('update:skillProgressive', idx, 'maxCap', num);
+                            }"
                         />
                     </div>
                 </div>

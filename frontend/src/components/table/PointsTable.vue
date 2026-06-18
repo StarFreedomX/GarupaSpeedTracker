@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Tooltip from "@/components/common/Tooltip.vue";
+import { sanitizeIntInput } from "@/composables/inputFilters";
 import { useShiftWheelHorizontalScroll } from "@/composables/useShiftWheelHorizontalScroll";
 import { useI18n } from "@/i18n";
 import type { TableModel } from "@/types/points";
@@ -340,11 +341,13 @@ onBeforeUnmount(() => {
                             <span>{{ t('table.paginationPage') }}</span>
                             <input
                                 v-model="pageJumpValue"
-                                type="number"
+                                type="text"
+                                inputmode="numeric"
                                 min="1"
                                 :max="totalPages"
                                 class="w-20 rounded-app border-border bg-surface px-2 py-1 text-sm text-text"
                                 @keydown.enter.prevent="commitPageJump"
+                                @input="sanitizeIntInput"
                                 @blur="commitPageJump"
                             />
                             <span>/ {{ totalPages }}</span>
