@@ -187,11 +187,11 @@ watch(server, loadEvents);
 
         <div class="flex flex-wrap items-end gap-2">
             <!-- 服务器 -->
-            <label class="flex flex-col gap-1 text-xs text-muted">
+            <label class="flex flex-col gap-1 text-xs text-muted min-w-0">
                 {{ t("playerDeck.server") }}
                 <select
                     v-model.number="server"
-                    class="rounded border border-border/80 bg-surface/90 px-4 py-1.5 text-sm text-text"
+                    class="w-16 sm:w-auto rounded border border-border/80 bg-surface/90 px-1.5 sm:px-4 py-1.5 text-sm text-text"
                 >
                     <option v-for="opt in SERVER_OPTIONS" :key="opt.key" :value="opt.key">
                         {{ opt.label }}
@@ -200,11 +200,11 @@ watch(server, loadEvents);
             </label>
 
             <!-- 活动 -->
-            <label class="flex flex-col gap-1 text-xs text-muted">
+            <label class="flex flex-col gap-1 text-xs text-muted min-w-0">
                 {{ t("playerDeck.event") }}
                 <select
                     v-model.number="eventId"
-                    class="rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text min-w-40"
+                    class="min-w-0 w-36 sm:w-auto sm:min-w-40 rounded border border-border/80 bg-surface/90 pl-2 pr-8 py-1.5 text-sm text-text"
                     :disabled="eventsLoading"
                 >
                     <option :value="undefined" disabled>{{ eventsLoading ? "..." : "" }}</option>
@@ -219,13 +219,13 @@ watch(server, loadEvents);
             </label>
 
             <!-- 玩家ID -->
-            <label class="flex flex-col gap-1 text-xs text-muted">
+            <label class="flex flex-col gap-1 text-xs text-muted min-w-0">
                 {{ t("playerDeck.playerId") }}
                 <input
                     v-model="playerId"
                     type="text"
                     inputmode="numeric"
-                    class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                    class="w-32 sm:w-28 min-w-0 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                     @keyup.enter="fetchDeck"
                 />
             </label>
@@ -233,7 +233,7 @@ watch(server, loadEvents);
             <!-- 按钮 -->
             <button
                 type="button"
-                class="app-btn border border-primary/40 bg-primary/15 px-4 py-1.5 text-sm text-primary transition-colors hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="app-btn shrink-0 border border-primary/40 bg-primary/15 px-3 sm:px-4 py-1.5 text-sm text-primary transition-colors hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="loading"
                 @click="fetchDeck"
             >
