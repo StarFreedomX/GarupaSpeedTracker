@@ -604,7 +604,7 @@ const bonusRows = computed(() => {
                             />
                             <span class="text-xs text-muted w-24">{{ t('interactive.filter.boostString') }}</span>
                             <input
-                                v-model="filterData.boostString"
+                                v-model.lazy="filterData.boostString"
                                 :disabled="!filterData.boostEnabled"
                                 type="text"
                                 class="flex-1 rounded border border-border/80 bg-surface/90 px-1.5 py-1 text-xs text-text font-mono disabled:opacity-40"
