@@ -105,6 +105,9 @@ export interface I18nMessages {
             skillRateLabel: string;
             skillCenterHint: string;
             skillNote: string;
+            progressiveToggle: string;
+            progressiveStepRate: string;
+            progressiveMaxCap: string;
         };
         table: {
             songId: string;

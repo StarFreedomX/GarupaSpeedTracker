@@ -17,6 +17,24 @@ export interface Skill {
      */
     scoreUp: number;
     duration: SkillDuration;
+    /**
+     * 叠p技能：技能区间内每达成一次Perfect，分数加成额外提升。
+     * 在auto模式下默认全部Perfect，因此每个Note都会触发叠p。
+     * 第k个Note的加成倍率 = min(scoreUp + k × stepRate, maxCap)
+     * 最终分数 = floor(baseAutoScore × (1 + 加成倍率))
+     *
+     * 示例：scoreUp=1.0, stepRate=0.005, maxCap=1.5
+     * 第1键：100% + 0.5% = 100.5% 加成 → 200.5% 分数
+     * 第2键：100% + 1.0% = 101% 加成 → 201% 分数
+     * ...
+     * 达到150%上限后锁定在150%
+     */
+    progressive?: {
+        /** 每次Perfect的额外加成（如 0.5% = 0.005） */
+        stepRate: number;
+        /** 最高加成上限（如 150% = 1.5） */
+        maxCap: number;
+    };
 }
 /**
  * 基础歌曲元数据

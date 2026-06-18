@@ -173,6 +173,25 @@ const updateSkill = (index: number, field: keyof Skill, value: string | number) 
     skills.value[index] = { ...skills.value[index], [field]: value };
 };
 
+// 切换叠p技能开关
+const updateSkillProgressiveToggle = (index: number, enabled: boolean) => {
+    const skill = skills.value[index];
+    skills.value[index] = {
+        ...skill,
+        progressive: enabled ? { stepRate: 0.005, maxCap: 1.5 } : undefined,
+    };
+};
+
+// 更新叠p技能参数
+const updateSkillProgressive = (index: number, field: "stepRate" | "maxCap", value: number) => {
+    const skill = skills.value[index];
+    if (!skill.progressive) return;
+    skills.value[index] = {
+        ...skill,
+        progressive: { ...skill.progressive, [field]: value },
+    };
+};
+
 const resetSkills = () => {
     skills.value = JSON.parse(JSON.stringify(defaultSkills));
     centerIndex.value = defaultCenterIndex;
@@ -627,6 +646,8 @@ const bonusRows = computed(() => {
                 :center-index="centerIndex"
                 @update:skill="updateSkill"
                 @update:center-index="centerIndex = $event"
+                @update:skill-progressive-toggle="updateSkillProgressiveToggle"
+                @update:skill-progressive="updateSkillProgressive"
                 @reset="resetSkills"
             />
         </div>

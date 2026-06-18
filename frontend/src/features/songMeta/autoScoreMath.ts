@@ -1,11 +1,62 @@
 import type { Skill, SongLevelSummary } from "@/types/songMetadata";
 
 /**
+ * 计算技能在覆盖 noteCount 个Note时的近似权重，用于 findExtremes 回溯搜索。
+ *
+ * - 普通技能：noteCount × scoreUp
+ * - 叠p技能：Σ(k=1..noteCount) min(scoreUp + k × stepRate, maxCap)
+ *
+ * 注意：这里不含 floor 和 baseAutoScore，精确分数由 calcExactScoreInTurns 计算。
+ */
+function computeSkillWeight(skill: Skill, noteCount: number): number {
+    const prog = skill.progressive;
+    if (!prog) {
+        return noteCount * skill.scoreUp;
+    }
+    const { stepRate, maxCap } = prog;
+    let sum = 0;
+    for (let k = 1; k <= noteCount; k++) {
+        sum += Math.min(skill.scoreUp + k * stepRate, maxCap);
+    }
+    return sum;
+}
+
+/**
+ * 精确计算技能在覆盖 noteCount 个Note时的得分（含 floor）。
+ *
+ * 使用整数缩放避免浮点精度问题。
+ * - 普通技能：noteCount × ⌊ baseAutoScore × (1 + scoreUp) ⌋
+ * - 叠p技能：Σ(k=1..noteCount) ⌊ baseAutoScore × (1 + min(scoreUp + k × stepRate, maxCap)) ⌋
+ *
+ * SCALE = 1,000,000，支持到 0.0001% 精度（远高于游戏实际需求）。
+ */
+const PROGRESSIVE_SCALE = 1_000_000;
+
+function computeSkillScore(baseAutoScore: number, skill: Skill, noteCount: number): number {
+    const prog = skill.progressive;
+    if (!prog) {
+        return noteCount * Math.floor(baseAutoScore * (1 + skill.scoreUp));
+    }
+    const { stepRate, maxCap } = prog;
+    // 将浮点数转为整数，避免 k × stepRate 的累积浮点误差
+    const scoreUpScaled = Math.round(skill.scoreUp * PROGRESSIVE_SCALE);
+    const stepRateScaled = Math.round(stepRate * PROGRESSIVE_SCALE);
+    const maxCapScaled = Math.round(maxCap * PROGRESSIVE_SCALE);
+
+    let score = 0;
+    for (let k = 1; k <= noteCount; k++) {
+        const bonusScaled = Math.min(scoreUpScaled + k * stepRateScaled, maxCapScaled);
+        score += Math.floor((baseAutoScore * (PROGRESSIVE_SCALE + bonusScaled)) / PROGRESSIVE_SCALE);
+    }
+    return score;
+}
+
+/**
  * 计算分数并返回
  *
  * AUTO分数计算方法:
  *
- * 基础自动分数 = ⌊ 2.25 * 队伍综合力 * (1+(歌曲等级-5)%) / 歌曲总Note数 ⌋
+ * 基础自动分数 = ⌊ 3 * autoPara * 队伍综合力 * (1+(歌曲等级-5)%) / 歌曲总Note数 ⌋
  *
  * 单个Note分数 = ⌊ 基础自动分数  * (1 + 技能加成倍率) ⌋
  *
@@ -31,9 +82,7 @@ export function calcScore(
      */
     const bonusMatrix = skills.map((skill) => {
         const countsRow = songLevelSummary.counts[skill.duration];
-        // 直接用 技能倍率 * Note数
-        // 足以准确指引回溯算法找到最优路径
-        return [0, 1, 2, 3, 4].map((posIdx) => (countsRow[posIdx] ?? 0) * skill.scoreUp);
+        return [0, 1, 2, 3, 4].map((posIdx) => computeSkillWeight(skill, countsRow[posIdx] ?? 0));
     });
 
     // 粗筛：寻找最优/最劣的路径 (索引映射)
@@ -81,11 +130,9 @@ export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songL
         // 第 6 个时段固定取队长技能：skills[center]
         const skill = skills[i];
 
-        // 技能覆盖的后续 Note：⌊ 基础自动分数 * (1 + 技能加成倍率) ⌋
+        // 技能覆盖的后续 Note
         const notesAfterTrigger = songLevelSummary.counts[skill.duration]?.[i] ?? 0;
-        const scoreWithSkill = Math.floor(baseAutoScore * (1 + skill.scoreUp));
-
-        totalScore += notesAfterTrigger * scoreWithSkill;
+        totalScore += computeSkillScore(baseAutoScore, skill, notesAfterTrigger);
 
         // 累计消耗的物量
         totalCoveredNotes += notesAfterTrigger;
