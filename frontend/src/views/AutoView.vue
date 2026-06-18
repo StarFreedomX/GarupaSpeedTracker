@@ -11,6 +11,7 @@ import { fetchSongList } from "@/services/songsApi";
 import type { ServerKey } from "@/types/points";
 import type { Skill, SongChartMeta, SongLevelSummary } from "@/types/songMetadata";
 import { MusicDataResponse } from "@/types/songs";
+import AutoScoreModal from "@/components/auto/AutoScoreModal.vue";
 
 const { t } = useI18n();
 // 活动类型选项
@@ -155,6 +156,7 @@ const allResults = ref<
         songId: number;
         songName: string;
         difficulty: string;
+        songLevelSummary: SongLevelSummary;
         minAutoScore: number;
         maxAutoScore: number;
         minPT: number;
@@ -164,6 +166,29 @@ const allResults = ref<
 
 // 队长技能（计算属性）
 const centerSkill = computed(() => skills.value[centerIndex.value]);
+
+// ─── 精确分数弹窗状态 ───
+const showScoreModal = ref(false);
+const modalSongData = ref<{
+    songId: number;
+    songName: string;
+    difficulty: string;
+    songLevelSummary: SongLevelSummary;
+    minAutoScore: number;
+    maxAutoScore: number;
+} | null>(null);
+
+const openScoreModal = (row: (typeof allResults.value)[number]) => {
+    modalSongData.value = {
+        songId: row.songId,
+        songName: row.songName,
+        difficulty: row.difficulty,
+        songLevelSummary: row.songLevelSummary,
+        minAutoScore: row.minAutoScore,
+        maxAutoScore: row.maxAutoScore,
+    };
+    showScoreModal.value = true;
+};
 
 const difficultyDict = {
     "0": "easy",
@@ -401,6 +426,7 @@ const calculateSong = (songId: number, songSummary: SongLevelSummary, difficulty
             songId,
             songName: title,
             difficulty: difficultyKey,
+            songLevelSummary: songSummary,
             minAutoScore: minScore,
             maxAutoScore: maxScore,
             minPT,
@@ -577,7 +603,14 @@ const calculate = () => {
                     class="border-b border-border/60 hover:bg-surface/30"
                 >
                     <td class="px-3 py-2">{{ row.songId }}</td>
-                    <td class="px-3 py-2">{{ row.songName }}</td>
+                    <td class="px-3 py-2">
+                        <span
+                            class="cursor-pointer text-primary hover:underline transition-colors"
+                            @click="openScoreModal(row)"
+                        >
+                            {{ row.songName }}
+                        </span>
+                    </td>
                     <td class="px-3 py-2">{{ difficultyDict[row.difficulty as keyof typeof difficultyDict] }}</td>
                     <td class="px-3 py-2 text-right font-mono">{{ row.minAutoScore.toLocaleString() }}</td>
                     <td class="px-3 py-2 text-right font-mono">{{ row.maxAutoScore.toLocaleString() }}</td>
@@ -602,5 +635,24 @@ const calculate = () => {
                 </tbody>
             </table>
         </div>
+
+        <AutoScoreModal
+            v-if="modalSongData"
+            :visible="showScoreModal"
+            :song-id="modalSongData.songId"
+            :song-name="modalSongData.songName"
+            :difficulty="modalSongData.difficulty"
+            :song-level-summary="modalSongData.songLevelSummary"
+            :min-auto-score="modalSongData.minAutoScore"
+            :max-auto-score="modalSongData.maxAutoScore"
+            :skills="skills"
+            :center-index="centerIndex"
+            :total-power="formData.totalPower"
+            :auto-para="formData.autoPara"
+            :activity-type="formData.activityType"
+            :support-band-power="formData.supportBandPower"
+            :event-bonus="formData.eventBonus"
+            @close="showScoreModal = false"
+        />
     </div>
 </template>

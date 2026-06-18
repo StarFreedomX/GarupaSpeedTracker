@@ -127,6 +127,17 @@ const zhCN = {
             loadSongList: "加载歌曲列表失败",
             calcFailed: "计算失败，请检查参数",
         },
+        detail: {
+            title: "精确分数计算",
+            skillOrder: "技能触发顺序（拖拽调整）",
+            result: "计算结果",
+            exactScore: "精确 Auto 分数",
+            exactPT: "对应 PT",
+            center: "队长",
+            rangeNote: "原始范围：{min} ~ {max}",
+            dragHint: "上下拖拽技能块调整触发顺序",
+            error: "计算异常",
+        },
     },
     home: {
         manualRefresh: "手动刷新",

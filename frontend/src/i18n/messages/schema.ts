@@ -126,6 +126,17 @@ export interface I18nMessages {
             loadSongList: string;
             calcFailed: string;
         };
+        detail: {
+            title: string;
+            skillOrder: string;
+            result: string;
+            exactScore: string;
+            exactPT: string;
+            center: string;
+            rangeNote: string;
+            dragHint: string;
+            error: string;
+        };
     };
     home: {
         manualRefresh: string;

@@ -111,7 +111,7 @@ export function calcScore(
 /**
  * 根据传入的技能数组（已排好序）和队长索引计算分数
  * @param totalPower 队伍综合力
- * @param skills 当前顺序下的技能组（长度为 5）
+ * @param skills 当前顺序下的技能组（长度为 5+1）
  * @param songLevelSummary 谱面数据
  * @param autoPara auto倍率参数
  */
@@ -127,7 +127,7 @@ export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songL
     for (let i = 0; i < 6; i++) {
         // 技能来源判定：
         // 前 5 个时段直接对应传入数组的顺序：skills[0...4]
-        // 第 6 个时段固定取队长技能：skills[center]
+        // 第 6 个时段固定取队长技能：skills[5]
         const skill = skills[i];
 
         // 技能覆盖的后续 Note

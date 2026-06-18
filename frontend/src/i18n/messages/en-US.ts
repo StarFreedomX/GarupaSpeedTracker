@@ -148,6 +148,17 @@ const enUS = {
             loadSongList: "Failed to load song list data.",
             calcFailed: "Calculation failed. Please check parameters.",
         },
+        detail: {
+            title: "Precise Score",
+            skillOrder: "Skill Activation Order (drag to reorder)",
+            result: "Result",
+            exactScore: "Exact Auto Score",
+            exactPT: "Corresponding PT",
+            center: "Center",
+            rangeNote: "Original range: {min} ~ {max}",
+            dragHint: "Drag skill blocks up/down to change order",
+            error: "Calculation error",
+        },
     },
     settings: {
         title: "Theme Settings",
