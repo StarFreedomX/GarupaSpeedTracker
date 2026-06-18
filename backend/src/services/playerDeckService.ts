@@ -194,12 +194,7 @@ function isLifeCondition(conditionLife: number | undefined): boolean {
     return conditionLife != null && conditionLife > 0;
 }
 
-function calcSkill(
-    card: { skillId: number; skillLevel: number },
-    skillsRaw: SkillBulkMap,
-    server: number,
-    allCards: CardBrief[],
-): CardSkillInfo {
+function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: SkillBulkMap, server: number, allCards: CardBrief[]): CardSkillInfo {
     const skill = skillsRaw[String(card.skillId)];
     if (!skill) return { bonusPercent: 0, durationSeconds: 0, progressive: null };
 
@@ -402,6 +397,10 @@ export const playerDeckService = {
 
         if (!event && autoPower === 0) eventPower = normalPower;
 
+        // 技能重排序：后端按 leader→member1-4 排列，前端 UI 从上到下为 member3→member1→leader→member2→member4
+        const UI_SKILL_ORDER = [3, 1, 0, 2, 4];
+        const reorderedSkills = skills.length === UI_SKILL_ORDER.length ? UI_SKILL_ORDER.map((i) => skills[i]) : skills;
+
         return {
             eventType: event?.eventType ?? "none",
             eventName: (event?.eventName?.[server] ?? event?.eventName?.[0] ?? "") as string,
@@ -411,7 +410,7 @@ export const playerDeckService = {
             eventPower: Math.floor(eventPower),
             autoPower: Math.floor(autoPower),
             eventBonusPct: Math.round(totalBonusPct),
-            skills,
+            skills: reorderedSkills,
         };
     },
 };
