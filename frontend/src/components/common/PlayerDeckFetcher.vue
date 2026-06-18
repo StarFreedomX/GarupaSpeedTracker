@@ -80,13 +80,12 @@ const emit =
 
 function mapEventType(eventType: string): ActivityType {
     const map: Record<string, ActivityType> = {
-        mission: "mission",
-        try: "try",
+        mission_live: "mission",
+        live_try: "try",
         challenge: "challenge",
         versus: "versus",
-        "5v5": "5v5",
         medley: "medley1",
-        festival: "medley1",
+        festival: "5v5",
     };
     return map[eventType] ?? "mission";
 }
@@ -109,7 +108,7 @@ const warnings = computed<string[]>(() => {
     if (!result.value.publishTotalDeckPowerFlg) {
         w.push(t("playerDeck.warnPowerNotPublic"));
     }
-    if (result.value.eventType === "mission") {
+    if (result.value.eventType === "mission_live") {
         w.push(t("playerDeck.warnMissionSupport"));
     }
     if (result.value.eventType === "medley" || result.value.eventType === "festival") {
