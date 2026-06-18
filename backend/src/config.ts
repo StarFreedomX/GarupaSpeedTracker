@@ -38,6 +38,9 @@ export const API_PREFIX = process.env.API_PREFIX ?? "/api";
 // Seconds: if newest Bestdori point is newer than this threshold, reuse cache.
 export const MIN_POINTS_UPDATE_TIME = toNumber(process.env.MIN_POINTS_UPDATE_TIME, 45);
 
+// Seconds: 静态信息（卡牌/技能/活动等）的缓存时间
+export const INFO_CACHE_TIME = toNumber(process.env.INFO_CACHE_TIME, 12 * 3600);
+
 // 连接失败超时时间，单位ms
 export const BESTDORI_TIMEOUT_MS = toNumber(process.env.BESTDORI_TIMEOUT_MS, 10_000);
 

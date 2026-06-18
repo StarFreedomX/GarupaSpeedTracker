@@ -1,6 +1,6 @@
 import { BESTDORI_API } from "@/config";
 import { type DownloadCacheOptions, downloader } from "@/storage/downloader";
-import type { BestdoriEventsAllRaw, BestdoriTopPointsRaw, PointsQueryParams } from "@/types/bestdori";
+import type { BestdoriEventFullRaw, BestdoriEventsAllRaw, BestdoriTopPointsRaw, PointsQueryParams } from "@/types/bestdori";
 import type { Chart } from "@/types/bestdori/chart";
 import type { MusicDataResponse } from "@/types/bestdori/songs";
 
@@ -27,6 +27,9 @@ const buildTopPointsUrl = (params: Pick<PointsQueryParams, "server" | "eventId" 
 export const fetchBestdoriEvents = async (deps: BestdoriDownloaderLike = downloader): Promise<BestdoriEventsAllRaw> =>
     deps.downloadCache<BestdoriEventsAllRaw>(buildEventsUrl());
 
+export const fetchBestdoriEventsFull = async (deps: BestdoriDownloaderLike = downloader): Promise<Record<string, BestdoriEventFullRaw>> =>
+    deps.downloadCache<Record<string, BestdoriEventFullRaw>>(buildEventsUrl());
+
 export const fetchBestdoriSongs = async (
     options?: DownloadCacheOptions<MusicDataResponse>,
     deps: BestdoriDownloaderLike = downloader,
@@ -40,3 +43,24 @@ export const fetchBestdoriTopPoints = async (
 
 export const fetchBestdoriChart = async (songId: number, difficultyName: string, deps: BestdoriDownloaderLike = downloader): Promise<Chart> =>
     deps.download<Chart>(buildChartUrl(songId, difficultyName));
+
+/** 获取玩家档案 */
+export const fetchBestdoriPlayer = async (serverName: string, playerId: number, deps: BestdoriDownloaderLike = downloader) => {
+    const url = toBestdoriUrl(`player/${serverName}/${playerId}?mode=2`);
+    return deps.download<{
+        result: boolean;
+        data?: { profile?: Record<string, unknown> };
+    }>(url);
+};
+
+/** 获取全部卡片元数据（批量，缓存优先；传 { forceUpdate: true } 可强制刷新） */
+export const fetchBestdoriCardsBulk = async (opts?: DownloadCacheOptions<Record<string, Record<string, unknown>>>, deps: BestdoriDownloaderLike = downloader) =>
+    deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("cards/all.5.json"), opts);
+
+/** 获取区域道具 */
+export const fetchBestdoriAreaItems = async (deps: BestdoriDownloaderLike = downloader) =>
+    deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("areaItems/main.5.json"));
+
+/** 获取技能（缓存优先；传 { forceUpdate: true } 可强制刷新） */
+export const fetchBestdoriSkills = async (opts?: DownloadCacheOptions<Record<string, Record<string, unknown>>>, deps: BestdoriDownloaderLike = downloader) =>
+    deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("skills/all.10.json"), opts);

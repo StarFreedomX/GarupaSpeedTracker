@@ -4,3 +4,4 @@ dist
 node_modules
 /cache/
 /data/
+/src/test/__response_schema__/

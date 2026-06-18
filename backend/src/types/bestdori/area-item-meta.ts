@@ -1,0 +1,73 @@
+import type { Attribute } from "./card-meta";
+import type { Stat } from "./stat";
+
+/**
+ * 区域道具（建筑）的元数据，用于综合力计算。
+ *
+ * 数据来源于 Bestdori 区域道具 API（e.g. `/api/areaItems/{id}.json`）。
+ */
+export interface AreaItemMeta {
+    areaItemCategory: number;
+    /** 目标属性（道具只对同色卡生效） */
+    targetAttributes: Attribute[];
+    /** 目标乐队 ID（道具只对同乐队卡生效，如 1=PPP, 2=Afterglow 等） */
+    targetBandIds: number[];
+
+    /** 各等级对应的百分比加成（key 为等级字符串，value 为各服百分比，null 表示该服未实装） */
+    performance: Record<string, Array<number | null>>;
+    technique: Record<string, Array<number | null>>;
+    visual: Record<string, Array<number | null>>;
+}
+
+/** 区域道具查询接口 */
+export interface AreaItemMetaProvider {
+    getAreaItemMeta(areaItemCategory: number): AreaItemMeta | undefined | Promise<AreaItemMeta | undefined>;
+}
+
+/**
+ * 计算单个区域道具对单张卡牌的综合力加成。
+ *
+ * 规则：只有卡牌的 attribute 和 bandId 同时命中道具的目标范围才生效。
+ *
+ * @param meta           区域道具元数据
+ * @param areaItemLevel  道具当前等级
+ * @param cardStat       卡牌自身综合力（算完基础+潜能后）
+ * @param cardAttribute  卡牌属性
+ * @param cardBandId     卡牌所属乐队
+ * @param serverIndex    服务器索引（日服=0, 国服=3 等，默认 0）
+ */
+export function calcAreaItemBonus(
+    meta: AreaItemMeta,
+    areaItemLevel: number,
+    cardStat: Stat,
+    cardAttribute: Attribute,
+    cardBandId: number,
+    serverIndex = 0,
+): Stat {
+    const empty: Stat = { performance: 0, technique: 0, visual: 0 };
+
+    // 必须同时命中属性目标与乐队目标
+    if (!meta.targetAttributes.includes(cardAttribute) || !meta.targetBandIds.includes(cardBandId)) {
+        return empty;
+    }
+
+    const levelKey = String(areaItemLevel);
+
+    const perfVal = meta.performance[levelKey]?.[serverIndex];
+    const techVal = meta.technique[levelKey]?.[serverIndex];
+    const visVal = meta.visual[levelKey]?.[serverIndex];
+
+    if (perfVal == null && techVal == null && visVal == null) {
+        return empty;
+    }
+
+    const perfPct = perfVal != null ? perfVal / 100 : 0;
+    const techPct = techVal != null ? techVal / 100 : 0;
+    const visPct = visVal != null ? visVal / 100 : 0;
+
+    return {
+        performance: cardStat.performance * perfPct,
+        technique: cardStat.technique * techPct,
+        visual: cardStat.visual * visPct,
+    };
+}

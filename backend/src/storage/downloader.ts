@@ -8,9 +8,9 @@ import {
     BESTDORI_TIMEOUT_MS,
     DISK_CACHE_CLEANUP_INTERVAL_MS,
     DISK_CACHE_MAX_BYTES,
+    INFO_CACHE_TIME,
     MEMORY_CACHE_MAX_BYTES,
     MEMORY_CACHE_MAX_ENTRIES,
-    MIN_POINTS_UPDATE_TIME,
 } from "@/config";
 import { logger } from "@/logger";
 
@@ -43,7 +43,10 @@ interface MemoryDownloadCacheEntry<T> {
 
 export interface DownloadCacheOptions<T> {
     getExpireAt?: (body: T) => number;
-    update?: boolean;
+    /** 后台异步刷新缓存（仍返回当前缓存数据） */
+    backUpdate?: boolean;
+    /** 强制抓取并更新缓存（忽略已有缓存） */
+    forceUpdate?: boolean;
     allowExpired?: boolean;
     fallbackTtlMs?: number;
 }
@@ -54,7 +57,7 @@ interface ReadCacheResult<T> {
     isExpired: boolean;
 }
 
-const defaultTtlMs = MIN_POINTS_UPDATE_TIME * 1000;
+const defaultTtlMs = INFO_CACHE_TIME * 1000;
 
 const axiosClient = axios.create({
     timeout: BESTDORI_TIMEOUT_MS,
@@ -131,11 +134,18 @@ class Downloader {
 
     public async downloadCache<T>(url: string, options?: DownloadCacheOptions<T>): Promise<T> {
         const key = toCacheKey(url);
+
+        // forceUpdate：跳过缓存，强制抓取并写入
+        if (options?.forceUpdate) {
+            const fresh = await this.fetchAndStore<T>(key, options);
+            return fresh.body;
+        }
+
         const cached = await this.readCacheEntry<T>(key);
 
         if (cached) {
             if (!cached.isExpired) {
-                if (options?.update) {
+                if (options?.backUpdate) {
                     this.refreshInBackground(key, options);
                 }
                 return cached.entry.body;
