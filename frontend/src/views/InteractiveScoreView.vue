@@ -583,7 +583,6 @@ const bonusRows = computed(() => {
                                 inputmode="numeric"
                                 class="w-20 rounded border border-border/80 bg-surface/90 px-1.5 py-1 text-xs text-text disabled:opacity-40"
                                 placeholder="ID"
-                                @keydown="filterIntKeydown"
                                 @input="sanitizeIntInput"
                             />
                             <select
