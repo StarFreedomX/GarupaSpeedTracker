@@ -295,49 +295,115 @@ function findAllAllocations(
 
 /** 找出整个可行域中最长的连续可达 PT 区间 */
 export function findContiguousWindows(basePTs: number[]): Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }> }> {
-    const singlePlays = new Set<number>();
-    for (const bp of basePTs) {
-        for (const m of FLAME_MULTIPLIERS) singlePlays.add(bp * m);
+    if (basePTs.length === 0) return [];
+
+    // 计算值域范围：最小 = minBasePT × 1，最大 = maxBasePT × 15 × 5
+    let minBase = basePTs[0];
+    let maxBase = basePTs[0];
+    for (let i = 1; i < basePTs.length; i++) {
+        const v = basePTs[i];
+        if (v < minBase) minBase = v;
+        if (v > maxBase) maxBase = v;
     }
-    const s1 = [...singlePlays].sort((a, b) => a - b);
-    if (s1.length === 0) return [];
+    const offset = minBase;
+    const rangeMax = maxBase * FLAME_MULTIPLIERS[3] * 5;
+    const bits = new Uint8Array(rangeMax - offset + 1);
 
-    const all = new Set(s1);
-
-    /** 从当前 all 集合中提取所有连续段，按长度降序 */
-    const collectSegments = (): Array<{ lo: number; hi: number; center: number }> => {
-        const sorted = [...all].sort((a, b) => a - b);
-        const segments: Array<{ lo: number; hi: number; center: number }> = [];
-        let runLo = sorted[0];
-        for (let i = 1; i < sorted.length; i++) {
-            if (sorted[i] !== sorted[i - 1] + 1) {
-                segments.push({ lo: runLo, hi: sorted[i - 1], center: Math.round((runLo + sorted[i - 1]) / 2) });
-                runLo = sorted[i];
+    // 构建 s1 并同时填充位集（通过位集去重）
+    const s1: number[] = [];
+    for (const bp of basePTs) {
+        for (const m of FLAME_MULTIPLIERS) {
+            const v = bp * m;
+            const idx = v - offset;
+            if (bits[idx] === 0) {
+                bits[idx] = 1;
+                s1.push(v);
             }
         }
-        segments.push({ lo: runLo, hi: sorted[sorted.length - 1], center: Math.round((runLo + sorted[sorted.length - 1]) / 2) });
-        segments.sort((a, b) => b.hi - b.lo - (a.hi - a.lo));
+    }
+    if (s1.length === 0) return [];
+    s1.sort((a, b) => a - b);
+
+    /** 位集快照：收集所有置位的值（绝对 PT） */
+    const snapshotValues = (): number[] => {
+        const values: number[] = [];
+        for (let i = 0; i < bits.length; i++) {
+            if (bits[i] !== 0) values.push(i + offset);
+        }
+        return values;
+    };
+
+    /** 从位集中提取所有连续段，按长度降序 */
+    const collectSegments = (): Array<{ lo: number; hi: number; center: number }> => {
+        const segments: Array<{ lo: number; hi: number; center: number }> = [];
+        let runStart = -1;
+        for (let i = 0; i < bits.length; i++) {
+            if (bits[i] !== 0) {
+                if (runStart === -1) runStart = i;
+            } else {
+                if (runStart !== -1) {
+                    const lo = runStart + offset;
+                    const hi = i - 1 + offset;
+                    segments.push({ lo, hi, center: Math.round((lo + hi) / 2) });
+                    runStart = -1;
+                }
+            }
+        }
+        if (runStart !== -1) {
+            const lo = runStart + offset;
+            const hi = bits.length - 1 + offset;
+            segments.push({ lo, hi, center: Math.round((lo + hi) / 2) });
+        }
+        segments.sort((a, b) => (b.hi - b.lo) - (a.hi - a.lo));
         return segments;
     };
 
     const tierResults: Array<{ plays: number; segments: Array<{ lo: number; hi: number; center: number }>; bestLen: number }> = [];
 
-    // N=2
-    for (const a of s1) for (const b of s1) all.add(a + b);
+    // N=2: s1 + s1 卷积
+    for (const a of s1) {
+        const baseIdx = a - offset;
+        const maxB = bits.length - baseIdx;
+        for (const b of s1) {
+            if (b >= maxB) break;
+            bits[baseIdx + b] = 1;
+        }
+    }
 
     // N=3
-    let prev = [...all];
-    for (const a of prev) for (const b of s1) all.add(a + b);
+    let prev = snapshotValues();
+    for (const a of prev) {
+        const baseIdx = a - offset;
+        const maxB = bits.length - baseIdx;
+        for (const b of s1) {
+            if (b >= maxB) break;
+            bits[baseIdx + b] = 1;
+        }
+    }
     tierResults.push({ plays: 3, segments: collectSegments(), bestLen: 0 });
 
     // N=4
-    prev = [...all];
-    for (const a of prev) for (const b of s1) all.add(a + b);
+    prev = snapshotValues();
+    for (const a of prev) {
+        const baseIdx = a - offset;
+        const maxB = bits.length - baseIdx;
+        for (const b of s1) {
+            if (b >= maxB) break;
+            bits[baseIdx + b] = 1;
+        }
+    }
     tierResults.push({ plays: 4, segments: collectSegments(), bestLen: 0 });
 
     // N=5
-    prev = [...all];
-    for (const a of prev) for (const b of s1) all.add(a + b);
+    prev = snapshotValues();
+    for (const a of prev) {
+        const baseIdx = a - offset;
+        const maxB = bits.length - baseIdx;
+        for (const b of s1) {
+            if (b >= maxB) break;
+            bits[baseIdx + b] = 1;
+        }
+    }
     tierResults.push({ plays: 5, segments: collectSegments(), bestLen: 0 });
 
     // 计算阈值：≤3 的累计需 ≥ ≤4 最长段的一半；≤4 需 ≥ ≤5 最长段的一半
