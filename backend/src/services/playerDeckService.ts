@@ -178,7 +178,28 @@ function calcCardBonusPct(
 // 技能
 // ============================================================================
 
-function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: SkillBulkMap, server: number): CardSkillInfo {
+/** 用于技能统一加成判定的卡片摘要 */
+interface CardBrief {
+    bandId: number;
+    attribute: string;
+}
+
+const SCORING_TYPES = ["score", "score_only_perfect", "score_over_life", "score_under_life", "score_continued_note_judge", "score_under_great_half"] as const;
+
+function isGameplayCondition(condition: string): boolean {
+    return condition === "perfect" || condition === "great" || condition === "good" || condition === "bad";
+}
+
+function isLifeCondition(conditionLife: number | undefined): boolean {
+    return conditionLife != null && conditionLife > 0;
+}
+
+function calcSkill(
+    card: { skillId: number; skillLevel: number },
+    skillsRaw: SkillBulkMap,
+    server: number,
+    allCards: CardBrief[],
+): CardSkillInfo {
     const skill = skillsRaw[String(card.skillId)];
     if (!skill) return { bonusPercent: 0, durationSeconds: 0, progressive: null };
 
@@ -188,13 +209,45 @@ function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: Ski
     const effectTypes = (ae?.activateEffectTypes ?? {}) as Record<string, Record<string, unknown> | undefined>;
     const progressive = PROGRESSIVE_MAP[card.skillId] ?? null;
 
+    // 遍历计分效果，取最高倍率
+    // 条件判定：游戏内判定条件（PERFECT/GREAT/LIFE 阈值等）默认全满足
     let bestBonus = 0;
-    const scoringTypes = ["score", "score_only_perfect", "score_over_life", "score_under_life", "score_continued_note_judge", "score_under_great_half"];
-    for (const type of scoringTypes) {
+    for (const type of SCORING_TYPES) {
         const eff = effectTypes[type];
         if (!eff) continue;
+
         const rawValue = getAtIndex(eff.activateEffectValue as (number | null)[], serverIndex);
-        if (rawValue != null && rawValue > bestBonus) bestBonus = rawValue;
+        if (rawValue == null) continue;
+
+        // 检查条件是否可触发（游戏内判定 / 血量条件 / 无条件的均视为适用）
+        const condition = (eff.activateCondition as string | undefined) ?? "good";
+        const conditionLife = eff.activateConditionLife as number | undefined;
+        const isApplicable = condition === "none" || isGameplayCondition(condition) || isLifeCondition(conditionLife);
+
+        if (isApplicable && rawValue > bestBonus) {
+            bestBonus = rawValue;
+        }
+    }
+
+    // 统一加成（unification）：当整队满足特定条件时触发更高倍率
+    // 例如：skill 74 的 "编队仅有 Poppin'Party 时 155%UP"（否则 145%）
+    const unificationValue = ae?.unificationActivateEffectValue as number | undefined;
+    if (unificationValue != null && unificationValue > bestBonus) {
+        const bandId = ae?.unificationActivateConditionBandId as number | undefined;
+        const attrType = ae?.unificationActivateConditionType as string | undefined;
+
+        // 条件检查：bandId 和 attrType 可同时存在，此时需同时满足
+        let satisfied = bandId != null || attrType != null;
+        if (bandId != null && !allCards.every((c) => c.bandId === bandId)) {
+            satisfied = false;
+        }
+        if (attrType != null && !allCards.every((c) => c.attribute.toUpperCase() === attrType.toUpperCase())) {
+            satisfied = false;
+        }
+
+        if (satisfied) {
+            bestBonus = unificationValue;
+        }
     }
 
     const durationArr = (skill.duration ?? []) as number[];
@@ -257,6 +310,17 @@ export const playerDeckService = {
             })
             .filter((s) => s > 0);
         const skillsRaw = await loadSkillsWithFallback(skillIds);
+
+        // 构建整队卡片摘要（用于技能统一加成判定）
+        const allCardBriefs: CardBrief[] = cardIds.map((id) => {
+            const c = cardsBulk[String(id)];
+            if (!c) return { bandId: 0, attribute: "" };
+            const chId = c.characterId as number;
+            return {
+                bandId: Math.ceil(chId / 5),
+                attribute: (c.attribute as string) ?? "",
+            };
+        });
 
         // 区域道具 map
         const areaItemMetaMap = new Map<number, AreaItemMeta>();
@@ -333,7 +397,7 @@ export const playerDeckService = {
             }
 
             // 技能
-            skills.push(calcSkill({ skillId: cardRaw.skillId as number, skillLevel: pc.skillLevel }, skillsRaw, server));
+            skills.push(calcSkill({ skillId: cardRaw.skillId as number, skillLevel: pc.skillLevel }, skillsRaw, server, allCardBriefs));
         }
 
         if (!event && autoPower === 0) eventPower = normalPower;
