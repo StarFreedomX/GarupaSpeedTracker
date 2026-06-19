@@ -43,7 +43,7 @@ function updateShifts(draggedIdx: number, target: number) {
         shifts.value = map;
         return;
     }
-    const h = drag.value!.itemHeight;
+    const h = drag.value?.itemHeight ?? 0;
     for (let i = 0; i < props.skillOrder.length; i++) {
         const skillIdx = props.skillOrder[i];
         if (i === draggedIdx) continue;
