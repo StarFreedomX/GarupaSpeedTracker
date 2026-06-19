@@ -10,6 +10,11 @@
 - 共享进行中的 Promise，避免并发重复请求上游
 - 统一处理 422/502/504/404 错误
 - 内置浏览器 CORS 支持，可通过环境变量配置
+- 玩家编队查询：通过 Bestdori 和 Garupa 游戏服务器查询玩家编队信息，计算综合力、活动加成和技能数据
+- 月榜数据追踪：支持多服务器月榜 Top 分和档线数据采集、存储、查询
+- 歌曲列表与谱面数据缓存：定时抓取并缓存 Bestdori 歌曲元数据和谱面分布数据
+- MongoDB 持久化存储：月榜数据、Garupa 元信息通过 MongoDB 持久化
+- 启动时自动预热缓存，拉取缺失数据；月榜数据支持定时轮询更新
 
 ## 快速开始
 
@@ -92,19 +97,34 @@ pnpm start
 
 更多请求/响应结构和错误示例请查看 `API.md`。
 
-月榜相关接口概览：
+### 接口概览
 
-- `GET /api/monthlyRanking/info.json`：获取所有月榜期次的基础信息列表
-- `GET /api/monthlyRanking/info.{monthlyRankingId}.json`：获取单一期次月榜的详细信息
-- `GET /api/monthlyRanking/topPoints`：获取月榜 Top 追踪数据
-- `GET /api/monthlyRanking/border`：获取月榜档线数据
+**榜线追踪**
 
-快速查询示例：
+- `GET /api/topPoints` — 获取活动榜线分速追踪数据
 
-`GET /api/events`
+**活动与歌曲**
 
+- `GET /api/events` — 获取活动列表
+- `GET /api/songs` — 获取歌曲列表
+- `GET /api/songMetadata.json` — 获取谱面分布元数据（支持 gzip）
 
-`GET /api/topPoints?server=0&event=321&time=60`
+**月榜相关**
+
+- `GET /api/monthlyRanking/info.json` — 获取所有月榜期次的基础信息列表
+- `GET /api/monthlyRanking/info.{monthlyRankingId}.json` — 获取单一期次月榜的详细信息
+- `GET /api/monthlyRanking/top` — 获取月榜 Top 玩家分速快照
+- `GET /api/monthlyRanking/border` — 获取月榜档线数据
+
+**玩家编队**
+
+- `GET /api/playerDeckStatus` — 查询玩家编队状态（综合力、活动加成、技能）
+
+### 快速查询示例
+
+```http
+GET /api/topPoints?server=0&event=321&time=60
+```
 
 - `server`: `0|1|2|3|4` -> `jp|en|tw|cn|kr`
 - `interval`: 可选，默认 `30000`
@@ -115,15 +135,38 @@ pnpm start
 ```json
 [
   {
-	"uid": 111798074,
-	"points": [
-	  { "time": 1776744533635, "points": 6890100 },
-	  { "time": 1776744594696, "points": 6890100 }
-	],
-	"info": {
-	  "name": "!",
-	  "introduction": "[00]"
-	}
+    "uid": 111798074,
+    "points": [
+      { "time": 1776744533635, "points": 6890100 },
+      { "time": 1776744594696, "points": 6890100 }
+    ],
+    "info": {
+      "name": "!",
+      "introduction": "[00]"
+    }
   }
 ]
+```
+
+```http
+GET /api/playerDeckStatus?server=0&playerId=28012549
+```
+
+- `eventId`: 可选，不传或传 `0` 则自动匹配当前活动
+
+返回结构（简要）：
+
+```json
+{
+  "eventType": "mission_live",
+  "eventName": "雨上がり、瞳に映る空は",
+  "eventId": 297,
+  "normalPower": 320000,
+  "eventPower": 380000,
+  "autoPower": 320000,
+  "eventBonusPct": 150,
+  "skills": [
+    { "bonusPercent": 110, "durationSeconds": 5.5, "progressive": null }
+  ]
+}
 ```
