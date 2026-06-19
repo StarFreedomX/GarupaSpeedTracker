@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "@/i18n";
 import type { Skill } from "@/types/songMetadata";
 
 const { t } = useI18n();
 
 const props = defineProps<{
-  skills: Skill[];
-  skillOrder: number[];
-  centerIndex: number;
+    skills: Skill[];
+    skillOrder: number[];
+    centerIndex: number;
 }>();
 
-const emit = defineEmits<{
-  (e: "update:skillOrder", order: number[]): void;
-}>();
+const emit = defineEmits<(e: "update:skillOrder", order: number[]) => void>();
 
 // ── Drag state ──
 // Key principle: keep the array order FIXED during drag.
@@ -21,143 +19,143 @@ const emit = defineEmits<{
 // Commit the final order ONCE on pointerup.
 
 interface DragState {
-  pointerId: number;
-  draggedIdx: number; // original position in the displayed list (0-4)
-  startY: number;
-  itemHeight: number;
+    pointerId: number;
+    draggedIdx: number; // original position in the displayed list (0-4)
+    startY: number;
+    itemHeight: number;
 }
 const drag = ref<DragState | null>(null);
 const pointerY = ref(0);
 
 // ── Computed: current visual target slot for the dragged item ──
 const targetSlot = computed(() => {
-  if (!drag.value) return -1;
-  const raw = drag.value.draggedIdx + Math.round((pointerY.value - drag.value.startY) / drag.value.itemHeight);
-  return Math.max(0, Math.min(4, raw));
+    if (!drag.value) return -1;
+    const raw = drag.value.draggedIdx + Math.round((pointerY.value - drag.value.startY) / drag.value.itemHeight);
+    return Math.max(0, Math.min(4, raw));
 });
 
 // ── Shift map: skillIdx → translateY offset for non-dragged items that need to make room ──
 const shifts = ref<Record<number, number>>({});
 
 function updateShifts(draggedIdx: number, target: number) {
-  const map: Record<number, number> = {};
-  if (target === draggedIdx) {
-    shifts.value = map;
-    return;
-  }
-  const h = drag.value!.itemHeight;
-  for (let i = 0; i < props.skillOrder.length; i++) {
-    const skillIdx = props.skillOrder[i];
-    if (i === draggedIdx) continue;
-    if (draggedIdx < target) {
-      // dragging downward: items between (draggedIdx, target] shift UP
-      if (i > draggedIdx && i <= target) {
-        map[skillIdx] = -h;
-      }
-    } else {
-      // dragging upward: items between [target, draggedIdx) shift DOWN
-      if (i >= target && i < draggedIdx) {
-        map[skillIdx] = h;
-      }
+    const map: Record<number, number> = {};
+    if (target === draggedIdx) {
+        shifts.value = map;
+        return;
     }
-  }
-  shifts.value = map;
+    const h = drag.value!.itemHeight;
+    for (let i = 0; i < props.skillOrder.length; i++) {
+        const skillIdx = props.skillOrder[i];
+        if (i === draggedIdx) continue;
+        if (draggedIdx < target) {
+            // dragging downward: items between (draggedIdx, target] shift UP
+            if (i > draggedIdx && i <= target) {
+                map[skillIdx] = -h;
+            }
+        } else {
+            // dragging upward: items between [target, draggedIdx) shift DOWN
+            if (i >= target && i < draggedIdx) {
+                map[skillIdx] = h;
+            }
+        }
+    }
+    shifts.value = map;
 }
 
 // ── Pointer handlers ──
 function onPointerDown(e: PointerEvent, displayIdx: number) {
-  if (drag.value) return;
-  const el = e.currentTarget as HTMLElement;
-  el.setPointerCapture(e.pointerId);
+    if (drag.value) return;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
 
-  // Measure the actual item height from the element
-  const rect = el.getBoundingClientRect();
-  const gap = 8; // matches gap-2 in the flex container
-  const itemH = rect.height + gap;
+    // Measure the actual item height from the element
+    const rect = el.getBoundingClientRect();
+    const gap = 8; // matches gap-2 in the flex container
+    const itemH = rect.height + gap;
 
-  drag.value = {
-    pointerId: e.pointerId,
-    draggedIdx: displayIdx,
-    startY: e.clientY,
-    itemHeight: itemH,
-  };
-  pointerY.value = e.clientY;
+    drag.value = {
+        pointerId: e.pointerId,
+        draggedIdx: displayIdx,
+        startY: e.clientY,
+        itemHeight: itemH,
+    };
+    pointerY.value = e.clientY;
 
-  document.addEventListener("pointermove", onPointerMove);
-  document.addEventListener("pointerup", onPointerUp);
-  document.addEventListener("pointercancel", onPointerUp);
-  document.body.style.touchAction = "none";
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("pointercancel", onPointerUp);
+    document.body.style.touchAction = "none";
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (!drag.value) return;
-  pointerY.value = e.clientY;
+    if (!drag.value) return;
+    pointerY.value = e.clientY;
 
-  updateShifts(drag.value.draggedIdx, targetSlot.value);
+    updateShifts(drag.value.draggedIdx, targetSlot.value);
 }
 
 function onPointerUp(_e: PointerEvent) {
-  if (!drag.value) return;
-  const finalTarget = targetSlot.value;
-  const orig = drag.value.draggedIdx;
+    if (!drag.value) return;
+    const finalTarget = targetSlot.value;
+    const orig = drag.value.draggedIdx;
 
-  // Commit the order change
-  if (finalTarget !== orig) {
-    const newOrder = [...props.skillOrder];
-    const [moved] = newOrder.splice(orig, 1);
-    newOrder.splice(finalTarget, 0, moved);
-    emit("update:skillOrder", newOrder);
-  }
+    // Commit the order change
+    if (finalTarget !== orig) {
+        const newOrder = [...props.skillOrder];
+        const [moved] = newOrder.splice(orig, 1);
+        newOrder.splice(finalTarget, 0, moved);
+        emit("update:skillOrder", newOrder);
+    }
 
-  // Clean up
-  drag.value = null;
-  pointerY.value = 0;
-  shifts.value = {};
+    // Clean up
+    drag.value = null;
+    pointerY.value = 0;
+    shifts.value = {};
 
-  document.removeEventListener("pointermove", onPointerMove);
-  document.removeEventListener("pointerup", onPointerUp);
-  document.removeEventListener("pointercancel", onPointerUp);
-  document.body.style.touchAction = "";
+    document.removeEventListener("pointermove", onPointerMove);
+    document.removeEventListener("pointerup", onPointerUp);
+    document.removeEventListener("pointercancel", onPointerUp);
+    document.body.style.touchAction = "";
 }
 
 // ── Style helper for each item ──
 function getItemStyle(skillIdx: number, displayIdx: number) {
-  if (!drag.value) return undefined;
+    if (!drag.value) return undefined;
 
-  const d = drag.value;
-  const isDragged = displayIdx === d.draggedIdx;
+    const d = drag.value;
+    const isDragged = displayIdx === d.draggedIdx;
 
-  if (isDragged) {
-    const deltaY = pointerY.value - d.startY;
+    if (isDragged) {
+        const deltaY = pointerY.value - d.startY;
+        return {
+            transform: `translateY(${deltaY}px)`,
+            zIndex: 20,
+            position: "relative" as const,
+            transition: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        };
+    }
+
+    const shift = shifts.value[skillIdx];
+    if (shift !== undefined && shift !== 0) {
+        return {
+            transform: `translateY(${shift}px)`,
+            transition: "transform 0.2s ease",
+            position: "relative" as const,
+        };
+    }
+
     return {
-      transform: `translateY(${deltaY}px)`,
-      zIndex: 20,
-      position: "relative" as const,
-      transition: "none",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        transform: "translateY(0px)",
+        transition: "transform 0.2s ease",
+        position: "relative" as const,
     };
-  }
-
-  const shift = shifts.value[skillIdx];
-  if (shift !== undefined && shift !== 0) {
-    return {
-      transform: `translateY(${shift}px)`,
-      transition: "transform 0.2s ease",
-      position: "relative" as const,
-    };
-  }
-
-  return {
-    transform: "translateY(0px)",
-    transition: "transform 0.2s ease",
-    position: "relative" as const,
-  };
 }
 
 function getItemClass(displayIdx: number) {
-  if (!drag.value) return "cursor-grab";
-  if (displayIdx === drag.value.draggedIdx) return "cursor-grabbing";
-  return "cursor-grab";
+    if (!drag.value) return "cursor-grab";
+    if (displayIdx === drag.value.draggedIdx) return "cursor-grabbing";
+    return "cursor-grab";
 }
 </script>
 

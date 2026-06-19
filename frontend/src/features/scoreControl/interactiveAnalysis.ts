@@ -354,7 +354,7 @@ export function findContiguousWindows(basePTs: number[]): Array<{ plays: number;
             const hi = bits.length - 1 + offset;
             segments.push({ lo, hi, center: Math.round((lo + hi) / 2) });
         }
-        segments.sort((a, b) => (b.hi - b.lo) - (a.hi - a.lo));
+        segments.sort((a, b) => b.hi - b.lo - (a.hi - a.lo));
         return segments;
     };
 

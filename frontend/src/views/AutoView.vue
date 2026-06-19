@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import AutoScoreModal from "@/components/auto/AutoScoreModal.vue";
 import EventParamsPanel from "@/components/common/EventParamsPanel.vue";
 import PlayerDeckFetcher from "@/components/common/PlayerDeckFetcher.vue";
 import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
@@ -11,7 +12,6 @@ import { fetchSongList } from "@/services/songsApi";
 import type { ServerKey } from "@/types/points";
 import type { Skill, SongChartMeta, SongLevelSummary } from "@/types/songMetadata";
 import { MusicDataResponse } from "@/types/songs";
-import AutoScoreModal from "@/components/auto/AutoScoreModal.vue";
 
 const { t } = useI18n();
 // 活动类型选项
