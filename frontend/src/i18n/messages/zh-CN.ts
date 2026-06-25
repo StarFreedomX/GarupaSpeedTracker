@@ -248,6 +248,12 @@ const zhCN = {
             boostPlaceholder: "如 Roselia",
             reset: "重置筛选",
         },
+        bpmWarning: {
+            title: "BPM 取整精度提醒",
+            description: "当前计算器由于取整原因，在特定 BPM 下可能存在分数计算偏差。",
+            hint: "请在控分时点击该歌曲查看分数区间，如果实际分数和预期分数不符请重新游戏！",
+            affectedBPMs: "目前受影响的 BPM",
+        },
         status: {
             noFixedSongs: "当前队伍配置下没有找到任何固定PT歌曲。",
             noFixedSongsHint: "请调整队伍参数（综合力、加成、技能等）以产生固定PT的歌曲，或降低 Auto 倍率。",

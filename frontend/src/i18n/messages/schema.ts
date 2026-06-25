@@ -247,6 +247,12 @@ export interface I18nMessages {
             boostPlaceholder: string;
             reset: string;
         };
+        bpmWarning: {
+            title: string;
+            description: string;
+            hint: string;
+            affectedBPMs: string;
+        };
         status: {
             noFixedSongs: string;
             noFixedSongsHint: string;

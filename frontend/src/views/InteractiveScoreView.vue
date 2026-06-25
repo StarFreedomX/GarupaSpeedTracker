@@ -16,7 +16,12 @@ import type { ServerKey } from "@/types/points";
 import type { Skill, SongChartMeta } from "@/types/songMetadata";
 import type { MusicDataResponse } from "@/types/songs";
 
+// ─── i18n ───
 const { t } = useI18n();
+
+// ─── BPM rounding bug warning ───
+const AFFECTED_BPMS = [137, 154];
+const affectedBPMsText = computed(() => AFFECTED_BPMS.join("、"));
 
 // ─── localStorage keys ───
 const STORAGE_KEYS = {
@@ -683,6 +688,27 @@ const bonusRows = computed(() => {
 
         <!-- ═══════ Step 3: Results ═══════ -->
         <div v-if="currentStep === 3">
+            <!-- BPM rounding warning -->
+            <div class="rounded border border-yellow-400 bg-yellow-100 p-3 mb-3">
+                <div class="flex items-start gap-2">
+                    <span class="text-lg shrink-0">⚠️</span>
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-black">
+                            {{ t('interactive.bpmWarning.title') }}
+                        </p>
+                        <p class="text-xs text-black/70">
+                            {{ t('interactive.bpmWarning.description') }}
+                        </p>
+                        <p class="text-xs text-black/70">
+                            {{ t('interactive.bpmWarning.affectedBPMs') }}：<span class="font-mono font-bold text-black">{{ affectedBPMsText }}</span>
+                        </p>
+                        <p class="text-xs text-black/70 mt-1">
+                            💡 {{ t('interactive.bpmWarning.hint') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Loading -->
             <div
                 v-if="computing"

@@ -248,6 +248,12 @@ const enUS = {
             boostPlaceholder: "e.g. Roselia",
             reset: "Reset Filter",
         },
+        bpmWarning: {
+            title: "BPM Rounding Accuracy Notice",
+            description: "Due to integer rounding, the calculator may have score deviations at specific BPMs.",
+            hint: "Please click on songs to check the actual score range when score-controlling. If the actual score does not match the expected score, please replay!",
+            affectedBPMs: "Currently affected BPMs",
+        },
         status: {
             noFixedSongs: "No fixed-PT songs found with current team config.",
             noFixedSongsHint: "Adjust team parameters (power, bonus, skills) to produce fixed-PT songs, or lower the auto rate.",
