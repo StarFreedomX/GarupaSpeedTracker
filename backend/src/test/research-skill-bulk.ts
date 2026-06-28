@@ -9,6 +9,7 @@
 
 import { BESTDORI_API } from "@/config";
 import { downloader } from "@/storage/downloader";
+import { getBandId } from "@/types/bestdori/area-item-meta";
 
 // ============================================================================
 // 类型
@@ -167,7 +168,7 @@ async function main() {
             console.log(`Card ${entry.situationId}: 未在批量数据中找到`);
             continue;
         }
-        const bandId = Math.ceil(bulk.characterId / 5);
+        const bandId = getBandId(bulk.characterId);
         cardBriefs.push({
             cardId: entry.situationId,
             characterId: bulk.characterId,

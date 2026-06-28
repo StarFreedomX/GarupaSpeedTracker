@@ -17,6 +17,7 @@
 
 import { BESTDORI_API } from "@/config";
 import { downloader } from "@/storage/downloader";
+import { getBandId } from "@/types/bestdori/area-item-meta";
 
 // ============================================================================
 // 类型定义
@@ -282,7 +283,7 @@ async function main() {
         cardBriefs.push({
             cardId: entry.situationId,
             characterId: cardMeta.characterId,
-            bandId: Math.ceil(cardMeta.characterId / 5),
+            bandId: getBandId(cardMeta.characterId),
             attribute: cardMeta.attribute as Attribute,
             skillId: cardMeta.skillId,
             skillLevel: entry.skillLevel,

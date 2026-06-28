@@ -245,7 +245,7 @@ class GarupaService {
             const query = await garupaMetaCollection.find({});
             const records = await query.toArray();
             for (const record of records) {
-                if (record && record.clientVersion.length > 0) {
+                if (record?.clientVersion?.length > 0) {
                     this.serverClientVersions.set(record.server, record.clientVersion);
                 }
             }

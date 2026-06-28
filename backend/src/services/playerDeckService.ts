@@ -1,6 +1,6 @@
-import { fetchBestdoriAreaItems, fetchBestdoriCardsBulk, fetchBestdoriEventsFull, fetchBestdoriPlayer, fetchBestdoriSkills } from "@/api/bestdori";
+import { fetchBestdoriAreaItems, fetchBestdoriCardsBulk, fetchBestdoriCharacters, fetchBestdoriEventsFull, fetchBestdoriPlayer, fetchBestdoriSkills } from "@/api/bestdori";
 import type { AreaItemMeta } from "@/types/bestdori/area-item-meta";
-import { calcAreaItemBonus } from "@/types/bestdori/area-item-meta";
+import { calcAreaItemBonus, getBandId, setBandIdMap } from "@/types/bestdori/area-item-meta";
 import type { BestdoriEventFullRaw } from "@/types/bestdori/event";
 import type { Stat } from "@/types/bestdori/stat";
 import { addStat, emptyStat, statTotal } from "@/types/bestdori/stat";
@@ -294,8 +294,11 @@ export const playerDeckService = {
             });
         }
 
-        // 批量加载卡牌和区域道具（并行）
-        const [cardsBulk, areaItemsRaw] = await Promise.all([loadCardsWithFallback(cardIds), fetchBestdoriAreaItems()]);
+        // 批量加载卡牌、区域道具、角色映射（并行）
+        const [cardsBulk, areaItemsRaw, charactersRaw] = await Promise.all([loadCardsWithFallback(cardIds), fetchBestdoriAreaItems(), fetchBestdoriCharacters()]);
+
+        // 初始化角色→乐队映射（确保 bandId 与 Bestdori 的 targetBandIds 一致）
+        setBandIdMap(charactersRaw);
 
         // 收集需要的 skill ID，批量加载技能
         const skillIds = cardIds
@@ -312,7 +315,7 @@ export const playerDeckService = {
             if (!c) return { bandId: 0, attribute: "" };
             const chId = c.characterId as number;
             return {
-                bandId: Math.ceil(chId / 5),
+                bandId: getBandId(chId),
                 attribute: (c.attribute as string) ?? "",
             };
         });
@@ -349,7 +352,7 @@ export const playerDeckService = {
             const chId = cardRaw.characterId as number;
             const attr = cardRaw.attribute as string;
             const rarity = cardRaw.rarity as number;
-            const bandId = Math.ceil(chId / 5);
+            const bandId = getBandId(chId);
 
             const baseStat = calcBaseStat(cardRaw, pc);
 

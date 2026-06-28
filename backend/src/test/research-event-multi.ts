@@ -14,7 +14,7 @@
 import { BESTDORI_API } from "@/config";
 import { downloader } from "@/storage/downloader";
 import type { AreaItemMeta } from "@/types/bestdori/area-item-meta";
-import { calcAreaItemBonus } from "@/types/bestdori/area-item-meta";
+import { calcAreaItemBonus, getBandId } from "@/types/bestdori/area-item-meta";
 import type { Stat } from "@/types/bestdori/stat";
 import { addStat, emptyStat, statTotal } from "@/types/bestdori/stat";
 
@@ -277,7 +277,7 @@ async function main() {
     const cards: CardInfo[] = [];
     for (const entry of entries) {
         const meta = await loadCardMeta(entry.situationId);
-        const bandId = Math.ceil(meta.characterId / 5);
+        const bandId = getBandId(meta.characterId);
         const baseStat = calcBaseStat(meta, entry);
 
         // 区域道具

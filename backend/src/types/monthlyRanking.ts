@@ -81,12 +81,19 @@ export interface MonthlyRankingDetail extends MonthlyRankingInfo {
 ///=========================================
 
 ///================数据库====================
-// 存储层使用的 snapshot 记录，字段与对外 API 保持一致，避免二次转换
-export interface MonthlyRankingTopDocument extends MonthlyRankingTopResponse {
+// 存储层使用的 snapshot 记录
+// 玩家信息已拆分到 MonthlyRankingPlayerDocument 独立存储
+export interface MonthlyRankingTopDocument {
+    points: MonthlyRankingTopPoint[];
     server: number;
     monthlyId: number;
     updatedAt: number;
     bucket?: number;
+}
+
+export interface MonthlyRankingPlayerDocument extends MonthlyRankingPlayer {
+    server: number;
+    updatedAt: number;
 }
 
 export interface MonthlyRankingBorderDocument extends MonthlyRankingBorderResponse {

@@ -89,11 +89,23 @@ const readJson = async <T>(filePath: string): Promise<T | undefined> => {
     }
 };
 
-const writeJson = async (filePath: string, value: unknown): Promise<void> => {
+const writeJson = async (filePath: string, value: unknown, retries = 3): Promise<void> => {
     await fs.ensureDir(path.dirname(filePath));
     const tempPath = `${filePath}.tmp`;
     await fs.writeJson(tempPath, value, { spaces: 2 });
-    await fs.move(tempPath, filePath, { overwrite: true });
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            await fs.move(tempPath, filePath, { overwrite: true });
+            return;
+        } catch (error: unknown) {
+            const nodeError = error as NodeJS.ErrnoException;
+            if (nodeError.code === "EBUSY" && attempt < retries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+                continue;
+            }
+            throw error;
+        }
+    }
 };
 
 export class BestdoriSongMetadataService {

@@ -12,7 +12,7 @@
 import { BESTDORI_API } from "@/config";
 import { downloader } from "@/storage/downloader";
 import type { AreaItemMeta } from "@/types/bestdori/area-item-meta";
-import { calcAreaItemBonus } from "@/types/bestdori/area-item-meta";
+import { calcAreaItemBonus, getBandId, setBandIdMap } from "@/types/bestdori/area-item-meta";
 import type { Stat } from "@/types/bestdori/stat";
 import { addStat, emptyStat, statTotal } from "@/types/bestdori/stat";
 
@@ -109,7 +109,9 @@ function applyEventBonus(
             break;
         }
     }
-    const doubleBonus = event.eventAttributeAndCharacterBonus?.parameterPercent || event.eventAttributeAndCharacterBonus?.pointPercent || 0;
+    const doubleBonus = event.eventType === "versus" || event.eventType === "festival" || event.eventType === "medley"
+        ? (event.eventAttributeAndCharacterBonus?.parameterPercent ?? 0)
+        : (event.eventAttributeAndCharacterBonus?.pointPercent ?? 0);
     if (charMatch && attrMatch && doubleBonus) {
         addStat(bonus, scalePct(cardStat, doubleBonus));
     }
@@ -203,6 +205,10 @@ async function main() {
 
     const [event, playerApi, areaItemMetaMap] = await Promise.all([loadEvent(EVENT_ID), loadPlayer(PLAYER_ID, SERVER_NAME), loadAreaItemMetas()]);
 
+    // 从 Bestdori characters API 加载角色→乐队映射（确保 bandId 准确）
+    const charactersRaw = await downloader.download<Record<string, { bandId: number }>>(new URL("characters/main.2.json", BESTDORI_API).toString());
+    setBandIdMap(charactersRaw);
+
     console.log(`\n活动: ${event.eventName[3]} (type=${event.eventType})`);
     console.log(`属性: ${event.attributes.map((a) => `${a.attribute}+${a.percent}%`).join(", ")}`);
     console.log(`角色: ${event.characters.map((c) => `ch${c.characterId}+${c.percent}%`).join(", ")}`);
@@ -211,9 +217,11 @@ async function main() {
     if (event.eventCharacterParameterBonus && Object.values(event.eventCharacterParameterBonus).some((v) => v))
         console.log(`偏科: ${JSON.stringify(event.eventCharacterParameterBonus)}`);
     console.log(`加成卡: ${event.members.map((m) => `card${m.situationId}+${m.percent}%`).join(", ")}`);
-    console.log(
-        `limitBreaks: r5lb4=${event.limitBreaks.find((l) => l.rarity === 5 && l.rank === 4)?.percent ?? 0}% r4lb4=${event.limitBreaks.find((l) => l.rarity === 4 && l.rank === 4)?.percent ?? 0}%`,
-    );
+    const lbDisplay = event.limitBreaks
+        .filter((l) => l.percent > 0)
+        .map((l) => `r${l.rarity}lb${l.rank}=${l.percent}%`)
+        .join(", ");
+    if (lbDisplay) console.log(`limitBreaks: ${lbDisplay}`);
 
     if (!playerApi.result || !playerApi.data?.profile) {
         console.error("\n玩家数据获取失败");
@@ -225,12 +233,14 @@ async function main() {
     const areaItemEntries: Array<{ areaItemCategory: number; level: number }> = profile.enabledUserAreaItems?.entries ?? [];
     console.log(`编队 ${entries.length} 张卡, ${areaItemEntries.length} 个区域道具\n`);
 
-    const baseTotal = emptyStat();
-    const eventTotal = emptyStat();
+    const normalTotal = emptyStat();
+    const eventBonusTotal = emptyStat();
+
+    const isEventPowerType = event.eventType === "versus" || event.eventType === "festival" || event.eventType === "medley" || event.eventType === "challenge";
 
     for (const entry of entries) {
         const cardMeta = await loadCard(entry.situationId);
-        const bandId = Math.ceil(cardMeta.characterId / 5);
+        const bandId = getBandId(cardMeta.characterId);
         const baseStat = calcBaseCardStat(cardMeta, entry);
 
         // 区域道具
@@ -255,8 +265,8 @@ async function main() {
             visual: baseStat.visual + areaBonus.visual + eventBonus.visual,
         };
 
-        addStat(baseTotal, baseStat);
-        addStat(eventTotal, cardEventStat);
+        addStat(normalTotal, cardTotalStat);
+        addStat(eventBonusTotal, eventBonus);
 
         const charMatch = event.characters.some((c) => c.characterId === cardMeta.characterId);
         const attrMatch = event.attributes.some((a) => a.attribute === cardMeta.attribute);
@@ -268,15 +278,21 @@ async function main() {
         if (memberMatch) tags.push("加成卡");
 
         console.log(
-            `Card ${entry.situationId} ch${cardMeta.characterId} r${cardMeta.rarity}lb${entry.limitBreakRank} ${cardMeta.attribute}: 普通=${statTotal(cardTotalStat).toFixed(0)} 活动=${statTotal(cardEventStat).toFixed(0)} (${tags.join("+") || "无加成"})`,
+            `Card ${entry.situationId} ch${cardMeta.characterId} r${cardMeta.rarity}lb${entry.limitBreakRank} ${cardMeta.attribute} band${bandId}: 普通=${statTotal(cardTotalStat).toFixed(0)} 活动=${statTotal(cardEventStat).toFixed(0)} (${tags.join("+") || "无加成"})`,
         );
     }
 
-    const finalTotal = Math.floor(statTotal(eventTotal));
-    console.log(`\n基础综合力: ${Math.floor(statTotal(baseTotal))}`);
-    console.log(`活动综合力: ${finalTotal} (目标: ${TARGET_TOTAL})`);
-    if (finalTotal === TARGET_TOTAL) console.log("✓ 匹配!");
-    else console.log(`✗ 差值: ${finalTotal - TARGET_TOTAL}`);
+    const normalPower = Math.floor(statTotal(normalTotal));
+    const eventPower = isEventPowerType ? Math.floor(statTotal(normalTotal) + statTotal(eventBonusTotal)) : normalPower;
+    console.log(`\n普通综合力(含区域道具): ${normalPower}`);
+    console.log(`活动加成总计: ${Math.floor(statTotal(eventBonusTotal))}`);
+    console.log(`活动综合力: ${eventPower} (目标: ${TARGET_TOTAL}, 类型: ${event.eventType}, 活动加成生效: ${isEventPowerType})`);
+    if (TARGET_TOTAL > 0) {
+        if (eventPower === TARGET_TOTAL) console.log("✓ 匹配!");
+        else console.log(`✗ 差值: ${eventPower - TARGET_TOTAL}`);
+    } else {
+        console.log("(未设置目标值)");
+    }
 }
 
 main().catch((err) => {

@@ -64,3 +64,7 @@ export const fetchBestdoriAreaItems = async (deps: BestdoriDownloaderLike = down
 /** 获取技能（缓存优先；传 { forceUpdate: true } 可强制刷新） */
 export const fetchBestdoriSkills = async (opts?: DownloadCacheOptions<Record<string, Record<string, unknown>>>, deps: BestdoriDownloaderLike = downloader) =>
     deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("skills/all.10.json"), opts);
+
+/** 获取角色→乐队映射 */
+export const fetchBestdoriCharacters = async (deps: BestdoriDownloaderLike = downloader) =>
+    deps.downloadCache<Record<string, { bandId: number }>>(toBestdoriUrl("characters/main.2.json"));

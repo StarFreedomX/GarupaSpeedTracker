@@ -1,5 +1,10 @@
 import { fetchMonthlyRanking, fetchMonthlyRankingBuffer } from "@/api/garupa";
-import { MONGODB_MONTHLY_BORDER_POINTS_COLLECTION, MONGODB_MONTHLY_TOP_POINTS_COLLECTION } from "@/config";
+import {
+    MONGODB_GARUPA_META_COLLECTION,
+    MONGODB_MONTHLY_BORDER_POINTS_COLLECTION,
+    MONGODB_MONTHLY_RANKING_PLAYERS_COLLECTION,
+    MONGODB_MONTHLY_TOP_POINTS_COLLECTION,
+} from "@/config";
 import { logger } from "@/logger";
 import { garupaService } from "@/services/garupaService";
 import { monthlyRankingInfoService } from "@/services/monthlyRankingInfoService";
@@ -11,12 +16,15 @@ import type {
     MonthlyRankingBorderResponse,
     MonthlyRankingBorderTier,
     MonthlyRankingPlayer,
+    MonthlyRankingPlayerDocument,
     MonthlyRankingTopDocument,
     MonthlyRankingTopResponse,
 } from "@/types/monthlyRanking";
 
 const topCollection = database.collection<MonthlyRankingTopDocument>(MONGODB_MONTHLY_TOP_POINTS_COLLECTION);
 const borderCollection = database.collection<MonthlyRankingBorderDocument>(MONGODB_MONTHLY_BORDER_POINTS_COLLECTION);
+const playerCollection = database.collection<MonthlyRankingPlayerDocument>(MONGODB_MONTHLY_RANKING_PLAYERS_COLLECTION);
+const metaCollection = database.collection<{ key: string; completed: boolean; completedAt: number }>(MONGODB_GARUPA_META_COLLECTION);
 
 const MONTHLY_RANKING_BORDER_TIERS: MonthlyRankingBorderTier[] = [20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000];
 const BORDER_TIER_SET = new Set<number>(MONTHLY_RANKING_BORDER_TIERS);
@@ -58,13 +66,76 @@ class MonthlyRankingService {
     start(): void {
         garupaService.start();
 
-        // 异步触发启动检查：如果发现当前月榜没数据，立即抓取一次
-        this.bootstrapCheck().catch((err) => {
-            logger("monthlyRanking", `Bootstrap check failed: ${err?.message || err}`);
-        });
+        // 先迁移旧数据，再执行启动检查和注册轮询
+        this.migrateLegacyPlayers()
+            .then(() => {
+                // 异步触发启动检查：如果发现当前月榜没数据，立即抓取一次
+                this.bootstrapCheck().catch((err) => {
+                    logger("monthlyRanking", `Bootstrap check failed: ${err?.message || err}`);
+                });
+            })
+            .catch((err) => {
+                logger("monthlyRanking", `Legacy player migration failed: ${err?.message || err}`);
+                // 迁移失败不阻塞启动，但需要记录
+            });
 
         // 注册定时轮询
         garupaService.registerPoller("monthlyRanking", async () => this.refreshAll());
+    }
+
+    /**
+     * 将旧 monthly_top_points 文档中内嵌的 users 数组迁移到独立的 monthly_ranking_players 集合
+     * 通过 GarupaMeta 记录迁移状态，避免每次启动重复扫描
+     */
+    private async migrateLegacyPlayers(): Promise<void> {
+        const migrationKey = "migration_monthly_ranking_players";
+
+        const migrated = await metaCollection.findOne({ key: migrationKey });
+        if (migrated?.completed) {
+            return;
+        }
+
+        logger("monthlyRanking", "Starting legacy player migration...");
+
+        const legacyDocs = (await (await topCollection.find({ users: { $exists: true } })).toArray()) as unknown as (MonthlyRankingTopDocument & {
+            users: MonthlyRankingPlayer[];
+        })[];
+        if (legacyDocs.length === 0) {
+            logger("monthlyRanking", "No legacy users data found, marking migration as complete.");
+            await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
+            return;
+        }
+
+        // 按 server + monthlyId + bucket 升序排列，保证后来的信息覆盖先前的
+        legacyDocs.sort((a, b) => a.server - b.server || a.monthlyId - b.monthlyId || (a.bucket ?? 0) - (b.bucket ?? 0));
+
+        // 按 {server, uid} 去重，后出现的覆盖先出现的
+        const userMap = new Map<string, MonthlyRankingPlayer & { server: number }>();
+        for (const doc of legacyDocs) {
+            if (!Array.isArray(doc.users)) {
+                continue;
+            }
+            for (const user of doc.users) {
+                userMap.set(`${doc.server}-${user.uid}`, { ...user, server: doc.server });
+            }
+        }
+
+        // 写入独立集合
+        const playerWrites = Array.from(userMap.values()).map((entry) => {
+            const { server, ...user } = entry;
+            return playerCollection.replaceOne({ server, uid: user.uid }, { ...user, server, updatedAt: Date.now() }, { upsert: true });
+        });
+        await Promise.all(playerWrites);
+
+        // 清理旧字段
+        const cleanWrites = legacyDocs.map((doc) =>
+            topCollection.updateOne({ server: doc.server, monthlyId: doc.monthlyId, bucket: doc.bucket }, { $unset: { users: "" } }),
+        );
+        await Promise.all(cleanWrites);
+
+        await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
+
+        logger("monthlyRanking", `Legacy player migration completed: ${legacyDocs.length} documents processed, ${userMap.size} players migrated.`);
     }
 
     /**
@@ -173,7 +244,6 @@ class MonthlyRankingService {
 
     async getTopSnapshot(server: number, monthlyId: number): Promise<MonthlyRankingTopResponse> {
         const query = await topCollection.find({ server, monthlyId });
-        // 按 bucket 从旧到新排序确保同一个用户如果有多次改名，后面新 bucket 里的最新名字能覆盖旧名字
         const records = await query.sort({ bucket: 1 }).toArray();
         if (records.length === 0) {
             return { points: [], users: [] };
@@ -181,23 +251,18 @@ class MonthlyRankingService {
 
         const points = records.flatMap((record) => record.points ?? []);
 
-        // 把所有 bucket 里的用户全部合并去重
-        const userMap = new Map<number, MonthlyRankingPlayer>();
+        // 只查 points 中实际出现过的 UID 对应的玩家信息
+        const uidSet = new Set(points.map((p) => p.uid));
+        const uids = Array.from(uidSet);
 
-        for (const record of records) {
-            if (Array.isArray(record.users)) {
-                record.users.forEach((user) => {
-                    // 因为 records 是按时间正序排列的
-                    // 如果同一个 uid 在 bucket 0 和 bucket 1 都存在，bucket 1 的最新信息会覆盖 bucket 0
-                    userMap.set(user.uid, user);
-                });
-            }
+        let users: MonthlyRankingPlayer[] = [];
+        if (uids.length > 0) {
+            const playerQuery = await playerCollection.find({ server, uid: { $in: uids } });
+            const docs = await playerQuery.toArray();
+            users = docs.map(({ server: _s, updatedAt: _u, ...player }) => player);
         }
 
-        return {
-            points,
-            users: Array.from(userMap.values()), // 所有 bucket 出现过的、且保持最新状态的用户
-        };
+        return { points, users };
     }
 
     //  持久化
@@ -206,28 +271,7 @@ class MonthlyRankingService {
         const currentTopUsers: MonthlyRankingPlayer[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
-        // 先从数据库查出该分桶现存的记录
-        const existingDoc = await topCollection.findOne({ server, monthlyId, bucket });
-
-        // 利用 Map 进行去重和更新合并
-        const userMap = new Map<number, MonthlyRankingPlayer>();
-
-        // 如果原有记录里已经有 users 数组了，先放进 Map
-        if (existingDoc && Array.isArray(existingDoc.users)) {
-            existingDoc.users.forEach((user) => {
-                userMap.set(user.uid, user);
-            });
-        }
-
-        // 把本次抓取到的最新前十名塞进 Map。如果 uid 重复，最新的信息会直接覆盖旧信息；如果不重复，则会追加进去
-        currentTopUsers.forEach((user) => {
-            userMap.set(user.uid, user);
-        });
-
-        // 将合并后的 Map 还原为数组结构
-        const mergedUsersArray = Array.from(userMap.values());
-
-        // 写回数据库，继续沿用updateOne
+        // 写入积分点到 top 文档（不再嵌入 users）
         await topCollection.updateOne(
             { server, monthlyId, bucket },
             [
@@ -235,7 +279,6 @@ class MonthlyRankingService {
                     $set: {
                         points: { $concatArrays: [{ $ifNull: ["$points", []] }, newPoints] },
                         updatedAt: timestamp,
-                        users: mergedUsersArray,
                         server: { $ifNull: ["$server", server] },
                         monthlyId: { $ifNull: ["$monthlyId", monthlyId] },
                         bucket: { $ifNull: ["$bucket", bucket] },
@@ -245,9 +288,15 @@ class MonthlyRankingService {
             { upsert: true },
         );
 
+        // 玩家信息写入独立集合，按 {server, uid} 为 key，不绑定 monthlyId
+        const playerWrites = currentTopUsers.map((user) =>
+            playerCollection.replaceOne({ server, uid: user.uid }, { ...user, server, updatedAt: timestamp }, { upsert: true }),
+        );
+        await Promise.all(playerWrites);
+
         logger(
             "monthlyRanking",
-            `top snapshot persisted server=${server} monthly=${monthlyId} bucket=${bucket} points_added=${newPoints.length} total_users=${mergedUsersArray.length}`,
+            `top snapshot persisted server=${server} monthly=${monthlyId} bucket=${bucket} points_added=${newPoints.length} players_upserted=${currentTopUsers.length}`,
         );
     }
 

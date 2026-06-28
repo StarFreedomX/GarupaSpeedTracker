@@ -11,7 +11,7 @@
 
 import { downloader } from "@/storage/downloader";
 import type { AreaItemMeta } from "@/types/bestdori/area-item-meta";
-import { calcAreaItemBonus } from "@/types/bestdori/area-item-meta";
+import { calcAreaItemBonus, getBandId } from "@/types/bestdori/area-item-meta";
 import type { CardMeta } from "@/types/bestdori/card-meta";
 import { calcCardStat } from "@/types/bestdori/card-meta";
 import type { BestdoriPlayerRaw } from "@/types/bestdori/player";
@@ -217,7 +217,7 @@ function cardRawToMeta(cardId: number, raw: BestdoriCardRaw): CardMeta {
 
     // bandId 来自 Bestdori characters API 映射（1=PPP,2=AG,3=HHW,4=PP,5=Roselia,...）
     const chId = raw.characterId;
-    const bandId = Math.ceil(chId / 5);
+    const bandId = getBandId(chId);
 
     return {
         cardId,
