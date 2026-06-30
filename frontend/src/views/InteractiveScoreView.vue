@@ -6,6 +6,7 @@ import SkillConfigPanel from "@/components/common/SkillConfigPanel.vue";
 import Tooltip from "@/components/common/Tooltip.vue";
 import { sanitizeIntInput } from "@/composables/inputFilters";
 import { useUserPreferences } from "@/composables/useUserPreferences";
+import { getScoreRangeByPT } from "@/features/PT/calcSinglePT";
 import { analyze, computeFixedBasePTs, findContiguousWindows } from "@/features/scoreControl/interactiveAnalysis";
 import type { ActivityType, AnalysisResult, PlayStep, SolutionFilter, TeamConfig } from "@/features/scoreControl/types";
 import { calcExactScoreInTurns, calcScore } from "@/features/songMeta/autoScoreMath";
@@ -321,6 +322,32 @@ const handleKeydown = (e: KeyboardEvent) => {
 };
 
 // 歌曲选中状态 & 分数范围
+// ─── 反推 PT 对应的分数范围 ───
+const ptScoreRangeParams = computed(() => {
+    switch (formData.value.activityType) {
+        case "mission":
+            return { type: "mission" as const, supportBandPower: formData.value.supportBandPower, eventBonus: formData.value.eventBonus };
+        case "try":
+            return { type: "try" as const, eventBonus: formData.value.eventBonus };
+        case "challenge":
+            return { type: "challenge" as const, eventBonus: formData.value.eventBonus };
+        case "versus":
+            return { type: "versus" as const };
+        case "5v5":
+            return { type: "5v5" as const };
+        case "medley1":
+            return { type: "medley1" as const };
+    }
+});
+
+function getPTScoreRange(basePT: number): { min: number; max: number } | null {
+    try {
+        return getScoreRangeByPT(basePT, ptScoreRangeParams.value);
+    } catch {
+        return null;
+    }
+}
+
 const selectedSongKey = ref<string | null>(null); // `${stepIdx}-${songId}-${diffKey}`
 const toggleSong = (stepIdx: number, song: { songId: number; difficultyKey: string }) => {
     const key = `${stepIdx}-${song.songId}-${song.difficultyKey}`;
@@ -798,6 +825,9 @@ const bonusRows = computed(() => {
                                 {{ t('interactive.step4.basePT') }} = <span class="font-mono text-text">{{ step.basePT.toLocaleString() }}</span>
                                 × {{ step.multiplier }}
                                 = <span class="font-mono font-bold text-primary">{{ step.boostedPT.toLocaleString() }} PT</span>
+                                <span v-if="getPTScoreRange(step.basePT)" class="text-[10px] text-muted/70 ml-1">
+                                    [{{ getPTScoreRange(step.basePT)!.min.toLocaleString() }} ~ {{ getPTScoreRange(step.basePT)!.max.toLocaleString() }}]
+                                </span>
                             </span>
                             <span
                                 v-if="step.songs.length > 0"

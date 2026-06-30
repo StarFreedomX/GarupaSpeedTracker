@@ -109,9 +109,10 @@ function applyEventBonus(
             break;
         }
     }
-    const doubleBonus = event.eventType === "versus" || event.eventType === "festival" || event.eventType === "medley"
-        ? (event.eventAttributeAndCharacterBonus?.parameterPercent ?? 0)
-        : (event.eventAttributeAndCharacterBonus?.pointPercent ?? 0);
+    const doubleBonus =
+        event.eventType === "versus" || event.eventType === "festival" || event.eventType === "medley"
+            ? (event.eventAttributeAndCharacterBonus?.parameterPercent ?? 0)
+            : (event.eventAttributeAndCharacterBonus?.pointPercent ?? 0);
     if (charMatch && attrMatch && doubleBonus) {
         addStat(bonus, scalePct(cardStat, doubleBonus));
     }

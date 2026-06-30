@@ -1,4 +1,11 @@
-import { fetchBestdoriAreaItems, fetchBestdoriCardsBulk, fetchBestdoriCharacters, fetchBestdoriEventsFull, fetchBestdoriPlayer, fetchBestdoriSkills } from "@/api/bestdori";
+import {
+    fetchBestdoriAreaItems,
+    fetchBestdoriCardsBulk,
+    fetchBestdoriCharacters,
+    fetchBestdoriEventsFull,
+    fetchBestdoriPlayer,
+    fetchBestdoriSkills,
+} from "@/api/bestdori";
 import type { AreaItemMeta } from "@/types/bestdori/area-item-meta";
 import { calcAreaItemBonus, getBandId, setBandIdMap } from "@/types/bestdori/area-item-meta";
 import type { BestdoriEventFullRaw } from "@/types/bestdori/event";
@@ -295,7 +302,11 @@ export const playerDeckService = {
         }
 
         // 批量加载卡牌、区域道具、角色映射（并行）
-        const [cardsBulk, areaItemsRaw, charactersRaw] = await Promise.all([loadCardsWithFallback(cardIds), fetchBestdoriAreaItems(), fetchBestdoriCharacters()]);
+        const [cardsBulk, areaItemsRaw, charactersRaw] = await Promise.all([
+            loadCardsWithFallback(cardIds),
+            fetchBestdoriAreaItems(),
+            fetchBestdoriCharacters(),
+        ]);
 
         // 初始化角色→乐队映射（确保 bandId 与 Bestdori 的 targetBandIds 一致）
         setBandIdMap(charactersRaw);
