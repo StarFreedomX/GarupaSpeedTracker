@@ -110,18 +110,29 @@ const teamConfig = computed<TeamConfig>(() => ({
     centerIndex: centerIndex.value,
 }));
 
-// 目标 PT 步骤的区间预览
-const previewWindows = computed(() => {
-    if (Object.keys(songMetadata.value).length === 0) return null;
-    if (Object.keys(songList.value).length === 0) return null;
-    try {
-        const { achievableBasePTs } = computeFixedBasePTs(teamConfig.value, formData.value.activityType, songMetadata.value, songList.value, filterData.value);
-        if (achievableBasePTs.length === 0) return null;
-        return findContiguousWindows(achievableBasePTs);
-    } catch {
-        return null;
-    }
-});
+	// 目标 PT 步骤的区间预览（手动触发，避免每次参数变更都重算）
+	const previewWindows = ref<ReturnType<typeof findContiguousWindows> | null>(null);
+	const previewLoading = ref(false);
+
+	const computePreviewWindows = () => {
+	    if (Object.keys(songMetadata.value).length === 0) return;
+	    if (Object.keys(songList.value).length === 0) return;
+	    previewLoading.value = true;
+	    setTimeout(() => {
+	        try {
+	            const { achievableBasePTs } = computeFixedBasePTs(teamConfig.value, formData.value.activityType, songMetadata.value, songList.value, filterData.value);
+	            if (achievableBasePTs.length === 0) {
+	                previewWindows.value = null;
+	            } else {
+	                previewWindows.value = findContiguousWindows(achievableBasePTs);
+	            }
+	        } catch {
+	            previewWindows.value = null;
+	        } finally {
+	            previewLoading.value = false;
+	        }
+	    }, 30);
+	};
 
 const isStepValid = computed(() => {
     switch (currentStep.value) {
@@ -656,23 +667,38 @@ const bonusRows = computed(() => {
                 </div>
 
                 <!-- Contiguous windows preview -->
-                <div v-if="previewWindows && previewWindows.length > 0" class="mt-3 pt-3 border-t border-border/60">
-                    <p class="mb-2 text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
-                    <div class="space-y-2">
-                        <div v-for="w in previewWindows" :key="w.plays">
-                            <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
-                            <p
-                                v-for="(seg, si) in w.segments"
-                                :key="si"
-                                class="text-xs text-muted ml-3"
-                                :class="si === 0 ? '' : 'opacity-60'"
-                            >
-                                <span v-if="si === 0">★ </span><span v-else>  </span>
-                                <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
-                                （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
-                            </p>
-                        </div>
+                <div class="mt-3 pt-3 border-t border-border/60">
+                    <div class="flex items-center gap-2 mb-2">
+                        <p class="text-xs font-medium text-text">{{ t('interactive.step4.windowPreview') }}</p>
+                        <button
+                            type="button"
+                            class="app-btn border border-primary/40 bg-primary/15 px-2 py-0.5 text-xs text-primary transition-colors hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                            :disabled="previewLoading"
+                            @click="computePreviewWindows"
+                        >
+                            {{ previewLoading ? '...' : '↻ ' + t('common.calculate') }}
+                        </button>
                     </div>
+                    <template v-if="previewWindows && previewWindows.length > 0">
+                        <div class="space-y-2">
+                            <div v-for="w in previewWindows" :key="w.plays">
+                                <p class="text-xs text-muted mb-0.5">{{ t('interactive.step4.playsLabel', { plays: w.plays }) }}</p>
+                                <p
+                                    v-for="(seg, si) in w.segments"
+                                    :key="si"
+                                    class="text-xs text-muted ml-3"
+                                    :class="si === 0 ? '' : 'opacity-60'"
+                                >
+                                    <span v-if="si === 0">★ </span><span v-else>  </span>
+                                    <span class="font-mono text-text">[{{ seg.lo.toLocaleString() }}, {{ seg.hi.toLocaleString() }}]</span>
+                                    （{{ t('interactive.step4.segmentLen', { center: seg.center.toLocaleString(), len: (seg.hi - seg.lo + 1).toLocaleString() }) }}）
+                                </p>
+                            </div>
+                        </div>
+                    </template>
+                    <p v-else-if="previewWindows && previewWindows.length === 0" class="text-xs text-muted">
+                        {{ t('interactive.status.noFixedSongs') }}
+                    </p>
                 </div>
             </div>
         </div>
