@@ -110,29 +110,35 @@ const teamConfig = computed<TeamConfig>(() => ({
     centerIndex: centerIndex.value,
 }));
 
-	// 目标 PT 步骤的区间预览（手动触发，避免每次参数变更都重算）
-	const previewWindows = ref<ReturnType<typeof findContiguousWindows> | null>(null);
-	const previewLoading = ref(false);
+// 目标 PT 步骤的区间预览（手动触发，避免每次参数变更都重算）
+const previewWindows = ref<ReturnType<typeof findContiguousWindows> | null>(null);
+const previewLoading = ref(false);
 
-	const computePreviewWindows = () => {
-	    if (Object.keys(songMetadata.value).length === 0) return;
-	    if (Object.keys(songList.value).length === 0) return;
-	    previewLoading.value = true;
-	    setTimeout(() => {
-	        try {
-	            const { achievableBasePTs } = computeFixedBasePTs(teamConfig.value, formData.value.activityType, songMetadata.value, songList.value, filterData.value);
-	            if (achievableBasePTs.length === 0) {
-	                previewWindows.value = null;
-	            } else {
-	                previewWindows.value = findContiguousWindows(achievableBasePTs);
-	            }
-	        } catch {
-	            previewWindows.value = null;
-	        } finally {
-	            previewLoading.value = false;
-	        }
-	    }, 30);
-	};
+const computePreviewWindows = () => {
+    if (Object.keys(songMetadata.value).length === 0) return;
+    if (Object.keys(songList.value).length === 0) return;
+    previewLoading.value = true;
+    setTimeout(() => {
+        try {
+            const { achievableBasePTs } = computeFixedBasePTs(
+                teamConfig.value,
+                formData.value.activityType,
+                songMetadata.value,
+                songList.value,
+                filterData.value,
+            );
+            if (achievableBasePTs.length === 0) {
+                previewWindows.value = null;
+            } else {
+                previewWindows.value = findContiguousWindows(achievableBasePTs);
+            }
+        } catch {
+            previewWindows.value = null;
+        } finally {
+            previewLoading.value = false;
+        }
+    }, 30);
+};
 
 const isStepValid = computed(() => {
     switch (currentStep.value) {
