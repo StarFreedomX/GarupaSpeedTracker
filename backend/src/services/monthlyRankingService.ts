@@ -15,11 +15,11 @@ import type {
     MonthlyRankingBorderPoint,
     MonthlyRankingBorderResponse,
     MonthlyRankingBorderTier,
-    MonthlyRankingPlayer,
     MonthlyRankingPlayerDocument,
     MonthlyRankingTopDocument,
     MonthlyRankingTopResponse,
 } from "@/types/monthlyRanking";
+import type { RankingUser } from "@/types/rankingUser";
 
 const topCollection = database.collection<MonthlyRankingTopDocument>(MONGODB_MONTHLY_TOP_POINTS_COLLECTION);
 const borderCollection = database.collection<MonthlyRankingBorderDocument>(MONGODB_MONTHLY_BORDER_POINTS_COLLECTION);
@@ -98,7 +98,7 @@ class MonthlyRankingService {
         logger("monthlyRanking", "Starting legacy player migration...");
 
         const legacyDocs = (await (await topCollection.find({ users: { $exists: true } })).toArray()) as unknown as (MonthlyRankingTopDocument & {
-            users: MonthlyRankingPlayer[];
+            users: RankingUser[];
         })[];
         if (legacyDocs.length === 0) {
             logger("monthlyRanking", "No legacy users data found, marking migration as complete.");
@@ -110,7 +110,7 @@ class MonthlyRankingService {
         legacyDocs.sort((a, b) => a.server - b.server || a.monthlyId - b.monthlyId || (a.bucket ?? 0) - (b.bucket ?? 0));
 
         // 按 {server, uid} 去重，后出现的覆盖先出现的
-        const userMap = new Map<string, MonthlyRankingPlayer & { server: number }>();
+        const userMap = new Map<string, RankingUser & { server: number }>();
         for (const doc of legacyDocs) {
             if (!Array.isArray(doc.users)) {
                 continue;
@@ -255,7 +255,7 @@ class MonthlyRankingService {
         const uidSet = new Set(points.map((p) => p.uid));
         const uids = Array.from(uidSet);
 
-        let users: MonthlyRankingPlayer[] = [];
+        let users: RankingUser[] = [];
         if (uids.length > 0) {
             const playerQuery = await playerCollection.find({ server, uid: { $in: uids } });
             const docs = await playerQuery.toArray();
@@ -268,7 +268,7 @@ class MonthlyRankingService {
     //  持久化
     private async persistTopSnapshot(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const newPoints = raw.monthlyRankingPointTopUsers.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
-        const currentTopUsers: MonthlyRankingPlayer[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
+        const currentTopUsers: RankingUser[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
         // 写入积分点到 top 文档（不再嵌入 users）

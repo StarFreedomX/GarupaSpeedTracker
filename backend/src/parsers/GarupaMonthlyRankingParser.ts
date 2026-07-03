@@ -1,7 +1,8 @@
 import { GarupaParser } from "@/parsers/GarupaParser";
 import type { GarupaMonthlyRankingRankingResponse, GarupaRankingUser } from "@/types/garupaSchema";
 import { userMonthlyRankingRankingResponseSchema } from "@/types/garupaSchema";
-import type { MonthlyRankingBandoriRaw, MonthlyRankingTopUserRaw } from "@/types/monthlyRanking";
+import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
+import type { RankingUserRaw } from "@/types/rankingUser";
 
 const garupaParser = new GarupaParser();
 
@@ -12,7 +13,7 @@ const buildDegrees = (user: GarupaRankingUser): number[] => {
     return entries.map((entry) => toNumber(entry.value?.degreeId)).filter((value) => Number.isFinite(value));
 };
 
-const parseUser = (user: GarupaRankingUser): MonthlyRankingTopUserRaw => {
+const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
     const profileSituation = user.userProfileSituation;
     const strained = profileSituation?.illust === "after_training" ? 1 : 0;
 
@@ -29,7 +30,7 @@ const parseUser = (user: GarupaRankingUser): MonthlyRankingTopUserRaw => {
     };
 };
 
-const buildUsers = (container?: { entries?: GarupaRankingUser[] }): MonthlyRankingTopUserRaw[] => {
+const buildUsers = (container?: { entries?: GarupaRankingUser[] }): RankingUserRaw[] => {
     const rows = container?.entries ?? [];
     return rows.map((user) => parseUser(user));
 };

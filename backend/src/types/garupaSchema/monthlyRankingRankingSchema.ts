@@ -1,4 +1,4 @@
-import { type GarupaRankingUserList, rankingUserListSchema } from "@/types/garupaSchema/userSchema"; // 假设你保存在这里
+import { type GarupaRankingUserList, rankingUserListSchema } from "@/types/garupaSchema/rankingUserSchema";
 import type { SchemaDefinition } from "./schemaDefinition";
 
 // ==========================================

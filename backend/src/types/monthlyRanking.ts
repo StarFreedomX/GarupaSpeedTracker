@@ -1,29 +1,12 @@
 import type { GarupaMasterMonthlyRankingGrade, GarupaMasterMonthlyRankingReward } from "@/types/garupaSchema";
-
-export interface MonthlyRankingPlayer {
-    uid: number;
-    name: string;
-    introduction: string;
-    rank: number;
-    sid: number;
-    strained: number;
-    degrees: number[];
-    // tier: number; 玩家信息无需存储tier，因为会变，所以只需要在points同一时间里是1~10排序顺序就能确定那一时刻的名次了
-    // 另外，玩家信息以最新为准
-}
+import type { RankingUser, RankingUserRaw } from "@/types/rankingUser";
 
 ///==================Garupa源数据结构========================
-// 从 Bandori 服务器获取并转化的 user 信息
-export interface MonthlyRankingTopUserRaw extends MonthlyRankingPlayer {
-    tier: number;
-    point: number;
-    // 还有一些字段我们抛弃了
-}
 
 // 从 Bandori 服务器获取并转化的原始结构
 export interface MonthlyRankingBandoriRaw {
-    monthlyRankingPointTopUsers: MonthlyRankingTopUserRaw[];
-    monthlyRankingPointBorderUsers: MonthlyRankingTopUserRaw[];
+    monthlyRankingPointTopUsers: RankingUserRaw[];
+    monthlyRankingPointBorderUsers: RankingUserRaw[];
 }
 
 export type MonthlyRankingInfo = {
@@ -45,7 +28,7 @@ export interface MonthlyRankingTopPoint {
 
 export interface MonthlyRankingTopResponse {
     points: MonthlyRankingTopPoint[];
-    users: MonthlyRankingPlayer[];
+    users: RankingUser[];
 }
 
 export interface MonthlyRankingBorderPoint {
@@ -91,7 +74,7 @@ export interface MonthlyRankingTopDocument {
     bucket?: number;
 }
 
-export interface MonthlyRankingPlayerDocument extends MonthlyRankingPlayer {
+export interface MonthlyRankingPlayerDocument extends RankingUser {
     server: number;
     updatedAt: number;
 }

@@ -163,18 +163,18 @@ export interface GarupaUserProfileDegreeMap {
 }
 
 export interface GarupaRankingUser {
-    name?: string;
-    ownFlg?: boolean;
-    rankLevel?: number;
-    introduction?: string;
-    rank?: number;
-    point?: number;
-    userId?: number;
-    degreeId?: number;
-    userDeck?: GarupaUserDeck;
-    userSituationList?: GarupaUserSituationList;
-    userProfileSituation?: GarupaUserProfileSituation;
-    userProfileDegreeMap?: GarupaUserProfileDegreeMap;
+    name?: string; // 玩家昵称
+    ownFlg?: boolean; // 是否为自己
+    rankLevel?: number; // 玩家等级
+    introduction?: string; // 玩家简介
+    rank?: number; // 玩家排名
+    point?: number; // 玩家积分
+    userId?: number; // 玩家ID
+    degreeId?: number; // 玩家称号ID
+    userDeck?: GarupaUserDeck; // 玩家队伍编成
+    userSituationList?: GarupaUserSituationList; // 玩家状态（详细队伍信息）
+    userProfileSituation?: GarupaUserProfileSituation; // 玩家简介信息
+    userProfileDegreeMap?: GarupaUserProfileDegreeMap; // 玩家挂的两个牌子
 }
 
 export interface GarupaRankingUserList {
