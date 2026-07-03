@@ -5,10 +5,10 @@ import type { RankingUser, RankingUserRaw } from "@/types/rankingUser";
 export interface EventRankingBandoriRaw {
     eventPointTopUsers?: RankingUserRaw[];
     eventPointBorderUsers?: RankingUserRaw[];
-    scoreRanking: ScoreRankingBandoriRaw[];
+    musicRanking: MusicRankingBandoriRaw[];
 }
 
-export interface ScoreRankingBandoriRaw {
+export interface MusicRankingBandoriRaw {
     musicId: number;
     scoreTopUsers?: RankingUserRaw[];
     scoreBorderUsers?: RankingUserRaw[];
@@ -72,12 +72,25 @@ export interface VersusEventRankingBandoriRaw {
 }*/
 
 export type EventInfo = {
+    eventType: string;
     eventName: Array<string | null>;
     assetBundleName: string;
     bgmFileName: string;
     startAt: Array<number | null>;
     endAt: Array<number | null>;
 };
+export interface EventDetail extends EventInfo {
+    eventId: number;
+    enableFlag: Array<boolean | null>;
+    publicStartAt: Array<number | null>;
+    publicEndAt: Array<number | null>;
+    distributionStartAt: Array<number | null>;
+    distributionEndAt: Array<number | null>;
+    aggregateEndAt: Array<number | null>;
+    receptionEndAt: Array<number | null>;
+    pointRewards?: Array<GarupaMasterEventPointReward[] | null>;
+    rankingRewards?: Array<GarupaMasterEventRankingReward[] | null>;
+}
 ///===============================================
 
 ///===============服务器对外API=====================
@@ -133,23 +146,11 @@ export interface EventDetailList {
     [eventId: string]: EventDetail;
 }
 
-export interface EventDetail extends EventInfo {
-    eventId: number;
-    enableFlag: Array<boolean | null>;
-    publicStartAt: Array<number | null>;
-    publicEndAt: Array<number | null>;
-    distributionStartAt: Array<number | null>;
-    distributionEndAt: Array<number | null>;
-    aggregateEndAt: Array<number | null>;
-    receptionEndAt: Array<number | null>;
-    pointRewards?: Array<GarupaMasterEventPointReward[] | null>;
-    rankingRewards?: Array<GarupaMasterEventRankingReward[] | null>;
-}
 ///=========================================
 
 ///================数据库====================
 // 存储层使用的 snapshot 记录
-// 玩家信息已拆分到 MonthlyRankingPlayerDocument 独立存储
+// 玩家信息已拆分到 RankingPlayerDocument 独立存储
 export interface EventRankingTopDocument {
     points: EventRankingTopPoint[];
     server: number;
@@ -157,28 +158,26 @@ export interface EventRankingTopDocument {
     updatedAt: number;
     bucket?: number;
 }
-
-export interface EventRankingPlayerDocument extends RankingUser {
-    server: number;
-    updatedAt: number;
-}
-export interface EventRankingTopDocument {
-    points: EventRankingTopPoint[];
-    server: number;
-    eventId: number;
-    updatedAt: number;
-    bucket?: number;
-}
-
-export interface EventRankingPlayerDocument extends RankingUser {
-    server: number;
-    updatedAt: number;
-}
-
 export interface EventRankingBorderDocument extends EventRankingBorderResponse {
     server: number;
     eventId: number;
     tier: EventRankingBorderTier;
+    updatedAt: number;
+}
+
+export interface MusicRankingTopDocument {
+    points: MusicRankingTopPoint[];
+    server: number;
+    eventId: number;
+    musicId: number;
+    updatedAt: number;
+    bucket?: number;
+}
+
+export interface MusicRankingBorderDocument extends MusicRankingBorderResponse {
+    server: number;
+    eventId: number;
+    tier: MusicRankingBorderTier;
     updatedAt: number;
 }
 ///=========================================
@@ -209,7 +208,6 @@ export interface EventDetailDocument extends EventDetail {
     updatedAt: number;
 }
 
-// 兼容历史命名：info collection 现在实际存的是完整 detail 文档
 export interface EventInfoDocument extends EventDetailDocument {
     eventId: number;
 }
