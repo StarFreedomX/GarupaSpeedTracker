@@ -310,8 +310,9 @@ class GarupaService {
                 }
 
                 const prev = this.serverClientVersions.get(server);
-                const isUpgrade = !prev || compareVersions(version, prev) > 0;
-                if (isUpgrade) {
+                if (prev === version) {
+                    logger("garupaService", `server=${server} client version is latest (${version})`);
+                } else if (!prev || compareVersions(version, prev) > 0) {
                     this.serverClientVersions.set(server, version);
                     logger("garupaService", `server=${server} client version updated ${prev ?? "-"} -> ${version} (${reason})`);
                 } else {

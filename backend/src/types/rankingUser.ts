@@ -15,3 +15,8 @@ export interface RankingUserRaw extends RankingUser {
     point: number;
     // 还有一些字段我们抛弃了
 }
+
+export interface RankingPlayerDocument extends RankingUser {
+    server: number;
+    updatedAt: number;
+}

@@ -113,6 +113,20 @@ class MongoDatabase implements Database {
         }
     }
 
+    async renameCollection(oldName: string, newName: string): Promise<void> {
+        await this.ensureConnected();
+        const existing = await this.db.listCollections({ name: newName }).toArray();
+        if (existing.length > 0) {
+            return; // 目标集合已存在，跳过
+        }
+        await this.db.renameCollection(oldName, newName);
+    }
+
+    async listCollectionNames(): Promise<string[]> {
+        await this.ensureConnected();
+        return (await this.db.listCollections().toArray()).map((c) => c.name);
+    }
+
     getCollectionRaw(name: string): Collection<Document> {
         if (!this.db) {
             void this.ensureConnected().catch(() => undefined);

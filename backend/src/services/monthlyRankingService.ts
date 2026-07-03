@@ -2,8 +2,8 @@ import { fetchMonthlyRanking, fetchMonthlyRankingBuffer } from "@/api/garupa";
 import {
     MONGODB_GARUPA_META_COLLECTION,
     MONGODB_MONTHLY_BORDER_POINTS_COLLECTION,
-    MONGODB_MONTHLY_RANKING_PLAYERS_COLLECTION,
     MONGODB_MONTHLY_TOP_POINTS_COLLECTION,
+    MONGODB_RANKING_PLAYERS_COLLECTION,
 } from "@/config";
 import { logger } from "@/logger";
 import { garupaService } from "@/services/garupaService";
@@ -15,15 +15,14 @@ import type {
     MonthlyRankingBorderPoint,
     MonthlyRankingBorderResponse,
     MonthlyRankingBorderTier,
-    MonthlyRankingPlayerDocument,
     MonthlyRankingTopDocument,
     MonthlyRankingTopResponse,
 } from "@/types/monthlyRanking";
-import type { RankingUser } from "@/types/rankingUser";
+import type { RankingPlayerDocument, RankingUser } from "@/types/rankingUser";
 
 const topCollection = database.collection<MonthlyRankingTopDocument>(MONGODB_MONTHLY_TOP_POINTS_COLLECTION);
 const borderCollection = database.collection<MonthlyRankingBorderDocument>(MONGODB_MONTHLY_BORDER_POINTS_COLLECTION);
-const playerCollection = database.collection<MonthlyRankingPlayerDocument>(MONGODB_MONTHLY_RANKING_PLAYERS_COLLECTION);
+const playerCollection = database.collection<RankingPlayerDocument>(MONGODB_RANKING_PLAYERS_COLLECTION);
 const metaCollection = database.collection<{ key: string; completed: boolean; completedAt: number }>(MONGODB_GARUPA_META_COLLECTION);
 
 const MONTHLY_RANKING_BORDER_TIERS: MonthlyRankingBorderTier[] = [20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000];
@@ -68,6 +67,7 @@ class MonthlyRankingService {
 
         // 先迁移旧数据，再执行启动检查和注册轮询
         this.migrateLegacyPlayers()
+            .then(() => this.migrateRenamePlayersCollection())
             .then(() => {
                 // 异步触发启动检查：如果发现当前月榜没数据，立即抓取一次
                 this.bootstrapCheck().catch((err) => {
@@ -136,6 +136,43 @@ class MonthlyRankingService {
         await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
 
         logger("monthlyRanking", `Legacy player migration completed: ${legacyDocs.length} documents processed, ${userMap.size} players migrated.`);
+    }
+
+    /**
+     * 将旧集合 monthly_ranking_players 重命名为 ranking_players，以便后续引入其他榜单
+     */
+    private async migrateRenamePlayersCollection(): Promise<void> {
+        const migrationKey = "migration_rename_ranking_players";
+
+        const migrated = await metaCollection.findOne({ key: migrationKey });
+        if (migrated?.completed) {
+            return;
+        }
+
+        const collectionNames = await database.listCollectionNames();
+
+        if (!collectionNames.includes("monthly_ranking_players")) {
+            logger("monthlyRanking", "Old collection monthly_ranking_players not found, marking rename migration as complete.");
+            await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
+            return;
+        }
+
+        if (collectionNames.includes("ranking_players")) {
+            logger("monthlyRanking", "Target collection ranking_players already exists, marking rename migration as complete.");
+            await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
+            return;
+        }
+
+        try {
+            await database.renameCollection("monthly_ranking_players", "ranking_players");
+            logger("monthlyRanking", "Renamed collection monthly_ranking_players → ranking_players successfully.");
+        } catch (err) {
+            const message = (err as { message?: string } | undefined)?.message ?? String(err);
+            logger("monthlyRanking", `Failed to rename collection: ${message}`);
+            throw err;
+        }
+
+        await metaCollection.replaceOne({ key: migrationKey }, { key: migrationKey, completed: true, completedAt: Date.now() }, { upsert: true });
     }
 
     /**

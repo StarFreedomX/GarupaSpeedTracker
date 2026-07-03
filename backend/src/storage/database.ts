@@ -18,6 +18,8 @@ export interface DatabaseCollection<TDocument> {
 
 export interface Database {
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument>;
+    renameCollection(oldName: string, newName: string): Promise<void>;
+    listCollectionNames(): Promise<string[]>;
     close(): Promise<void>;
 }
 

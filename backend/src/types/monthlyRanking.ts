@@ -74,11 +74,6 @@ export interface MonthlyRankingTopDocument {
     bucket?: number;
 }
 
-export interface MonthlyRankingPlayerDocument extends RankingUser {
-    server: number;
-    updatedAt: number;
-}
-
 export interface MonthlyRankingBorderDocument extends MonthlyRankingBorderResponse {
     server: number;
     monthlyId: number;
