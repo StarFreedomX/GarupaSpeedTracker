@@ -1,4 +1,4 @@
-export type ProtoDataType = "int" | "string" | "bool" | "float" | "double" | "message" | "bytes";
+export type ProtoDataType = "int" | "long" | "string" | "bool" | "float" | "double" | "message" | "bytes";
 
 export interface FieldDefinition {
     name: string;

@@ -13,7 +13,7 @@ export const userDeckSchema: SchemaDefinition = {
 };
 
 export const userAppendParameterSchema: SchemaDefinition = {
-    1: { name: "userId", type: "int" }, // ulong 使用 int 盲扫解析
+    1: { name: "userId", type: "long" },
     2: { name: "situationId", type: "int" },
     3: { name: "performance", type: "int" },
     4: { name: "technique", type: "int" },
@@ -27,11 +27,11 @@ export const userAppendParameterSchema: SchemaDefinition = {
 };
 
 export const userSituationSchema: SchemaDefinition = {
-    1: { name: "userId", type: "int" },
+    1: { name: "userId", type: "long" },
     2: { name: "situationId", type: "int" },
     3: { name: "level", type: "int" },
     4: { name: "exp", type: "int" },
-    5: { name: "createdAt", type: "int" },
+    5: { name: "createdAt", type: "long" },
     6: { name: "addExp", type: "int" },
     7: { name: "trainingStatus", type: "string" },
     8: { name: "duplicateCount", type: "int" },
@@ -47,14 +47,14 @@ export const userSituationListSchema: SchemaDefinition = {
 };
 
 export const userProfileSituationSchema: SchemaDefinition = {
-    1: { name: "userId", type: "int" },
+    1: { name: "userId", type: "long" },
     2: { name: "situationId", type: "int" },
     3: { name: "illust", type: "string" },
     4: { name: "viewProfileSituationStatus", type: "string" },
 };
 
 export const userProfileDegreeSchema: SchemaDefinition = {
-    1: { name: "userId", type: "int" },
+    1: { name: "userId", type: "long" },
     2: { name: "profileDegreeType", type: "string" },
     3: { name: "degreeId", type: "int" },
 };

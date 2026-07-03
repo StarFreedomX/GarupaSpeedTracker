@@ -129,7 +129,7 @@ export class GarupaParser {
             const { name, type, repeated, schema: subSchema } = meta;
 
             const parseValue = (item: ProtoFieldRaw) => {
-                if (type === "int") {
+                if (type === "int" || type === "long") {
                     return Number(item.data);
                 }
                 if (type === "bool") {
