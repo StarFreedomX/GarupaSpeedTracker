@@ -12,7 +12,7 @@ import {
     GARUPA_UUIDS,
 } from "@/config";
 import { GarupaParser } from "@/parsers/GarupaParser";
-import { type GarupaMonthlyRankingRankingResponse, userMonthlyRankingRankingResponseSchema } from "@/types/garupaSchema/monthlyRankingSchema";
+import { type GarupaMonthlyRankingRankingResponse, userMonthlyRankingRankingResponseSchema } from "@/types/garupaSchema/monthlyRankingRankingSchema";
 
 interface ProbeNode {
     field: number;

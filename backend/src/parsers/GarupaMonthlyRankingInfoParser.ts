@@ -1,6 +1,6 @@
 import { GarupaParser } from "@/parsers/GarupaParser";
-import type { GarupaMasterMonthlyRanking, GarupaMasterMonthlyRankingListResponse } from "@/types/garupaSchema/monthlyRankingSchema";
-import { masterMonthlyRankingListSchema } from "@/types/garupaSchema/monthlyRankingSchema";
+import type { GarupaMasterMonthlyRanking, GarupaMasterMonthlyRankingListResponse } from "@/types/garupaSchema";
+import { masterMonthlyRankingListSchema } from "@/types/garupaSchema";
 import type { MonthlyRankingDetail, MonthlyRankingDetailList } from "@/types/monthlyRanking";
 
 const garupaParser = new GarupaParser();
