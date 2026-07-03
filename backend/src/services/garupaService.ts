@@ -1,3 +1,4 @@
+import { compareVersions } from "compare-versions";
 import {
     checkGarupaGameStatus,
     getGarupaFallbackClientVersion,
@@ -279,7 +280,10 @@ class GarupaService {
 
         const task = (async () => {
             try {
-                const url = getGarupaPackageUrl(server);
+                const baseUrl = getGarupaPackageUrl(server);
+                const urlObj = new URL(baseUrl);
+                urlObj.searchParams.set("t", Date.now().toString());
+                const url = urlObj.toString();
                 const controller = new AbortController();
                 const tid = setTimeout(() => controller.abort(), getGarupaVersionCheckTimeoutMs());
                 let res: Response;
@@ -306,9 +310,12 @@ class GarupaService {
                 }
 
                 const prev = this.serverClientVersions.get(server);
-                if (prev !== version) {
+                const isUpgrade = !prev || compareVersions(version, prev) > 0;
+                if (isUpgrade) {
                     this.serverClientVersions.set(server, version);
                     logger("garupaService", `server=${server} client version updated ${prev ?? "-"} -> ${version} (${reason})`);
+                } else {
+                    logger("garupaService", `server=${server} ignored older version from Apple: ${version} (current: ${prev ?? "-"})`);
                 }
 
                 await garupaMetaCollection.updateOne({ server }, { $set: { server, clientVersion: version, updatedAt: Date.now() } }, { upsert: true });
