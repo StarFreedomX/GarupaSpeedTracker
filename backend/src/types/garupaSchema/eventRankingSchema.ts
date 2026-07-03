@@ -34,7 +34,7 @@ export const userChallengeEventRankingResponseSchema: SchemaDefinition = {
     1: { name: "eventPointNearUsers", type: "message", schema: rankingUserListSchema },
     2: { name: "eventPointTopUsers", type: "message", schema: rankingUserListSchema },
     3: { name: "eventPointBorderUsers", type: "message", schema: rankingUserListSchema },
-    4: { name: "challengeMusicRankings", type: "message", repeated: true, schema: userChallengeMusicRankingResponseSchema },
+    101: { name: "challengeMusicRankings", type: "message", repeated: true, schema: userChallengeMusicRankingResponseSchema },
 };
 
 export const userMissionLiveEventRankingResponseSchema: SchemaDefinition = {
