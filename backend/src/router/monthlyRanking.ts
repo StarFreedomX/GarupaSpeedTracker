@@ -10,6 +10,12 @@ monthlyRankingRouter.get(["/monthlyRanking/info", "/monthlyRanking/info.json"], 
     ctx.body = result;
 });
 
+monthlyRankingRouter.get(["/monthlyRanking/all", "/monthlyRanking/all.json"], async (ctx) => {
+    const result = await monthlyRankingInfoService.getMonthlyRankingDetailList();
+    ctx.status = 200;
+    ctx.body = result;
+});
+
 monthlyRankingRouter.get("/monthlyRanking/info.:monthlyRankingId.json", async (ctx) => {
     const monthlyRankingId = queryToNumber(ctx.params.monthlyRankingId);
 

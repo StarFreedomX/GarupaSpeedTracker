@@ -118,6 +118,16 @@ class MonthlyRankingInfoService {
         return detail;
     }
 
+    async getMonthlyRankingDetailList(): Promise<MonthlyRankingDetailList> {
+        await this.ensureCacheLoaded();
+        const out: MonthlyRankingDetailList = {};
+        for (const [monthlyRankingId, record] of this.infoCache) {
+            const { updatedAt: _updatedAt, ...detail } = record;
+            out[String(monthlyRankingId)] = detail;
+        }
+        return out;
+    }
+
     async getActiveMonthlyId(server: number, now: number = Date.now()): Promise<number | null> {
         await this.ensureCacheLoaded();
         return this.findActiveMonthlyId(server, now);
