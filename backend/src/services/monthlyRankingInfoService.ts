@@ -115,6 +115,7 @@ class MonthlyRankingInfoService {
         }
 
         const { updatedAt: _updatedAt, ...detail } = record;
+        delete (detail as Record<string, unknown>)._id;
         return detail;
     }
 
@@ -123,6 +124,7 @@ class MonthlyRankingInfoService {
         const out: MonthlyRankingDetailList = {};
         for (const [monthlyRankingId, record] of this.infoCache) {
             const { updatedAt: _updatedAt, ...detail } = record;
+            delete (detail as Record<string, unknown>)._id;
             out[String(monthlyRankingId)] = detail;
         }
         return out;
