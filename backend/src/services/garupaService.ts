@@ -63,7 +63,12 @@ class GarupaService {
     }
 
     getActiveServerIds(): number[] {
-        return this.getServerIds().filter((server) => !this.disabledServers.has(server));
+        return this.getConfiguredServerIds().filter((server) => !this.disabledServers.has(server));
+    }
+
+    /** 仅按配置过滤（排除 GARUPA_SERVER_BASES 中值为 "-" 的），不关心服务器是否被临时禁用 */
+    getConfiguredServerIds(): number[] {
+        return this.getServerIds();
     }
 
     getClientVersion(server: number): string {

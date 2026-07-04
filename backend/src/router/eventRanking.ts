@@ -4,6 +4,8 @@ import { eventRankingService, getEventServerCount, isEventRankingBorderTier, isM
 
 export const eventRankingRouter = new Router();
 
+const BESTDORI_BASE = "https://bestdori.com";
+
 // ============================================================================
 // /eventtop/data — 活动 top / 歌榜 top
 //   Query: server (必填), event (必填), mid (选填 — 有则歌榜 top)
@@ -32,17 +34,22 @@ eventRankingRouter.get("/eventtop/data", async (ctx) => {
         throw validationError("server", `server must be between 0 and ${maxServerIndex}`);
     }
 
+    let result: { points: unknown[]; users: unknown[] };
+
     if (mid !== undefined) {
-        // 歌榜 top
-        const result = await eventRankingService.getMusicTopSnapshot(server, event, mid);
-        ctx.status = 200;
-        ctx.body = result;
+        result = await eventRankingService.getMusicTopSnapshot(server, event, mid);
     } else {
-        // 活动 top
-        const result = await eventRankingService.getEventTopSnapshot(server, event);
-        ctx.status = 200;
-        ctx.body = result;
+        result = await eventRankingService.getEventTopSnapshot(server, event);
     }
+
+    // Fallback: if no local data, redirect to Bestdori
+    if (result.points.length === 0) {
+        ctx.redirect(`${BESTDORI_BASE}${ctx.originalUrl}`);
+        return;
+    }
+
+    ctx.status = 200;
+    ctx.body = result;
 });
 
 // ============================================================================
@@ -75,23 +82,26 @@ eventRankingRouter.get("/tracker/data", async (ctx) => {
         throw validationError("server", `server must be between 0 and ${maxServerIndex}`);
     }
 
+    let result: { result: boolean; cutoffs: unknown[] };
+
     if (mid !== undefined) {
-        // 歌榜档线
         if (!isMusicRankingBorderTier(tier)) {
             throw validationError("tier", "tier must be one of: 20,30,40,50,100,200,300,500,1000,2000,5000,10000,20000,50000,100000");
         }
-
-        const result = await eventRankingService.getMusicBorderPoints(server, event, mid, tier);
-        ctx.status = 200;
-        ctx.body = result;
+        result = await eventRankingService.getMusicBorderPoints(server, event, mid, tier);
     } else {
-        // 活动档线
         if (!isEventRankingBorderTier(tier)) {
             throw validationError("tier", "tier must be one of: 20,30,40,50,100,200,300,500,1000,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000");
         }
-
-        const result = await eventRankingService.getEventBorderPoints(server, event, tier);
-        ctx.status = 200;
-        ctx.body = result;
+        result = await eventRankingService.getEventBorderPoints(server, event, tier);
     }
+
+    // Fallback: if no local data, redirect to Bestdori
+    if (result.cutoffs.length === 0) {
+        ctx.redirect(`${BESTDORI_BASE}${ctx.originalUrl}`);
+        return;
+    }
+
+    ctx.status = 200;
+    ctx.body = result;
 });

@@ -1,5 +1,6 @@
 import { fetchEventRanking, fetchEventRankingBuffer } from "@/api/garupa";
 import {
+    BESTDORI_API,
     EVENT_RANKING_REFRESH_INTERVAL_MS,
     MONGODB_EVENT_BORDER_POINTS_COLLECTION,
     MONGODB_EVENT_TOP_POINTS_COLLECTION,
@@ -104,6 +105,109 @@ class EventRankingService {
     start(): void {
         garupaService.start();
         garupaService.registerPoller("eventRanking", async () => this.refreshAll(), EVENT_RANKING_REFRESH_INTERVAL_MS);
+
+        // Bootstrap: fire-and-forget; during the window, requests 302 to Bestdori
+        this.bootstrapFromBestdori().catch((err) => {
+            logger("eventRanking", `Bestdori bootstrap sync failed: ${(err as Error)?.message || err}`);
+        });
+    }
+
+    // ========================================================================
+    // Bestdori bootstrap — seed active event data on first startup
+    // ========================================================================
+
+    private async bootstrapFromBestdori(): Promise<void> {
+        const servers = garupaService.getConfiguredServerIds();
+
+        for (const server of servers) {
+            const eventId = await eventInfoService.getActiveEventId(server);
+            if (!eventId) continue;
+
+            // Only sync if we don't already have local data
+            const existing = await eventTopCollection.findOne({ server, eventId });
+            if (existing) {
+                logger("eventRanking", `Bootstrap: already have data for event=${eventId} server=${server}, skipping`);
+                continue;
+            }
+
+            logger("eventRanking", `Bootstrap: seeding event=${eventId} server=${server} from Bestdori`);
+
+            try {
+                // Fetch event top from Bestdori
+                const topUrl = `${BESTDORI_API}eventtop/data?server=${server}&event=${eventId}`;
+                const topRes = await fetch(topUrl);
+                if (!topRes.ok) {
+                    logger("eventRanking", `Bootstrap: Bestdori top fetch failed for event=${eventId} HTTP ${topRes.status}`);
+                    continue;
+                }
+                const topData = (await topRes.json()) as EventRankingTopResponse;
+                if (!topData.points || topData.points.length === 0) {
+                    logger("eventRanking", `Bootstrap: Bestdori returned empty top data for event=${eventId}`);
+                    continue;
+                }
+
+                // Store top data
+                const timestamp = topData.points[0]?.timestamp ?? Date.now();
+                const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
+
+                await eventTopCollection.updateOne(
+                    { server, eventId, bucket },
+                    {
+                        $set: {
+                            points: topData.points,
+                            updatedAt: timestamp,
+                            server,
+                            eventId,
+                            bucket,
+                        },
+                    },
+                    { upsert: true },
+                );
+
+                // Store user data
+                if (topData.users && topData.users.length > 0) {
+                    const playerWrites = topData.users.map((user) =>
+                        playerCollection.replaceOne({ server, uid: user.uid }, { ...user, server, updatedAt: timestamp }, { upsert: true }),
+                    );
+                    await Promise.all(playerWrites);
+                }
+
+                // Fetch event border for each tier from Bestdori
+                for (const tier of EVENT_RANKING_BORDER_TIERS) {
+                    try {
+                        const borderUrl = `${BESTDORI_API}tracker/data?server=${server}&event=${eventId}&tier=${tier}`;
+                        const borderRes = await fetch(borderUrl);
+                        if (!borderRes.ok) continue;
+                        const borderData = (await borderRes.json()) as EventRankingBorderResponse;
+                        if (!borderData.cutoffs || borderData.cutoffs.length === 0) continue;
+
+                        await eventBorderCollection.updateOne(
+                            { server, eventId, tier },
+                            {
+                                $set: {
+                                    cutoffs: borderData.cutoffs,
+                                    updatedAt: timestamp,
+                                    result: true,
+                                    server,
+                                    eventId,
+                                    tier,
+                                },
+                            },
+                            { upsert: true },
+                        );
+                    } catch {
+                        // skip individual tier failures
+                    }
+                }
+
+                logger(
+                    "eventRanking",
+                    `Bootstrap: seeded event=${eventId} server=${server} points=${topData.points.length} users=${topData.users?.length ?? 0} tiers=${EVENT_RANKING_BORDER_TIERS.length}`,
+                );
+            } catch (err) {
+                logger("eventRanking", `Bootstrap: failed for event=${eventId} server=${server}: ${(err as Error)?.message || err}`);
+            }
+        }
     }
 
     // ========================================================================
