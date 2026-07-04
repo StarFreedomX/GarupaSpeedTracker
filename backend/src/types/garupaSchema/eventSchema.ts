@@ -22,7 +22,7 @@ export const masterEventPointRewardSchema: SchemaDefinition = {
     7: { name: "recommendFlg", type: "bool" },
 };
 
-// 月榜信息字段
+// event信息字段
 export const masterEventSchema: SchemaDefinition = {
     1: { name: "eventId", type: "int" },
     2: { name: "eventType", type: "string" },
@@ -69,17 +69,18 @@ export const masterEventListSchema: SchemaDefinition = {
 export interface GarupaMasterEventPointReward {
     id?: number;
     eventId?: number;
-    fromRank?: number;
-    toRank?: number;
+    point?: number;
     rewardType?: string;
     rewardId?: number;
     rewardQuantity?: number;
+    recommendFlg?: boolean;
 }
 
 export interface GarupaMasterEventRankingReward {
     id?: number;
     eventId?: number;
-    point?: number;
+    fromRank?: number;
+    toRank?: number;
     rewardType?: string;
     rewardId?: number;
     rewardQuantity?: number;

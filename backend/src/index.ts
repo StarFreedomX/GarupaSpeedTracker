@@ -1,7 +1,7 @@
 import { createApp } from "@/app";
 import { HOST, PORT } from "@/config";
 import { logger } from "@/logger";
-import { monthlyRankingInfoService, monthlyRankingService, songMetadataService } from "@/services";
+import { eventInfoService, eventRankingService, monthlyRankingInfoService, monthlyRankingService, songMetadataService } from "@/services";
 
 logger("mainAPI", "initializing...");
 
@@ -14,6 +14,8 @@ void songMetadataService.getSongMetadata().catch((error: unknown) => {
 
 monthlyRankingInfoService.start();
 monthlyRankingService.start();
+eventInfoService.start();
+eventRankingService.start();
 
 app.listen(PORT, HOST, () => {
     logger("mainAPI", `listening on ${HOST}:${PORT}`);

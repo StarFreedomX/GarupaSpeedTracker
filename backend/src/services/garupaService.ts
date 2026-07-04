@@ -34,7 +34,7 @@ class GarupaService {
     private disabledServers = new Set<number>();
     private recoveryInFlight = new Map<number, Promise<void>>();
     private versionRefreshInFlight = new Map<number, Promise<void>>();
-    private pollers = new Map<string, () => Promise<void>>();
+    private pollers = new Map<string, { fn: () => Promise<void>; intervalMs: number; lastRun: number }>();
 
     start(): void {
         if (this.started) {
@@ -74,8 +74,12 @@ class GarupaService {
         return version;
     }
 
-    registerPoller(key: string, callback: () => Promise<void>): void {
-        this.pollers.set(key, callback);
+    registerPoller(key: string, callback: () => Promise<void>, intervalMs?: number): void {
+        this.pollers.set(key, {
+            fn: callback,
+            intervalMs: intervalMs ?? GARUPA_REFRESH_INTERVAL_SECONDS * 1000,
+            lastRun: 0,
+        });
         this.start();
         this.scheduleNextTick();
     }
@@ -199,7 +203,15 @@ class GarupaService {
             return;
         }
 
-        const tasks = Array.from(this.pollers.values()).map((poller) => poller());
+        const now = Date.now();
+        const tasks: Promise<void>[] = [];
+        for (const [, entry] of this.pollers) {
+            if (now - entry.lastRun < entry.intervalMs) {
+                continue;
+            }
+            entry.lastRun = now;
+            tasks.push(entry.fn());
+        }
         await Promise.allSettled(tasks);
     }
 

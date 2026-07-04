@@ -1,3 +1,5 @@
+export { eventInfoService } from "@/services/eventInfoService";
+export { eventRankingService } from "@/services/eventRankingService";
 export { getEventList } from "@/services/eventsService";
 export { garupaService } from "@/services/garupaService";
 export { monthlyRankingInfoService } from "@/services/monthlyRankingInfoService";

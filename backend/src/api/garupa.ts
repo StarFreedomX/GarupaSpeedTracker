@@ -14,7 +14,9 @@ import {
     GARUPA_UUIDS,
     GARUPA_VERSION_CHECK_TIMEOUT_MS,
 } from "@/config";
+import { bandoriEventRankingParser } from "@/parsers/GarupaEventRankingParser";
 import { bandoriMonthlyRankingParser as garupaMonthlyRankingParser } from "@/parsers/GarupaMonthlyRankingParser";
+import type { EventRankingBandoriRaw } from "@/types/event";
 import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
 
 const toBaseUrl = (raw: string): string => {
@@ -227,4 +229,69 @@ export const waitUntilGarupaAvailable = async (
 
         await new Promise((resolve) => setTimeout(resolve, Math.max(1000, pollIntervalMs)));
     }
+};
+
+// ============================================================================
+// Event Ranking
+// ============================================================================
+
+export const buildEventRankingUrl = (server: number, eventId: number, eventType: string, mid?: number): string => {
+    const base = getGarupaBaseUrl(server);
+    const uid = getGarupaUid(server);
+    const url = new URL(`user/${uid}/event/${eventId}/${eventType}/ranking`, base);
+    if (mid !== undefined) {
+        url.searchParams.set("mid", String(mid));
+    }
+    return url.toString();
+};
+
+export const buildEventMasterListUrl = (server: number): string => {
+    const base = getGarupaBaseUrl(server);
+    const url = new URL("event", base);
+    return url.toString();
+};
+
+export const fetchEventRankingBuffer = async (
+    server: number,
+    eventId: number,
+    eventType: string,
+    clientVersion: string,
+    mid?: number,
+): Promise<{ decrypted: Buffer; status: number; length: number }> => {
+    const url = buildEventRankingUrl(server, eventId, eventType, mid);
+    const headers = createGarupaHeaders(server, clientVersion);
+
+    const response = await fetch(url, { headers });
+    const status = response.status;
+    const arrayBuffer = await response.arrayBuffer();
+    const bodyBuffer = Buffer.from(arrayBuffer);
+    const decrypted = decryptPayload(server, bodyBuffer);
+    return { decrypted, status, length: bodyBuffer.length };
+};
+
+export const fetchEventMasterListBuffer = async (server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
+    const url = buildEventMasterListUrl(server);
+    const headers = createGarupaHeaders(server, clientVersion);
+
+    const response = await fetch(url, { headers });
+    const status = response.status;
+    const arrayBuffer = await response.arrayBuffer();
+    const bodyBuffer = Buffer.from(arrayBuffer);
+    const decrypted = decryptPayload(server, bodyBuffer);
+    return { decrypted, status, length: bodyBuffer.length };
+};
+
+export const fetchEventRanking = async (
+    server: number,
+    eventId: number,
+    eventType: string,
+    clientVersion: string,
+    mid?: number,
+): Promise<EventRankingBandoriRaw> => {
+    const { decrypted, status } = await fetchEventRankingBuffer(server, eventId, eventType, clientVersion, mid);
+    if (status < 200 || status >= 300) {
+        throw new Error(`Event ranking HTTP ${status}`);
+    }
+
+    return bandoriEventRankingParser.parse(decrypted, eventType);
 };

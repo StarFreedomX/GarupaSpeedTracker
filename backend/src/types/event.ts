@@ -5,7 +5,7 @@ import type { RankingUser, RankingUserRaw } from "@/types/rankingUser";
 export interface EventRankingBandoriRaw {
     eventPointTopUsers?: RankingUserRaw[];
     eventPointBorderUsers?: RankingUserRaw[];
-    musicRanking: MusicRankingBandoriRaw[];
+    musicRankings?: MusicRankingBandoriRaw[];
 }
 
 export interface MusicRankingBandoriRaw {
@@ -177,6 +177,7 @@ export interface MusicRankingTopDocument {
 export interface MusicRankingBorderDocument extends MusicRankingBorderResponse {
     server: number;
     eventId: number;
+    musicId: number;
     tier: MusicRankingBorderTier;
     updatedAt: number;
 }

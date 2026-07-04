@@ -4,6 +4,7 @@ import {
     MONGODB_MONTHLY_BORDER_POINTS_COLLECTION,
     MONGODB_MONTHLY_TOP_POINTS_COLLECTION,
     MONGODB_RANKING_PLAYERS_COLLECTION,
+    MONTHLY_RANKING_REFRESH_INTERVAL_MS,
 } from "@/config";
 import { logger } from "@/logger";
 import { garupaService } from "@/services/garupaService";
@@ -80,7 +81,7 @@ class MonthlyRankingService {
             });
 
         // 注册定时轮询
-        garupaService.registerPoller("monthlyRanking", async () => this.refreshAll());
+        garupaService.registerPoller("monthlyRanking", async () => this.refreshAll(), MONTHLY_RANKING_REFRESH_INTERVAL_MS);
     }
 
     /**
@@ -296,7 +297,10 @@ class MonthlyRankingService {
         if (uids.length > 0) {
             const playerQuery = await playerCollection.find({ server, uid: { $in: uids } });
             const docs = await playerQuery.toArray();
-            users = docs.map(({ server: _s, updatedAt: _u, ...player }) => player);
+            users = docs.map(({ server: _s, updatedAt: _u, ...player }) => {
+                delete (player as Record<string, unknown>)._id;
+                return player;
+            });
         }
 
         return { points, users };
