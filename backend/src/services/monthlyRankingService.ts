@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { fetchMonthlyRanking, fetchMonthlyRankingBuffer } from "@/api/garupa";
 import {
     MONGODB_GARUPA_META_COLLECTION,
@@ -264,15 +266,38 @@ class MonthlyRankingService {
                     logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
                     return;
                 } catch (error) {
+                    const diagDir = path.join("cache", "diag");
+                    await fs.mkdir(diagDir, { recursive: true });
+                    const ts = Date.now();
+                    const binFile = path.join(diagDir, `monthly-${server}-${monthlyId}-${ts}.bin`);
+                    const metaFile = path.join(diagDir, `monthly-${server}-${monthlyId}-${ts}.json`);
                     try {
                         const diag = await fetchMonthlyRankingBuffer(server, monthlyId, currentVersion);
-                        const prefix = diag.decrypted.subarray(0, 64).toString("hex");
-                        logger("monthlyRanking", `diagnostic fetch server=${server} status=${diag.status} prefix=${prefix}`);
+                        await fs.writeFile(binFile, diag.decrypted);
+                        await fs.writeFile(
+                            metaFile,
+                            JSON.stringify({
+                                error: (error as Error)?.message || String(error),
+                                server,
+                                monthlyId,
+                                status: diag.status,
+                                length: diag.length,
+                                timestamp: ts,
+                            }),
+                        );
+                        logger("monthlyRanking", `diagnostic saved: ${binFile} (${diag.length}B)`);
                     } catch {
-                        // 忽略诊断自身的错误
+                        await fs.writeFile(
+                            metaFile,
+                            JSON.stringify({
+                                error: (error as Error)?.message || String(error),
+                                server,
+                                monthlyId,
+                                diagnosticFetchFailed: true,
+                                timestamp: ts,
+                            }),
+                        );
                     }
-
-                    // 把原始错误扔出
                     throw error;
                 }
             },

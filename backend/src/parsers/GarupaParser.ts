@@ -129,41 +129,53 @@ export class GarupaParser {
             const { name, type, repeated, schema: subSchema } = meta;
 
             const parseValue = (item: ProtoFieldRaw) => {
+                // Validate wire type matches expected type, skip garbage
+                const wt = item.wireType;
+
                 if (type === "int" || type === "long") {
+                    if (wt !== 0) return undefined;
                     return Number(item.data);
                 }
                 if (type === "bool") {
+                    if (wt !== 0) return undefined;
                     return item.data === 1;
                 }
-
-                if (item.wireType === 2 && Buffer.isBuffer(item.data)) {
-                    if (type === "string") {
-                        return item.data.toString("utf8");
-                    }
-                    if (type === "bytes") {
-                        return item.data;
-                    }
-                    if (type === "message" && subSchema) {
-                        return this.decode(item.data, subSchema);
-                    }
+                if (type === "string") {
+                    if (wt !== 2 || !Buffer.isBuffer(item.data)) return undefined;
+                    return item.data.toString("utf8");
+                }
+                if (type === "bytes") {
+                    if (wt !== 2 || !Buffer.isBuffer(item.data)) return undefined;
+                    return item.data;
+                }
+                if (type === "message") {
+                    if (wt !== 2 || !Buffer.isBuffer(item.data)) return undefined;
+                    if (subSchema) return this.decode(item.data, subSchema);
+                    return undefined;
+                }
+                if (type === "double") {
+                    if (wt !== 1 || !Buffer.isBuffer(item.data) || item.data.length !== 8) return undefined;
+                    return item.data.readDoubleLE(0);
+                }
+                if (type === "float") {
+                    if (wt !== 5 || !Buffer.isBuffer(item.data) || item.data.length !== 4) return undefined;
+                    return item.data.readFloatLE(0);
                 }
 
-                if (Buffer.isBuffer(item.data)) {
-                    if (type === "double" && item.wireType === 1 && item.data.length === 8) {
-                        return item.data.readDoubleLE(0);
-                    }
-                    if (type === "float" && item.wireType === 5 && item.data.length === 4) {
-                        return item.data.readFloatLE(0);
-                    }
-                }
-
-                return item.data;
+                return undefined;
             };
 
             if (repeated) {
-                result[name] = items.map((item) => parseValue(item));
+                result[name] = items.map((item) => parseValue(item)).filter((v) => v !== undefined);
             } else {
-                result[name] = parseValue(items[items.length - 1]);
+                // Take the last occurrence that parses successfully (skip trailing garbage)
+                for (let i = items.length - 1; i >= 0; i--) {
+                    const value = parseValue(items[i]);
+                    if (value !== undefined) {
+                        result[name] = value;
+                        break;
+                    }
+                }
             }
         }
 

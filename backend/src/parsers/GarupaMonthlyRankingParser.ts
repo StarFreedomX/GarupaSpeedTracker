@@ -42,15 +42,10 @@ export class GarupaMonthlyRankingParser {
     }
 
     private buildReport(rootFields: GarupaMonthlyRankingRankingResponse): MonthlyRankingBandoriRaw {
-        const report: MonthlyRankingBandoriRaw = {
-            monthlyRankingPointTopUsers: [],
-            monthlyRankingPointBorderUsers: [],
+        return {
+            monthlyRankingPointTopUsers: buildUsers(rootFields.monthlyRankingPointTopUsers),
+            monthlyRankingPointBorderUsers: buildUsers(rootFields.monthlyRankingPointBorderUsers),
         };
-
-        report.monthlyRankingPointTopUsers = buildUsers(rootFields.monthlyRankingPointTopUsers);
-        report.monthlyRankingPointBorderUsers = buildUsers(rootFields.monthlyRankingPointBorderUsers);
-
-        return report;
     }
 }
 

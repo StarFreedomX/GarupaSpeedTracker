@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { fetchEventRanking, fetchEventRankingBuffer } from "@/api/garupa";
 import {
     BESTDORI_API,
@@ -283,12 +285,40 @@ class EventRankingService {
 
                     logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
                 } catch (error) {
+                    // Save full payload to cache for offline analysis
+                    const diagDir = path.join("cache", "diag");
+                    await fs.mkdir(diagDir, { recursive: true });
+                    const ts = Date.now();
+                    const binFile = path.join(diagDir, `event-${server}-${eventId}-${ts}.bin`);
+                    const metaFile = path.join(diagDir, `event-${server}-${eventId}-${ts}.json`);
                     try {
                         const diag = await fetchEventRankingBuffer(server, eventId, eventType, clientVersion);
-                        const prefix = diag.decrypted.subarray(0, 64).toString("hex");
-                        logger("eventRanking", `diagnostic fetch server=${server} event=${eventId} status=${diag.status} prefix=${prefix}`);
+                        await fs.writeFile(binFile, diag.decrypted);
+                        await fs.writeFile(
+                            metaFile,
+                            JSON.stringify({
+                                error: (error as Error)?.message || String(error),
+                                server,
+                                eventId,
+                                eventType,
+                                status: diag.status,
+                                length: diag.length,
+                                timestamp: ts,
+                            }),
+                        );
+                        logger("eventRanking", `diagnostic saved: ${binFile} (${diag.length}B)`);
                     } catch {
-                        // ignore diagnostic errors
+                        await fs.writeFile(
+                            metaFile,
+                            JSON.stringify({
+                                error: (error as Error)?.message || String(error),
+                                server,
+                                eventId,
+                                eventType,
+                                diagnosticFetchFailed: true,
+                                timestamp: ts,
+                            }),
+                        );
                     }
                     throw error;
                 }
@@ -340,6 +370,7 @@ class EventRankingService {
 
     private async persistEventBorderByTier(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
         const byTier = buildBorderBuckets(raw.eventPointBorderUsers, timestamp);
+        logger("eventRanking", `event border tiers parsed server=${server} event=${eventId}: [${Array.from(byTier.keys()).join(",")}]`);
         const writes: Promise<void>[] = [];
 
         for (const [tier, cutoff] of byTier) {

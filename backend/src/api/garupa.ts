@@ -1,4 +1,6 @@
 import * as crypto from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import {
     GARUPA_CLIENT_PLATFORMS,
     GARUPA_CLIENT_VERSIONS,
@@ -14,6 +16,7 @@ import {
     GARUPA_UUIDS,
     GARUPA_VERSION_CHECK_TIMEOUT_MS,
 } from "@/config";
+import { logger } from "@/logger";
 import { bandoriEventRankingParser } from "@/parsers/GarupaEventRankingParser";
 import { bandoriMonthlyRankingParser as garupaMonthlyRankingParser } from "@/parsers/GarupaMonthlyRankingParser";
 import type { EventRankingBandoriRaw } from "@/types/event";
@@ -170,7 +173,17 @@ export const fetchMonthlyRanking = async (server: number, monthlyId: number, cli
         throw new Error(`Monthly ranking HTTP ${status}`);
     }
 
-    return garupaMonthlyRankingParser.parse(decrypted);
+    try {
+        return garupaMonthlyRankingParser.parse(decrypted);
+    } catch (parseErr) {
+        const diagDir = path.join("cache", "diag");
+        await fs.mkdir(diagDir, { recursive: true });
+        const ts = Date.now();
+        const binFile = path.join(diagDir, `monthly-parse-err-${server}-${monthlyId}-${ts}.bin`);
+        await fs.writeFile(binFile, decrypted);
+        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`);
+        throw parseErr;
+    }
 };
 
 export const fetchMonthlyRankingMasterListBuffer = async (
@@ -293,5 +306,16 @@ export const fetchEventRanking = async (
         throw new Error(`Event ranking HTTP ${status}`);
     }
 
-    return bandoriEventRankingParser.parse(decrypted, eventType);
+    try {
+        return bandoriEventRankingParser.parse(decrypted, eventType);
+    } catch (parseErr) {
+        // Save the exact buffer that caused parse failure
+        const diagDir = path.join("cache", "diag");
+        await fs.mkdir(diagDir, { recursive: true });
+        const ts = Date.now();
+        const binFile = path.join(diagDir, `event-parse-err-${server}-${eventId}-${ts}.bin`);
+        await fs.writeFile(binFile, decrypted);
+        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`);
+        throw parseErr;
+    }
 };
