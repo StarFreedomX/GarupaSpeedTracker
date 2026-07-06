@@ -56,47 +56,17 @@ class MongoCollection<TDocument> implements DatabaseCollection<TDocument> {
 }
 
 class MongoDatabase implements Database {
-    private client: MongoClient | undefined;
-    private db = undefined as unknown as import("mongodb").Db;
-    private initPromise: Promise<void> | undefined;
+    private readonly client: MongoClient;
+    private readonly db: import("mongodb").Db;
 
     constructor() {
-        this.ensureConnected().catch(() => undefined);
-    }
-
-    /**
-     * 💡 核心优化：利用 MongoClient 的自身机制维护长连接
-     * 只要 client 创建了，后续任何查询失败它会自动进行内置重连，不需要我们用定时器去维护 status
-     */
-    private async ensureConnected(): Promise<void> {
-        if (this.client) {
-            return;
-        }
-
-        if (this.initPromise) {
-            return this.initPromise;
-        }
-
-        this.initPromise = (async () => {
-            try {
-                const client = new MongoClient(MONGODB_URI, {
-                    serverSelectionTimeoutMS: MONGODB_CONNECTION_TIMEOUT_MS,
-                    maxPoolSize: 10,
-                });
-
-                await client.connect();
-                this.client = client;
-                this.db = client.db(MONGODB_DB);
-                logger("database", "mongodb connected");
-            } catch (error) {
-                this.initPromise = undefined;
-                const nodeError = error as { message?: string };
-                logger("database", `mongodb connection failed: ${nodeError.message ?? "unknown error"}`);
-                throw error;
-            }
-        })();
-
-        return this.initPromise;
+        // 驱动 v6+ 支持 lazy connect：不需要显式调用 connect()。
+        // 首次操作时驱动自动连接，之后 SDAM 持续监控，断线自动恢复。
+        this.client = new MongoClient(MONGODB_URI, {
+            serverSelectionTimeoutMS: MONGODB_CONNECTION_TIMEOUT_MS,
+            maxPoolSize: 10,
+        });
+        this.db = this.client.db(MONGODB_DB);
     }
 
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument> {
@@ -104,38 +74,23 @@ class MongoDatabase implements Database {
     }
 
     async close(): Promise<void> {
-        this.initPromise = undefined;
-        if (this.client) {
-            await this.client.close();
-            this.client = undefined;
-            this.db = undefined as unknown as import("mongodb").Db;
-            logger("database", "mongodb connection closed");
-        }
+        await this.client.close();
+        logger("database", "mongodb connection closed");
     }
 
     async renameCollection(oldName: string, newName: string): Promise<void> {
-        await this.ensureConnected();
         const existing = await this.db.listCollections({ name: newName }).toArray();
         if (existing.length > 0) {
-            return; // 目标集合已存在，跳过
+            return;
         }
         await this.db.renameCollection(oldName, newName);
     }
 
     async listCollectionNames(): Promise<string[]> {
-        await this.ensureConnected();
         return (await this.db.listCollections().toArray()).map((c) => c.name);
     }
 
     getCollectionRaw(name: string): Collection<Document> {
-        if (!this.db) {
-            void this.ensureConnected().catch(() => undefined);
-            const tempClient = this.client || new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: MONGODB_CONNECTION_TIMEOUT_MS });
-            if (!this.client) this.client = tempClient; // 复用实例
-
-            return tempClient.db(MONGODB_DB).collection(name);
-        }
-
         return this.db.collection(name);
     }
 }
