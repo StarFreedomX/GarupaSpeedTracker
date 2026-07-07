@@ -2,7 +2,7 @@
 
 GarupaSpeedTracker 是一个用于查看 Bestdori 榜线分速、查询玩家编队、计算自动分数和活动 PT 的全栈项目，包含：
 
-- `backend/`：Koa + TypeScript 后端，负责转发 Bestdori API、查询 Garupa 游戏服务器、做参数校验和数据整理、月榜追踪
+- `backend/`：Koa + TypeScript 后端，负责转发 Bestdori API、查询 Garupa 游戏服务器、做参数校验和数据整理、月榜追踪、活动排名追踪与冷启动数据同步
 - `frontend/`：Vue 3 + TypeScript + Tailwind CSS 前端，负责展示活动信息、分数表格、自动控分计算和交互式控分规划
 
 ## 默认端口与路径

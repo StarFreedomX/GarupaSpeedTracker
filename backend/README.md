@@ -11,10 +11,12 @@
 - 统一处理 422/502/504/404 错误
 - 内置浏览器 CORS 支持，可通过环境变量配置
 - 玩家编队查询：通过 Bestdori 和 Garupa 游戏服务器查询玩家编队信息，计算综合力、活动加成和技能数据
+- 活动排名追踪：支持多服务器活动 Top 分和档线数据采集、存储、查询，初次启动自动从 Bestdori 同步当期数据
 - 月榜数据追踪：支持多服务器月榜 Top 分和档线数据采集、存储、查询
 - 歌曲列表与谱面数据缓存：定时抓取并缓存 Bestdori 歌曲元数据和谱面分布数据
-- MongoDB 持久化存储：月榜数据、Garupa 元信息通过 MongoDB 持久化
-- 启动时自动预热缓存，拉取缺失数据；月榜数据支持定时轮询更新
+- MongoDB 持久化存储：活动排名、月榜数据、Garupa 元信息通过 MongoDB 持久化；使用驱动内置 SDAM 心跳监控连接状态，支持自动重连
+- 启动时自动预热缓存，拉取缺失数据；活动/月榜数据支持定时轮询更新
+- 诊断日志：解析失败时自动保存原始响应到 `cache/diag/`，便于离线排查
 
 ## 快速开始
 
@@ -80,12 +82,22 @@ pnpm start
 | `MONTHLY_RANKING_INFO_POLL_INTERVAL_MS`           | `3600000`                              | 月榜信息轮询间隔（毫秒）                          |
 | `MONGODB_URI`                                     | `mongodb://127.0.0.1:27017`            | MongoDB 连接地址                          |
 | `MONGODB_DB`                                      | `garupa`                               | MongoDB 数据库名                          |
-| `MONGODB_CONNECTION_TIMEOUT_MS`                   | `10000`                                | MongoDB 连接超时（毫秒）                      |
+| `MONGODB_CONNECTION_TIMEOUT_MS`                   | `60000`                                | MongoDB 连接超时（毫秒）                      |
 | `MONGODB_RECONNECT_INTERVAL_MS`                   | `5000`                                 | MongoDB 重连间隔（毫秒）                      |
 | `MONGODB_GARUPA_META_COLLECTION`                  | `GarupaMeta`                           | Garupa 元信息集合                          |
 | `MONGODB_MONTHLY_TOP_POINTS_COLLECTION`           | `monthly_top_points`                   | 月榜 Top 数据集合                           |
 | `MONGODB_MONTHLY_BORDER_POINTS_COLLECTION`        | `monthly_border_points`                | 月榜档线数据集合                              |
 | `MONGODB_MONTHLY_INFO_COLLECTION`                 | `monthly_ranking_info`                 | 月榜信息集合                                |
+| `MONGODB_RANKING_PLAYERS_COLLECTION`              | `ranking_players`                      | 排名玩家信息集合                              |
+| `MONGODB_EVENT_TOP_POINTS_COLLECTION`             | `event_top_points`                     | 活动 Top 分数据集合                           |
+| `MONGODB_EVENT_BORDER_POINTS_COLLECTION`          | `event_border_points`                  | 活动档线数据集合                              |
+| `MONGODB_MUSIC_TOP_POINTS_COLLECTION`             | `music_top_points`                     | 歌榜 Top 分数据集合                           |
+| `MONGODB_MUSIC_BORDER_POINTS_COLLECTION`          | `music_border_points`                  | 歌榜档线数据集合                              |
+| `MONGODB_EVENT_INFO_COLLECTION`                   | `event_info`                           | 活动信息集合                                |
+| `EVENT_RANKING_INFO_POLL_INTERVAL_MS`             | `3600000`                              | 活动信息轮询间隔（毫秒）                          |
+| `EVENT_RANKING_REFRESH_INTERVAL_MS`               | `60000`                                | 活动排名轮询间隔（毫秒）                          |
+| `MONTHLY_RANKING_REFRESH_INTERVAL_MS`             | `60000`                                | 月榜排名轮询间隔（毫秒）                          |
+| `INFO_CACHE_TIME`                                 | `43200`                                | 静态信息缓存时间（秒）                           |
 
 ## 监听地址
 
@@ -108,6 +120,11 @@ pnpm start
 - `GET /api/events` — 获取活动列表
 - `GET /api/songs` — 获取歌曲列表
 - `GET /api/songMetadata.json` — 获取谱面分布元数据（支持 gzip）
+
+**活动排名**
+
+- `GET /api/eventtop/data` — 获取活动 Top / 歌榜 Top 分速快照（本地无数据时 302 跳转 Bestdori）
+- `GET /api/tracker/data` — 获取活动档线 / 歌榜档线数据（本地无数据时 302 跳转 Bestdori）
 
 **月榜相关**
 

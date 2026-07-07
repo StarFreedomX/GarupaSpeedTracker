@@ -7,6 +7,8 @@
 - [GET `/api/events`](#get-apievents)
 - [GET `/api/songs`](#get-apisongs)
 - [GET `/api/songMetadata.json`](#get-apisongmetadatajson)
+- [GET `/api/eventtop/data`](#get-apieventtopdata)
+- [GET `/api/tracker/data`](#get-apitrackerdata)
 - [GET `/api/monthlyRanking/info.json`](#get-apimonthlyrankinginfojson)
 - [GET `/api/monthlyRanking/info.{monthlyRankingId}.json`](#get-apimonthlyrankinginfomonthlyrankingidjson)
 - [GET `/api/monthlyRanking/top`](#get-apimonthlyrankingtop)
@@ -332,6 +334,160 @@ Response is JSON and may be gzipped when the client sends `Accept-Encoding: gzip
 - The dataset is stored under `backend/data/songMetadata.json` and reused until the configured check interval expires.
 - Raw chart storage is disabled by default and can be enabled via `BESTDORI_STORE_RAW_CHARTS`.
 - All available difficulties are fetched in upstream order (`easy`, `normal`, `hard`, `expert`, `special`) and stored as `{ [song_id]: { [level]: { total, counts } } }`.
+
+## GET `/api/eventtop/data`
+
+Fetch a snapshot of the current event top / music top player points for a given server.
+
+This endpoint accepts both `/eventtop/data` and `/eventtop/data.json`. When no local data is available (e.g. before the first poll cycle), the endpoint issues a `302` redirect to the equivalent Bestdori upstream URL.
+
+### Query Parameters
+
+- `server` (`number`, required, integer, `>= 0`, max depends on configured server count)
+- `event` (`number`, required, integer, `>= 1`)
+- `mid` (`number`, optional, integer, `>= 1`)
+  - when provided, returns music top for the specified music ID instead of event top
+
+Example (event top):
+
+```http
+GET /api/eventtop/data?server=0&event=321
+```
+
+Example (music top):
+
+```http
+GET /api/eventtop/data?server=0&event=321&mid=184
+```
+
+### Success Response `200`
+
+```json
+{
+  "points": [
+    { "timestamp": 1776744533635, "uid": 111798074, "value": 6890100 }
+  ],
+  "users": [
+    {
+      "uid": 111798074,
+      "name": "player-name",
+      "introduction": "",
+      "rank": 1,
+      "sid": 23,
+      "strained": 0,
+      "degrees": []
+    }
+  ]
+}
+```
+
+### Response Contract
+
+- `points` is an array of `{ timestamp, uid, value }` records sorted by timestamp.
+- `users` is an array of player profiles keyed by `uid`, with `name`, `introduction`, `rank`, `sid`, `strained`, and `degrees`.
+- Player info in `users` reflects the latest known state and is not timestamped.
+- When no local data exists, returns `302` redirect to Bestdori.
+
+### Error Responses
+
+#### `422` Validation Failed
+
+```json
+{
+  "status": 422,
+  "message": "Validation Failed",
+  "details": [
+    {
+      "message": "server must be between 0 and 0",
+      "code": "invalid",
+      "field": "server"
+    }
+  ]
+}
+```
+
+#### `404` Route Not Found
+
+```json
+{
+  "status": 404,
+  "message": "Route Not Found: GET /api/xxx"
+}
+```
+
+## GET `/api/tracker/data`
+
+Fetch the latest border/cutoff points for a given server, event, and tier.
+
+This endpoint accepts both `/tracker/data` and `/tracker/data.json`. When no local data is available (e.g. before the first poll cycle), the endpoint issues a `302` redirect to the equivalent Bestdori upstream URL.
+
+### Query Parameters
+
+- `server` (`number`, required, integer, `>= 0`, max depends on configured server count)
+- `event` (`number`, required, integer, `>= 1`)
+- `tier` (`number`, required, integer, see supported values below)
+- `mid` (`number`, optional, integer, `>= 1`)
+  - when provided, returns music border for the specified music ID instead of event border
+
+**Event tier supported values:** `20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000`
+
+**Music tier supported values:** `20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000`
+
+Example (event border):
+
+```http
+GET /api/tracker/data?server=0&event=321&tier=100
+```
+
+Example (music border):
+
+```http
+GET /api/tracker/data?server=0&event=321&tier=100&mid=184
+```
+
+### Success Response `200`
+
+```json
+{
+  "result": true,
+  "cutoffs": [
+    { "time": 1776744533635, "ep": 5000 }
+  ]
+}
+```
+
+### Response Contract
+
+- `cutoffs` is an array of `{ time, ep }` records where `time` is a Unix timestamp (ms) and `ep` is the event-point cutoff value for the requested tier.
+- `result` is always `true` when data is available.
+- When no local data exists, returns `302` redirect to Bestdori.
+
+### Error Responses
+
+#### `422` Validation Failed
+
+```json
+{
+  "status": 422,
+  "message": "Validation Failed",
+  "details": [
+    {
+      "message": "tier must be one of: 20,30,40,50,100,200,300,500,1000,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000",
+      "code": "invalid",
+      "field": "tier"
+    }
+  ]
+}
+```
+
+#### `404` Route Not Found
+
+```json
+{
+  "status": 404,
+  "message": "Route Not Found: GET /api/xxx"
+}
+```
 
 ## GET `/api/monthlyRanking/info.json`
 
