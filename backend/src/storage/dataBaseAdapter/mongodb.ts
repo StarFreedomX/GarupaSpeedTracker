@@ -1,5 +1,5 @@
 import { type Collection, type Document, type Filter, type FindCursor, MongoClient } from "mongodb";
-import { MONGODB_CONNECTION_TIMEOUT_MS, MONGODB_DB, MONGODB_URI } from "@/config";
+import { MONGODB_CONNECTION_TIMEOUT_MS, MONGODB_DB, MONGODB_RECONNECT_INTERVAL_MS, MONGODB_URI } from "@/config";
 import { logger } from "@/logger";
 import type { Database, DatabaseCollection, DatabaseFilter, DatabaseFindQuery, DatabaseProjection, DatabaseSort, DatabaseUpdate } from "@/storage/database";
 
@@ -64,6 +64,7 @@ class MongoDatabase implements Database {
         // 首次操作时驱动自动连接，之后 SDAM 持续监控，断线自动恢复。
         this.client = new MongoClient(MONGODB_URI, {
             serverSelectionTimeoutMS: MONGODB_CONNECTION_TIMEOUT_MS,
+            heartbeatFrequencyMS: MONGODB_RECONNECT_INTERVAL_MS,
             maxPoolSize: 10,
         });
         this.db = this.client.db(MONGODB_DB);

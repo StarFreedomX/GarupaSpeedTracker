@@ -95,7 +95,7 @@ export const MONTHLY_RANKING_REFRESH_INTERVAL_MS = toNumber(process.env.MONTHLY_
 
 export const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
 export const MONGODB_DB = process.env.MONGODB_DB ?? "garupa";
-export const MONGODB_CONNECTION_TIMEOUT_MS = toNumber(process.env.MONGODB_CONNECTION_TIMEOUT_MS, 10_000);
+export const MONGODB_CONNECTION_TIMEOUT_MS = toNumber(process.env.MONGODB_CONNECTION_TIMEOUT_MS, 60_000);
 export const MONGODB_RECONNECT_INTERVAL_MS = toNumber(process.env.MONGODB_RECONNECT_INTERVAL_MS, 5_000);
 export const MONGODB_GARUPA_META_COLLECTION = process.env.MONGODB_GARUPA_META_COLLECTION ?? "GarupaMeta";
 export const MONGODB_MONTHLY_TOP_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_TOP_POINTS_COLLECTION ?? "monthly_top_points";
