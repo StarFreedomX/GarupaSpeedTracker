@@ -67,6 +67,24 @@ class MongoDatabase implements Database {
             maxPoolSize: 10,
         });
         this.db = this.client.db(MONGODB_DB);
+
+        let connected = false; // 标记当前连接状态，避免重复日志
+
+        // 心跳成功 → 连接正常（仅状态变化时打印）
+        this.client.on("serverHeartbeatSucceeded", () => {
+            if (!connected) {
+                connected = true;
+                logger("database", "mongodb connected.");
+            }
+        });
+
+        // 心跳失败 → 连接断开（仅状态变化时打印）
+        this.client.on("serverHeartbeatFailed", () => {
+            if (connected) {
+                connected = false;
+                logger("database", "mongodb connection lost.");
+            }
+        });
     }
 
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument> {
