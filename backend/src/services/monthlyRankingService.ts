@@ -59,8 +59,6 @@ export const getCurrentMonthlyId = async (server: number, date: Date = new Date(
 export const getMonthlyRankingServerCount = (): number => garupaService.getServerCount();
 
 class MonthlyRankingService {
-    private refreshInFlight = false;
-
     constructor() {
         garupaService.start();
     }
@@ -224,27 +222,32 @@ class MonthlyRankingService {
         );
     }
 
+    /** Retry a DB write until it succeeds (waits for database recovery on transient errors). */
+    private async retryPersist<T>(label: string, action: () => Promise<T>): Promise<T> {
+        while (true) {
+            try {
+                return await action();
+            } catch (err: unknown) {
+                const message = (err as { message?: string })?.message ?? String(err);
+                if (message.includes("Topology is closed") || message.includes("ECONNREFUSED") || message.includes("closed")) {
+                    logger("monthlyRanking", `${label} failed (${message}), waiting for DB recovery...`);
+                    await database.ready();
+                    continue;
+                }
+                throw err;
+            }
+        }
+    }
+
     async refreshAll(): Promise<void> {
-        if (this.refreshInFlight) {
-            return;
-        }
-
-        this.refreshInFlight = true;
         const servers = garupaService.getActiveServerIds();
-
-        try {
-            await Promise.allSettled(
-                servers.map(async (server) => {
-                    const monthlyId = await monthlyRankingInfoService.getActiveMonthlyId(server);
-                    if (!monthlyId) {
-                        return;
-                    }
-                    await this.refreshServer(server, monthlyId);
-                }),
-            );
-        } finally {
-            this.refreshInFlight = false;
-        }
+        await Promise.allSettled(
+            servers.map(async (server) => {
+                const monthlyId = await monthlyRankingInfoService.getActiveMonthlyId(server);
+                if (!monthlyId) return;
+                await this.refreshServer(server, monthlyId);
+            }),
+        );
     }
 
     async refreshServer(server: number, monthlyId: number): Promise<void> {
@@ -262,8 +265,8 @@ class MonthlyRankingService {
                         timestamp = endAt;
                         logger("monthlyRanking", `monthly=${monthlyId} has ended. Clamping timestamp to endAt: ${new Date(timestamp).toISOString()}`);
                     }
-                    await this.persistTopSnapshot(server, monthlyId, timestamp, raw);
-                    await this.persistBorderByTier(server, monthlyId, timestamp, raw);
+                    await this.retryPersist("persistTopSnapshot", () => this.persistTopSnapshot(server, monthlyId, timestamp, raw));
+                    await this.retryPersist("persistBorderByTier", () => this.persistBorderByTier(server, monthlyId, timestamp, raw));
                     logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
                     return;
                 } catch (error) {
@@ -314,6 +317,7 @@ class MonthlyRankingService {
         }
 
         const points = records.flatMap((record) => record.points ?? []);
+        points.sort((a, b) => a.timestamp - b.timestamp);
 
         // 只查 points 中实际出现过的 UID 对应的玩家信息
         const uidSet = new Set(points.map((p) => p.uid));
@@ -370,6 +374,8 @@ class MonthlyRankingService {
         if (!record) {
             return { result: true, cutoffs: [] };
         }
+
+        record.cutoffs.sort((a, b) => a.time - b.time);
 
         return {
             result: record.result,

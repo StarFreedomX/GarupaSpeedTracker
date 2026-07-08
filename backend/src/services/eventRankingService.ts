@@ -98,8 +98,6 @@ const MEDLEY_EVENT_TYPES = new Set(["medley"]);
 // ============================================================================
 
 class EventRankingService {
-    private refreshInFlight = false;
-
     constructor() {
         garupaService.start();
     }
@@ -213,26 +211,36 @@ class EventRankingService {
         }
     }
 
+    /** Retry a DB write until it succeeds (waits for database recovery on transient errors). */
+    private async retryPersist<T>(label: string, action: () => Promise<T>): Promise<T> {
+        while (true) {
+            try {
+                return await action();
+            } catch (err: unknown) {
+                const message = (err as { message?: string })?.message ?? String(err);
+                if (message.includes("Topology is closed") || message.includes("ECONNREFUSED") || message.includes("closed")) {
+                    logger("eventRanking", `${label} failed (${message}), waiting for DB recovery...`);
+                    await database.ready();
+                    continue;
+                }
+                throw err;
+            }
+        }
+    }
+
     // ========================================================================
     // Polling
     // ========================================================================
 
     async refreshAll(): Promise<void> {
-        if (this.refreshInFlight) return;
-        this.refreshInFlight = true;
         const servers = garupaService.getActiveServerIds();
-
-        try {
-            await Promise.allSettled(
-                servers.map(async (server) => {
-                    const eventId = await eventInfoService.getActiveEventId(server);
-                    if (!eventId) return;
-                    await this.refreshServer(server, eventId);
-                }),
-            );
-        } finally {
-            this.refreshInFlight = false;
-        }
+        await Promise.allSettled(
+            servers.map(async (server) => {
+                const eventId = await eventInfoService.getActiveEventId(server);
+                if (!eventId) return;
+                await this.refreshServer(server, eventId);
+            }),
+        );
     }
 
     async refreshServer(server: number, eventId: number): Promise<void> {
@@ -257,15 +265,15 @@ class EventRankingService {
                         logger("eventRanking", `event=${eventId} has ended. Clamping timestamp to endAt.`);
                     }
 
-                    await this.persistEventTopSnapshot(server, eventId, timestamp, raw);
-                    await this.persistEventBorderByTier(server, eventId, timestamp, raw);
+                    await this.retryPersist("persistEventTopSnapshot", () => this.persistEventTopSnapshot(server, eventId, timestamp, raw));
+                    await this.retryPersist("persistEventBorderByTier", () => this.persistEventBorderByTier(server, eventId, timestamp, raw));
 
                     // 2. Handle music rankings
                     if (raw.musicRankings && raw.musicRankings.length > 0) {
                         // challenge/versus: music rankings nested in response
                         for (const musicRaw of raw.musicRankings) {
-                            await this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw);
-                            await this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw);
+                            await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw));
+                            await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw));
                         }
                     } else if (MEDLEY_EVENT_TYPES.has(eventType)) {
                         // medley: fetch music ranking with mid=1
@@ -277,8 +285,8 @@ class EventRankingService {
                                 scoreTopUsers: musicRaw.eventPointTopUsers,
                                 scoreBorderUsers: musicRaw.eventPointBorderUsers,
                             };
-                            await this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic);
-                            await this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic);
+                            await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
+                            await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic));
                         } catch (err) {
                             logger("eventRanking", `medley music fetch failed event=${eventId}: ${(err as Error)?.message || err}`);
                         }
@@ -486,6 +494,7 @@ class EventRankingService {
         }
 
         const points = records.flatMap((record) => record.points ?? []);
+        points.sort((a, b) => a.timestamp - b.timestamp);
         const uidSet = new Set(points.map((p) => p.uid));
         const uids = Array.from(uidSet);
 
@@ -512,6 +521,7 @@ class EventRankingService {
             return { result: true, cutoffs: [] };
         }
 
+        record.cutoffs.sort((a, b) => a.time - b.time);
         return { result: record.result, cutoffs: record.cutoffs };
     }
 
@@ -527,6 +537,7 @@ class EventRankingService {
         }
 
         const points = records.flatMap((record) => record.points ?? []);
+        points.sort((a, b) => a.timestamp - b.timestamp);
         const uidSet = new Set(points.map((p) => p.uid));
         const uids = Array.from(uidSet);
 
@@ -553,6 +564,7 @@ class EventRankingService {
             return { result: true, cutoffs: [] };
         }
 
+        record.cutoffs.sort((a, b) => a.time - b.time);
         return { result: record.result, cutoffs: record.cutoffs };
     }
 }
