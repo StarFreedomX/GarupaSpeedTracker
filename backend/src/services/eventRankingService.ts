@@ -119,6 +119,7 @@ class EventRankingService {
     // ========================================================================
 
     private async bootstrapFromBestdori(): Promise<void> {
+        await database.ready();
         const servers = garupaService.getConfiguredServerIds();
 
         for (const server of servers) {

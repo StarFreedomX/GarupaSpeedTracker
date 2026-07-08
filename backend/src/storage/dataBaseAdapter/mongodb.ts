@@ -158,8 +158,8 @@ class MongoDatabase implements Database {
 
     /** 后台无限重试连接，防止并发重复启动。构造时和心跳断线时自动调用。 */
     private startRecovery(): void {
-        if (this.recoveryPromise) {
-            return; // 已有恢复任务在进行中
+        if (this.connected || this.recoveryPromise) {
+            return;
         }
         this.recoveryPromise = this.waitForReady()
             .then(() => {
@@ -171,6 +171,20 @@ class MongoDatabase implements Database {
             .finally(() => {
                 this.recoveryPromise = null;
             });
+    }
+
+    /**
+     * 返回一个在数据库就绪时 resolve 的 Promise。
+     * 已连接时立即返回；未连接时等待后台恢复完成。
+     * 服务在需要 DB 的操作前 await database.ready() 可避免启动时因数据库未就绪而报错。
+     */
+    async ready(): Promise<void> {
+        while (!this.connected) {
+            if (!this.recoveryPromise) {
+                this.startRecovery();
+            }
+            await this.recoveryPromise;
+        }
     }
 
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument> {

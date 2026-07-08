@@ -91,6 +91,7 @@ class MonthlyRankingService {
      * 通过 GarupaMeta 记录迁移状态，避免每次启动重复扫描
      */
     private async migrateLegacyPlayers(): Promise<void> {
+        await database.ready();
         const migrationKey = "migration_monthly_ranking_players";
 
         const migrated = await metaCollection.findOne({ key: migrationKey });

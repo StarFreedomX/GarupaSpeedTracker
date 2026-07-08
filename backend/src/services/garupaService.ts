@@ -260,6 +260,7 @@ class GarupaService {
 
     private async loadCachedClientVersions(): Promise<void> {
         try {
+            await database.ready();
             const query = await garupaMetaCollection.find({});
             const records = await query.toArray();
             for (const record of records) {
