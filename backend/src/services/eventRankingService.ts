@@ -412,37 +412,22 @@ class EventRankingService {
         const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
-        const existing = await musicTopCollection.findOne({ server, eventId, musicId, bucket });
-        const existingPoints = existing?.points ?? [];
-
-        // Build last value per UID from existing data (last occurrence wins)
-        const lastValues = new Map<number, number>();
-        for (const p of existingPoints) {
-            lastValues.set(p.uid, p.value);
-        }
-
-        // Check if any value actually changed
-        const anyChanged = newPoints.some((p) => {
-            const last = lastValues.get(p.uid);
-            return last === undefined || last !== p.value;
-        });
-
-        if (anyChanged) {
-            // Append full snapshot, preserving old entries
-            const updatedPoints = [...existingPoints, ...newPoints];
-
-            await musicTopCollection.updateOne(
-                { server, eventId, musicId, bucket },
-                { $set: { points: updatedPoints, updatedAt: timestamp, server, eventId, musicId, bucket } },
-                { upsert: true },
-            );
-        } else {
-            // Nothing changed: just refresh updatedAt to confirm server is alive
-            await musicTopCollection.updateOne(
-                { server, eventId, musicId, bucket },
-                { $set: { updatedAt: timestamp } },
-            );
-        }
+        await musicTopCollection.updateOne(
+            { server, eventId, musicId, bucket },
+            [
+                {
+                    $set: {
+                        points: { $concatArrays: [{ $ifNull: ["$points", []] }, newPoints] },
+                        updatedAt: timestamp,
+                        server: { $ifNull: ["$server", server] },
+                        eventId: { $ifNull: ["$eventId", eventId] },
+                        musicId: { $ifNull: ["$musicId", musicId] },
+                        bucket: { $ifNull: ["$bucket", bucket] },
+                    },
+                },
+            ],
+            { upsert: true },
+        );
 
         const currentTopUsers: RankingUser[] = users.map(({ point: _p, tier: _t, ...user }) => user);
         const playerWrites = currentTopUsers.map((user) =>
