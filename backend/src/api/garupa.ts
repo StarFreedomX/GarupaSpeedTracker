@@ -136,7 +136,6 @@ export const createGarupaHeaders = (server: number, clientVersion: string) => {
 
 const cipherKeyCache = new Map<number, Buffer>();
 const cipherIvCache = new Map<number, Buffer>();
-const requestIdCache = new Map<number, string>();
 
 const getCipherKey = (server: number): Buffer => {
     const cached = cipherKeyCache.get(server);
@@ -176,45 +175,34 @@ const extractNewRequestId = (decrypted: Buffer): string | null => {
 const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 
 /**
- * 获取当前有效的 X-Requestid（缓存优先，否则生成随机 rid）
+ * 发起一次 ranking 请求并返回解密后的数据。
+ * CN 服务器需要 X-Requestid：先发随机 rid，若 405 则用 server 返回的 rid 重试一次。
  */
-const getEffectiveRequestId = (server: number): string => {
-    const cached = requestIdCache.get(server);
-    if (cached) return cached;
-    const random = generateRandomRequestId();
-    requestIdCache.set(server, random);
-    return random;
-};
+const fetchRankingBuffer = async (url: string, server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
+    const headers = createGarupaHeaders(server, clientVersion);
+    headers["X-Requestid"] = generateRandomRequestId();
 
-/**
- * 为请求 headers 附加 X-Requestid
- */
-const attachRequestId = (headers: Record<string, string>, server: number): Record<string, string> => {
-    headers["X-Requestid"] = getEffectiveRequestId(server);
-    return headers;
-};
+    const response = await fetch(url, { headers });
+    const status = response.status;
+    const arrayBuffer = await response.arrayBuffer();
+    const bodyBuffer = Buffer.from(arrayBuffer);
+    const decrypted = decryptPayload(server, bodyBuffer);
 
-/**
- * 尝试从 405 响应中刷新 X-Requestid
- * 返回 true 表示 rid 已更新且应该重试
- */
-const tryRefreshRequestId = (server: number, decrypted: Buffer, status: number): boolean => {
-    if (status !== 405) return false;
+    const serverRid = status === 405 ? extractNewRequestId(decrypted) : null;
+    if (serverRid) {
+        logger("garupaApi", `server ${server}: X-Requestid refreshed`);
+        const retryHeaders = createGarupaHeaders(server, clientVersion);
+        retryHeaders["X-Requestid"] = serverRid;
+        const retryResponse = await fetch(url, { headers: retryHeaders });
+        const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+        return {
+            decrypted: decryptPayload(server, retryBody),
+            status: retryResponse.status,
+            length: retryBody.length,
+        };
+    }
 
-    const newRid = extractNewRequestId(decrypted);
-    if (!newRid) return false;
-
-    requestIdCache.set(server, newRid);
-    logger("garupaApi", `server ${server}: X-Requestid refreshed`);
-    return true;
-};
-
-/**
- * 成功请求后丢弃已用的 rid，下次请求走随机→刷新流程
- * 避免跨端点请求时触发服务端缓存返回相同数据
- */
-const invalidateRequestId = (server: number): void => {
-    requestIdCache.delete(server);
+    return { decrypted, status, length: bodyBuffer.length };
 };
 
 export const fetchMonthlyRankingBuffer = async (
@@ -223,29 +211,7 @@ export const fetchMonthlyRankingBuffer = async (
     clientVersion: string,
 ): Promise<{ decrypted: Buffer; status: number; length: number }> => {
     const url = buildMonthlyRankingUrl(server, monthlyId);
-    const headers = attachRequestId(createGarupaHeaders(server, clientVersion), server);
-
-    const response = await fetch(url, { headers });
-    const status = response.status;
-    const arrayBuffer = await response.arrayBuffer();
-    const bodyBuffer = Buffer.from(arrayBuffer);
-    const decrypted = decryptPayload(server, bodyBuffer);
-
-    // CN: if rid expired, refresh and retry once
-    if (tryRefreshRequestId(server, decrypted, status)) {
-        const retryHeaders = attachRequestId(createGarupaHeaders(server, clientVersion), server);
-        const retryResponse = await fetch(url, { headers: retryHeaders });
-        const retryBody = Buffer.from(await retryResponse.arrayBuffer());
-        invalidateRequestId(server);
-        return {
-            decrypted: decryptPayload(server, retryBody),
-            status: retryResponse.status,
-            length: retryBody.length,
-        };
-    }
-
-    invalidateRequestId(server);
-    return { decrypted, status, length: bodyBuffer.length };
+    return fetchRankingBuffer(url, server, clientVersion);
 };
 
 export const fetchMonthlyRanking = async (server: number, monthlyId: number, clientVersion: string): Promise<MonthlyRankingBandoriRaw> => {
@@ -370,30 +336,13 @@ export const fetchEventRankingBuffer = async (
     mid?: number,
 ): Promise<{ decrypted: Buffer; status: number; length: number }> => {
     const url = buildEventRankingUrl(server, eventId, eventType, mid);
-    const headers = attachRequestId(createGarupaHeaders(server, clientVersion), server);
-
-    const response = await fetch(url, { headers });
-    const status = response.status;
-    const arrayBuffer = await response.arrayBuffer();
-    const bodyBuffer = Buffer.from(arrayBuffer);
-    const decrypted = decryptPayload(server, bodyBuffer);
-
-    // CN: if rid expired, refresh and retry once
-    if (tryRefreshRequestId(server, decrypted, status)) {
-        const retryHeaders = attachRequestId(createGarupaHeaders(server, clientVersion), server);
-        const retryResponse = await fetch(url, { headers: retryHeaders });
-        const retryBody = Buffer.from(await retryResponse.arrayBuffer());
-        invalidateRequestId(server);
-        return {
-            decrypted: decryptPayload(server, retryBody),
-            status: retryResponse.status,
-            length: retryBody.length,
-        };
-    }
-
-    invalidateRequestId(server);
-    return { decrypted, status, length: bodyBuffer.length };
+    return fetchRankingBuffer(url, server, clientVersion);
 };
+}
+
+    invalidateRequestId(server)
+return { decrypted, status, length: bodyBuffer.length };
+}
 
 export const fetchEventMasterListBuffer = async (server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
     const url = buildEventMasterListUrl(server);
