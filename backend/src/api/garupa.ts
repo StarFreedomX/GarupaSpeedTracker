@@ -253,17 +253,16 @@ export const waitUntilGarupaAvailable = async (
  * 来源：客户端反编译 URL 模板。日服国服一致。
  */
 const EVENT_TYPE_TO_URL_SEGMENT: Readonly<Record<string, string>> = {
-    challenge:           "challenge",
-    live_try:            "livetry",
-    medley:              "medley",
-    mission_live:        "mission",
-    story:               "story",
-    team_live_festival:  "festival",
-    versus:              "versus",
+    challenge: "challenge",
+    live_try: "livetry",
+    medley: "medley",
+    mission_live: "mission",
+    story: "story",
+    team_live_festival: "festival",
+    versus: "versus",
 };
 
-const eventTypeToUrlSegment = (protobufEventType: string): string =>
-    EVENT_TYPE_TO_URL_SEGMENT[protobufEventType] ?? protobufEventType;
+const eventTypeToUrlSegment = (protobufEventType: string): string => EVENT_TYPE_TO_URL_SEGMENT[protobufEventType] ?? protobufEventType;
 
 export const buildEventRankingUrl = (server: number, eventId: number, eventType: string, mid?: number): string => {
     const base = getGarupaBaseUrl(server);

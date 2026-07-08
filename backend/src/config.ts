@@ -58,18 +58,18 @@ export const DEFAULT_INTERVAL = 30_000;
 export const ENABLE_CORS = toBoolean(process.env.ENABLE_CORS, false);
 export const APP_PROXY = toBoolean(process.env.APP_PROXY, false);
 
-export const GARUPA_SERVER_BASES = toList(process.env.GARUPA_SERVER_BASES, ["api.garupa.jp", "-", "-", "-"]);
+export const GARUPA_SERVER_BASES = toList(process.env.GARUPA_SERVER_BASES, ["-", "-", "-", "-"]);
 export const GARUPA_UIDS = toList(process.env.GARUPA_UIDS, ["-", "-", "-", "-"]);
 export const GARUPA_UUIDS = toList(process.env.GARUPA_UUIDS, ["-", "-", "-", "-"]);
-export const GARUPA_CLIENT_VERSIONS = toList(process.env.GARUPA_CLIENT_VERSIONS ?? process.env.GARUPA_CLIENT_VERSION, ["10.1.1", "-", "-", "-"]);
-export const GARUPA_UNITY_VERSIONS = toList(process.env.GARUPA_UNITY_VERSIONS ?? process.env.GARUPA_UNITY_VERSION, ["2021.3.45f2"]);
+export const GARUPA_CLIENT_VERSIONS = toList(process.env.GARUPA_CLIENT_VERSIONS ?? process.env.GARUPA_CLIENT_VERSION, ["10.1.3", "-", "-", "-"]);
+export const GARUPA_UNITY_VERSIONS = toList(process.env.GARUPA_UNITY_VERSIONS ?? process.env.GARUPA_UNITY_VERSION, ["2021.3.45f2", "-", "-", "2022.3.62f3c1"]);
 export const GARUPA_USER_AGENTS = toList(process.env.GARUPA_USER_AGENTS ?? process.env.GARUPA_USER_AGENT, [
     "UnityPlayer/2021.3.45f2 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
     "-",
     "-",
-    "-",
+    "UnityPlayer/2022.3.62f3c1 (UnityWebRequest/1.0, libcurl/8.10.1-DEV)",
 ]);
-export const GARUPA_CLIENT_PLATFORMS = toList(process.env.GARUPA_CLIENT_PLATFORMS ?? process.env.GARUPA_CLIENT_PLATFORM, ["Android", "-", "-", "-"]);
+export const GARUPA_CLIENT_PLATFORMS = toList(process.env.GARUPA_CLIENT_PLATFORMS ?? process.env.GARUPA_CLIENT_PLATFORM, ["Android"]);
 export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS ?? process.env.GARUPA_ENCRYPTION_KEY, ["-", "-", "-", "-"]);
 export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ?? process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
 export const GARUPA_REFRESH_INTERVAL_SECONDS = toNumber(process.env.GARUPA_REFRESH_INTERVAL_SECONDS, 60);
