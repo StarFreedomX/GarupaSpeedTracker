@@ -146,10 +146,13 @@ class MongoDatabase implements Database {
                     throw new Error(`MongoDB unavailable after ${elapsed}ms: ${message}`);
                 }
 
-                logger("database", `mongodb not available (${message}), retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
-
-                // 重建 client 以获得干净的连接状态，避免 "Topology is closed" 遗留问题
-                this.initClient();
+                // 拓扑已关闭时需要重建客户端；普通连接失败（如 ECONNREFUSED）直接重试即可
+                if (message.includes("Topology is closed")) {
+                    logger("database", `mongodb topology closed, recreating client. retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
+                    this.initClient();
+                } else {
+                    logger("database", `mongodb not available (${message}), retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
+                }
 
                 await new Promise((resolve) => setTimeout(resolve, interval));
             }
