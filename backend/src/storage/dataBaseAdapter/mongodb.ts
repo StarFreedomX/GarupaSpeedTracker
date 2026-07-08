@@ -1,5 +1,5 @@
 import { type Collection, type Document, type Filter, type FindCursor, MongoClient } from "mongodb";
-import { MONGODB_CONNECTION_TIMEOUT_MS, MONGODB_DB, MONGODB_RECONNECT_INTERVAL_MS, MONGODB_URI } from "@/config";
+import { MONGODB_CONNECT_TIMEOUT_MS, MONGODB_DB, MONGODB_RECONNECT_INTERVAL_MS, MONGODB_SERVER_SELECTION_TIMEOUT_MS, MONGODB_STARTUP_RETRY_INTERVAL_MS, MONGODB_URI } from "@/config";
 import { logger } from "@/logger";
 import type { Database, DatabaseCollection, DatabaseFilter, DatabaseFindQuery, DatabaseProjection, DatabaseSort, DatabaseUpdate } from "@/storage/database";
 
@@ -56,36 +56,121 @@ class MongoCollection<TDocument> implements DatabaseCollection<TDocument> {
 }
 
 class MongoDatabase implements Database {
-    private readonly client: MongoClient;
-    private readonly db: import("mongodb").Db;
+    private client!: MongoClient;
+    private db!: import("mongodb").Db;
+    private connected = false;
+    private recoveryPromise: Promise<void> | null = null;
 
     constructor() {
-        // 驱动 v6+ 支持 lazy connect：不需要显式调用 connect()。
-        // 首次操作时驱动自动连接，之后 SDAM 持续监控，断线自动恢复。
+        this.initClient();
+        // 构造时立即启动后台重试——不阻塞模块加载和服务启动
+        this.startRecovery();
+    }
+
+    /** 创建/重建 MongoClient 实例。失败后重试时也会调用此方法以获得干净的连接状态。 */
+    private initClient(): void {
+        if (this.client) {
+            this.client.removeAllListeners();
+            try {
+                void this.client.close();
+            } catch {
+                /* 忽略关闭失败 */
+            }
+        }
+
         this.client = new MongoClient(MONGODB_URI, {
-            serverSelectionTimeoutMS: MONGODB_CONNECTION_TIMEOUT_MS,
+            serverSelectionTimeoutMS: MONGODB_SERVER_SELECTION_TIMEOUT_MS,
             heartbeatFrequencyMS: MONGODB_RECONNECT_INTERVAL_MS,
             maxPoolSize: 10,
         });
         this.db = this.client.db(MONGODB_DB);
 
-        let connected = false; // 标记当前连接状态，避免重复日志
+        this.connected = false;
 
-        // 心跳成功 → 连接正常（仅状态变化时打印）
         this.client.on("serverHeartbeatSucceeded", () => {
-            if (!connected) {
-                connected = true;
+            if (!this.connected) {
+                this.connected = true;
                 logger("database", "mongodb connected.");
             }
         });
 
-        // 心跳失败 → 连接断开（仅状态变化时打印）
         this.client.on("serverHeartbeatFailed", () => {
-            if (connected) {
-                connected = false;
+            if (this.connected) {
+                this.connected = false;
                 logger("database", "mongodb connection lost.");
+                // 连接断开后自动启动后台重试，防止 topology 进入 closed 后永久失效
+                this.startRecovery();
             }
         });
+    }
+
+    /** 尝试建立连接并验证可用性。使用短超时探针快速失败，便于重试循环及时响应。 */
+    async connect(): Promise<void> {
+        // 先用短超时探针检测数据库是否可达，避免重试循环每次等 MONGODB_SERVER_SELECTION_TIMEOUT_MS
+        const probe = new MongoClient(MONGODB_URI, {
+            serverSelectionTimeoutMS: MONGODB_CONNECT_TIMEOUT_MS,
+            maxPoolSize: 1,
+        });
+        try {
+            await probe.connect();
+            await probe.db(MONGODB_DB).admin().ping();
+        } finally {
+            await probe.close();
+        }
+
+        // 探针通过后，连接主客户端（使用正常的 serverSelectionTimeoutMS）
+        await this.client.connect();
+        await this.db.admin().ping();
+        this.connected = true;
+    }
+
+    /**
+     * 阻塞等待数据库就绪，自动重试直到超时或成功。
+     * 不传 timeoutMs 则无限重试（用于后台恢复）。
+     */
+    async waitForReady(options?: { timeoutMs?: number; retryIntervalMs?: number }): Promise<void> {
+        const timeout = options?.timeoutMs; // undefined = 无限重试
+        const interval = options?.retryIntervalMs ?? MONGODB_STARTUP_RETRY_INTERVAL_MS;
+        const startTime = Date.now();
+
+        while (true) {
+            try {
+                await this.connect();
+                logger("database", "mongodb ready for operations.");
+                return;
+            } catch (err: unknown) {
+                const elapsed = Date.now() - startTime;
+                const message = (err as { message?: string })?.message ?? String(err);
+
+                if (timeout !== undefined && elapsed >= timeout) {
+                    throw new Error(`MongoDB unavailable after ${elapsed}ms: ${message}`);
+                }
+
+                logger("database", `mongodb not available (${message}), retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
+
+                // 重建 client 以获得干净的连接状态，避免 "Topology is closed" 遗留问题
+                this.initClient();
+
+                await new Promise((resolve) => setTimeout(resolve, interval));
+            }
+        }
+    }
+
+    /** 后台无限重试连接，防止并发重复启动。构造时和心跳断线时自动调用。 */
+    private startRecovery(): void {
+        if (this.recoveryPromise) {
+            return; // 已有恢复任务在进行中
+        }
+        this.recoveryPromise = this.waitForReady()
+            .then(() => {
+                logger("database", "mongodb recovery succeeded.");
+            })
+            .catch((err: unknown) => {
+                logger("database", `mongodb recovery failed: ${(err as Error)?.message ?? String(err)}`);
+            })
+            .finally(() => {
+                this.recoveryPromise = null;
+            });
     }
 
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument> {

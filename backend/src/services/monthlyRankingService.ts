@@ -337,7 +337,6 @@ class MonthlyRankingService {
         const currentTopUsers: RankingUser[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
-        // 写入积分点到 top 文档（不再嵌入 users）
         await topCollection.updateOne(
             { server, monthlyId, bucket },
             [
@@ -354,7 +353,6 @@ class MonthlyRankingService {
             { upsert: true },
         );
 
-        // 玩家信息写入独立集合，按 {server, uid} 为 key，不绑定 monthlyId
         const playerWrites = currentTopUsers.map((user) =>
             playerCollection.replaceOne({ server, uid: user.uid }, { ...user, server, updatedAt: timestamp }, { upsert: true }),
         );

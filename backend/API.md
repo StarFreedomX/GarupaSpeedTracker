@@ -346,7 +346,8 @@ This endpoint accepts both `/eventtop/data` and `/eventtop/data.json`. When no l
 - `server` (`number`, required, integer, `>= 0`, max depends on configured server count)
 - `event` (`number`, required, integer, `>= 1`)
 - `mid` (`number`, optional, integer, `>= 1`)
-  - when provided, returns music top for the specified music ID instead of event top
+  - When provided, returns music score ranking for the specified music ID instead of event point ranking. `mid` corresponds to Bestdori song IDs (see `/api/songs`).
+  - Not all event types have music rankings. `challenge` and `versus` events include per-song rankings; `medley` events use `mid=1` internally for a combined score ranking; `mission_live` / `live_try` / `story` events have no music ranking at all.
 
 Example (event top):
 
@@ -383,7 +384,7 @@ GET /api/eventtop/data?server=0&event=321&mid=184
 
 ### Response Contract
 
-- `points` is an array of `{ timestamp, uid, value }` records sorted by timestamp.
+- `points` is an array of `{ timestamp, uid, value }` records sorted by timestamp. The `value` field represents event points when `mid` is omitted, or music score when `mid` is provided.
 - `users` is an array of player profiles keyed by `uid`, with `name`, `introduction`, `rank`, `sid`, `strained`, and `degrees`.
 - Player info in `users` reflects the latest known state and is not timestamped.
 - When no local data exists, returns `302` redirect to Bestdori.
@@ -427,7 +428,8 @@ This endpoint accepts both `/tracker/data` and `/tracker/data.json`. When no loc
 - `event` (`number`, required, integer, `>= 1`)
 - `tier` (`number`, required, integer, see supported values below)
 - `mid` (`number`, optional, integer, `>= 1`)
-  - when provided, returns music border for the specified music ID instead of event border
+  - When provided, returns music score border for the specified music ID instead of event point border. Same semantics as `/api/eventtop/data#mid`.
+  - The valid `tier` values differ between event borders and music borders (see below).
 
 **Event tier supported values:** `20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000`
 
@@ -458,7 +460,7 @@ GET /api/tracker/data?server=0&event=321&tier=100&mid=184
 
 ### Response Contract
 
-- `cutoffs` is an array of `{ time, ep }` records where `time` is a Unix timestamp (ms) and `ep` is the event-point cutoff value for the requested tier.
+- `cutoffs` is an array of `{ time, ep }` records where `time` is a Unix timestamp (ms) and `ep` is the cutoff value for the requested tier. The `ep` field represents event points when `mid` is omitted, or music score when `mid` is provided.
 - `result` is always `true` when data is available.
 - When no local data exists, returns `302` redirect to Bestdori.
 
