@@ -136,6 +136,7 @@ export const createGarupaHeaders = (server: number, clientVersion: string) => {
 
 const cipherKeyCache = new Map<number, Buffer>();
 const cipherIvCache = new Map<number, Buffer>();
+const ridLock = new Map<number, Promise<void>>();
 
 const getCipherKey = (server: number): Buffer => {
     const cached = cipherKeyCache.get(server);
@@ -176,33 +177,57 @@ const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => M
 
 /**
  * 发起一次 ranking 请求并返回解密后的数据。
- * CN 服务器需要 X-Requestid：先发随机 rid，若 405 则用 server 返回的 rid 重试一次。
+ * 国服需要 X-Requestid 串行化防缓存污染；日服直接请求。
  */
 const fetchRankingBuffer = async (url: string, server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
-    const headers = createGarupaHeaders(server, clientVersion);
-    headers["X-Requestid"] = generateRandomRequestId();
+    const needsRid = getGarupaChannelId(server) !== undefined;
 
-    const response = await fetch(url, { headers });
-    const status = response.status;
-    const arrayBuffer = await response.arrayBuffer();
-    const bodyBuffer = Buffer.from(arrayBuffer);
-    const decrypted = decryptPayload(server, bodyBuffer);
-
-    const serverRid = status === 405 ? extractNewRequestId(decrypted) : null;
-    if (serverRid) {
-        logger("garupaApi", `server ${server}: X-Requestid refreshed`);
-        const retryHeaders = createGarupaHeaders(server, clientVersion);
-        retryHeaders["X-Requestid"] = serverRid;
-        const retryResponse = await fetch(url, { headers: retryHeaders });
-        const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+    // Non-CN: simple fetch
+    if (!needsRid) {
+        const headers = createGarupaHeaders(server, clientVersion);
+        const response = await fetch(url, { headers });
+        const bodyBuffer = Buffer.from(await response.arrayBuffer());
         return {
-            decrypted: decryptPayload(server, retryBody),
-            status: retryResponse.status,
-            length: retryBody.length,
+            decrypted: decryptPayload(server, bodyBuffer),
+            status: response.status,
+            length: bodyBuffer.length,
         };
     }
 
-    return { decrypted, status, length: bodyBuffer.length };
+    // CN: lock + random rid → 405 → retry with server's rid
+    const prev = ridLock.get(server) ?? Promise.resolve();
+    let release: () => void;
+    const next = new Promise<void>((resolve) => { release = resolve; });
+    ridLock.set(server, Promise.all([prev, next]).then(() => {}));
+    await prev;
+
+    try {
+        const headers = createGarupaHeaders(server, clientVersion);
+        headers["X-Requestid"] = generateRandomRequestId();
+
+        const response = await fetch(url, { headers });
+        const status = response.status;
+        const bodyBuffer = Buffer.from(await response.arrayBuffer());
+        const decrypted = decryptPayload(server, bodyBuffer);
+
+        const serverRid = status === 405 ? extractNewRequestId(decrypted) : null;
+        if (serverRid) {
+            logger("garupaApi", `server ${server}: X-Requestid refreshed`);
+            const retryHeaders = createGarupaHeaders(server, clientVersion);
+            retryHeaders["X-Requestid"] = serverRid;
+            const retryResponse = await fetch(url, { headers: retryHeaders });
+            const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+            return {
+                decrypted: decryptPayload(server, retryBody),
+                status: retryResponse.status,
+                length: retryBody.length,
+            };
+        }
+
+        return { decrypted, status, length: bodyBuffer.length };
+    } finally {
+        release!();
+    }
 };
 
 export const fetchMonthlyRankingBuffer = async (
@@ -338,11 +363,6 @@ export const fetchEventRankingBuffer = async (
     const url = buildEventRankingUrl(server, eventId, eventType, mid);
     return fetchRankingBuffer(url, server, clientVersion);
 };
-}
-
-    invalidateRequestId(server)
-return { decrypted, status, length: bodyBuffer.length };
-}
 
 export const fetchEventMasterListBuffer = async (server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
     const url = buildEventMasterListUrl(server);
