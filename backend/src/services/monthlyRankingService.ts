@@ -214,6 +214,8 @@ class MonthlyRankingService {
                         } catch (err) {
                             logger("monthlyRanking", `Bootstrap error: Failed to fetch server=${server} monthly=${missingId}: ${err}`);
                         }
+                        // Throttle: 10s gap between each monthlyId to avoid CN rate limiting
+                        await new Promise((resolve) => setTimeout(resolve, 10_000));
                     }
                 } else {
                     logger("monthlyRanking", `Bootstrap: Server=${server} has all data from 1 to ${currentMonthlyId}. Skipping bootstrap fetch.`);

@@ -74,7 +74,6 @@ export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS 
 export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ?? process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
 
 // CN-specific headers (only required for CN server; other servers can leave "-")
-export const GARUPA_RIDS = toList(process.env.GARUPA_RIDS, ["-", "-", "-", "-"]);
 export const GARUPA_CIDS = toList(process.env.GARUPA_CIDS, ["-", "-", "-", "-"]);
 export const GARUPA_PIDS = toList(process.env.GARUPA_PIDS, ["-", "-", "-", "-"]);
 

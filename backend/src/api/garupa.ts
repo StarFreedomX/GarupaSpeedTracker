@@ -9,7 +9,6 @@ import {
     GARUPA_ENCRYPTION_KEYS,
     GARUPA_PACKAGE_URLS,
     GARUPA_PIDS,
-    GARUPA_RIDS,
     GARUPA_SERVER_BASES,
     GARUPA_STATUS_POLL_INTERVAL_MS,
     GARUPA_STATUS_UNAVAILABILITY_THRESHOLD,
@@ -76,7 +75,6 @@ const getGarupaEncryptionKey = (server: number): string => resolveServerValue(GA
 const getGarupaEncryptionIv = (server: number): string => resolveServerValue(GARUPA_ENCRYPTION_IVS, server, "GARUPA_ENCRYPTION_IVS");
 const getGarupaChannelId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_CIDS, server);
 const getGarupaPlatformId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_PIDS, server);
-const getGarupaRequestId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_RIDS, server);
 
 const buildMonthlyRankingUrl = (server: number, monthlyId: number): string => {
     const base = getGarupaBaseUrl(server);
@@ -175,21 +173,24 @@ const extractNewRequestId = (decrypted: Buffer): string | null => {
     return match?.[1] ?? null;
 };
 
+const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+
 /**
- * 获取当前有效的 X-Requestid（缓存优先，fallback 到 env 配置）
+ * 获取当前有效的 X-Requestid（缓存优先，否则生成随机 rid）
  */
-const getEffectiveRequestId = (server: number): string | undefined => {
+const getEffectiveRequestId = (server: number): string => {
     const cached = requestIdCache.get(server);
     if (cached) return cached;
-    return getGarupaRequestId(server);
+    const random = generateRandomRequestId();
+    requestIdCache.set(server, random);
+    return random;
 };
 
 /**
- * 为请求 headers 附加 X-Requestid（如果存在）
+ * 为请求 headers 附加 X-Requestid
  */
 const attachRequestId = (headers: Record<string, string>, server: number): Record<string, string> => {
-    const rid = getEffectiveRequestId(server);
-    if (rid) headers["X-Requestid"] = rid;
+    headers["X-Requestid"] = getEffectiveRequestId(server);
     return headers;
 };
 
@@ -203,12 +204,17 @@ const tryRefreshRequestId = (server: number, decrypted: Buffer, status: number):
     const newRid = extractNewRequestId(decrypted);
     if (!newRid) return false;
 
-    const oldRid = requestIdCache.get(server);
-    if (oldRid !== newRid) {
-        requestIdCache.set(server, newRid);
-        logger("garupaApi", `server ${server}: X-Requestid refreshed${oldRid ? " (expired)" : ""}`);
-    }
+    requestIdCache.set(server, newRid);
+    logger("garupaApi", `server ${server}: X-Requestid refreshed`);
     return true;
+};
+
+/**
+ * 成功请求后丢弃已用的 rid，下次请求走随机→刷新流程
+ * 避免跨端点请求时触发服务端缓存返回相同数据
+ */
+const invalidateRequestId = (server: number): void => {
+    requestIdCache.delete(server);
 };
 
 export const fetchMonthlyRankingBuffer = async (
@@ -230,6 +236,7 @@ export const fetchMonthlyRankingBuffer = async (
         const retryHeaders = attachRequestId(createGarupaHeaders(server, clientVersion), server);
         const retryResponse = await fetch(url, { headers: retryHeaders });
         const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+        invalidateRequestId(server);
         return {
             decrypted: decryptPayload(server, retryBody),
             status: retryResponse.status,
@@ -237,6 +244,7 @@ export const fetchMonthlyRankingBuffer = async (
         };
     }
 
+    invalidateRequestId(server);
     return { decrypted, status, length: bodyBuffer.length };
 };
 
@@ -375,6 +383,7 @@ export const fetchEventRankingBuffer = async (
         const retryHeaders = attachRequestId(createGarupaHeaders(server, clientVersion), server);
         const retryResponse = await fetch(url, { headers: retryHeaders });
         const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+        invalidateRequestId(server);
         return {
             decrypted: decryptPayload(server, retryBody),
             status: retryResponse.status,
@@ -382,6 +391,7 @@ export const fetchEventRankingBuffer = async (
         };
     }
 
+    invalidateRequestId(server);
     return { decrypted, status, length: bodyBuffer.length };
 };
 
