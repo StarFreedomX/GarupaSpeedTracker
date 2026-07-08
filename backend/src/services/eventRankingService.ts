@@ -272,8 +272,12 @@ class EventRankingService {
                     if (raw.musicRankings && raw.musicRankings.length > 0) {
                         // challenge/versus: music rankings nested in response
                         for (const musicRaw of raw.musicRankings) {
-                            await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw));
-                            await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw));
+                            await this.retryPersist("persistMusicTopSnapshot", () =>
+                                this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                            );
+                            await this.retryPersist("persistMusicBorderByTier", () =>
+                                this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                            );
                         }
                     } else if (MEDLEY_EVENT_TYPES.has(eventType)) {
                         // medley: fetch music ranking with mid=1
@@ -286,7 +290,9 @@ class EventRankingService {
                                 scoreBorderUsers: musicRaw.eventPointBorderUsers,
                             };
                             await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
-                            await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic));
+                            await this.retryPersist("persistMusicBorderByTier", () =>
+                                this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic),
+                            );
                         } catch (err) {
                             logger("eventRanking", `medley music fetch failed event=${eventId}: ${(err as Error)?.message || err}`);
                         }
