@@ -9,6 +9,7 @@ import {
     GARUPA_ENCRYPTION_KEYS,
     GARUPA_PACKAGE_URLS,
     GARUPA_PIDS,
+    GARUPA_RKEYS,
     GARUPA_SERVER_BASES,
     GARUPA_STATUS_POLL_INTERVAL_MS,
     GARUPA_STATUS_UNAVAILABILITY_THRESHOLD,
@@ -75,6 +76,7 @@ const getGarupaEncryptionKey = (server: number): string => resolveServerValue(GA
 const getGarupaEncryptionIv = (server: number): string => resolveServerValue(GARUPA_ENCRYPTION_IVS, server, "GARUPA_ENCRYPTION_IVS");
 const getGarupaChannelId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_CIDS, server);
 const getGarupaPlatformId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_PIDS, server);
+const getGarupaRequestKey = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_RKEYS, server);
 
 const buildMonthlyRankingUrl = (server: number, monthlyId: number): string => {
     const base = getGarupaBaseUrl(server);
@@ -136,7 +138,19 @@ export const createGarupaHeaders = (server: number, clientVersion: string) => {
 
 const cipherKeyCache = new Map<number, Buffer>();
 const cipherIvCache = new Map<number, Buffer>();
+
+// CN RID state: per-server serialisation lock + stored nonce (requestID from server)
 const ridLock = new Map<number, Promise<void>>();
+const ridStore = new Map<number, string>();
+
+/**
+ * 计算 X-Requestid 请求头：MD5(requestKey + requestID)
+ * requestKey: 编译时硬编码的静态密钥
+ * requestID: 服务端上次响应下发的 nonce
+ */
+const computeRequestId = (requestKey: string, requestId: string): string => {
+    return crypto.createHash("md5").update(requestKey + requestId).digest("hex");
+};
 
 const getCipherKey = (server: number): Buffer => {
     const cached = cipherKeyCache.get(server);
@@ -177,24 +191,29 @@ const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => M
 
 /**
  * 发起一次 ranking 请求并返回解密后的数据。
- * 国服需要 X-Requestid 串行化防缓存污染；日服直接请求。
+ * 国服：本地计算 X-Requestid = MD5(requestKey + requestID)，失败时回退到服务器返回的新值。
+ * 日服：直接请求。
  */
 const fetchRankingBuffer = async (url: string, server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
-    const needsRid = getGarupaChannelId(server) !== undefined;
+    const needsRid = getGarupaRequestKey(server) !== undefined;
 
     // Non-CN: simple fetch
     if (!needsRid) {
         const headers = createGarupaHeaders(server, clientVersion);
         const response = await fetch(url, { headers });
         const bodyBuffer = Buffer.from(await response.arrayBuffer());
+        const status = response.status;
+        const length = bodyBuffer.length;
+        logger("garupaApi", `fetch ${url} → status=${status} len=${length}`);
         return {
             decrypted: decryptPayload(server, bodyBuffer),
-            status: response.status,
-            length: bodyBuffer.length,
+            status,
+            length,
         };
     }
 
-    // CN: lock + random rid → 405 → retry with server's rid
+    // CN: lock + compute RID locally → send → on 200 store response header nonce, on 405 fallback
+    const requestKey = getGarupaRequestKey(server)!;
     const prev = ridLock.get(server) ?? Promise.resolve();
     let release: () => void;
     const next = new Promise<void>((resolve) => { release = resolve; });
@@ -202,28 +221,54 @@ const fetchRankingBuffer = async (url: string, server: number, clientVersion: st
     await prev;
 
     try {
+        const storedRequestId = ridStore.get(server);
+
+        // 如果有 requestKey 和已存储的 requestID，本地计算 RID
+        const computedRid = (requestKey && storedRequestId)
+            ? computeRequestId(requestKey, storedRequestId)
+            : null;
+
         const headers = createGarupaHeaders(server, clientVersion);
-        headers["X-Requestid"] = generateRandomRequestId();
+        headers["X-Requestid"] = computedRid ?? generateRandomRequestId();
 
         const response = await fetch(url, { headers });
         const status = response.status;
         const bodyBuffer = Buffer.from(await response.arrayBuffer());
         const decrypted = decryptPayload(server, bodyBuffer);
 
-        const serverRid = status === 405 ? extractNewRequestId(decrypted) : null;
-        if (serverRid) {
-            logger("garupaApi", `server ${server}: X-Requestid refreshed`);
-            const retryHeaders = createGarupaHeaders(server, clientVersion);
-            retryHeaders["X-Requestid"] = serverRid;
-            const retryResponse = await fetch(url, { headers: retryHeaders });
-            const retryBody = Buffer.from(await retryResponse.arrayBuffer());
-            return {
-                decrypted: decryptPayload(server, retryBody),
-                status: retryResponse.status,
-                length: retryBody.length,
-            };
+        // 从响应头提取服务端下发的新 nonce（无论 200 还是 405 都可能有）
+        const responseHeaderRid = response.headers.get("X-Requestid");
+        if (responseHeaderRid) {
+            ridStore.set(server, responseHeaderRid);
         }
 
+        if (status === 405) {
+            // RID 失效：从 body 提取新 nonce 并重试
+            const serverRid = extractNewRequestId(decrypted) ?? responseHeaderRid;
+            if (serverRid) {
+                ridStore.set(server, serverRid);
+                logger("garupaApi", `server ${server}: X-Requestid refreshed via 405 fallback`);
+                const retryHeaders = createGarupaHeaders(server, clientVersion);
+                retryHeaders["X-Requestid"] = serverRid;
+                const retryResponse = await fetch(url, { headers: retryHeaders });
+                const retryBody = Buffer.from(await retryResponse.arrayBuffer());
+                const retryStatus = retryResponse.status;
+                const retryLength = retryBody.length;
+                // 重试成功后也存储响应头中的 nonce（可能更新）
+                const retryHeaderRid = retryResponse.headers.get("X-Requestid");
+                if (retryHeaderRid) {
+                    ridStore.set(server, retryHeaderRid);
+                }
+                logger("garupaApi", `fetch ${url} → status=${retryStatus} len=${retryLength} (retry)`);
+                return {
+                    decrypted: decryptPayload(server, retryBody),
+                    status: retryStatus,
+                    length: retryLength,
+                };
+            }
+        }
+
+        logger("garupaApi", `fetch ${url} → status=${status} len=${bodyBuffer.length}`);
         return { decrypted, status, length: bodyBuffer.length };
     } finally {
         release!();
