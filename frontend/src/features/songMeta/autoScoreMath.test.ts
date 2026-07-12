@@ -297,3 +297,48 @@ describe("Progressive Skill (叠p) Score Calculation", () => {
         expect(result).toEqual(1701412);
     });
 });
+
+// ==================== Overlap 修正测试 ====================
+
+describe("Overlap Delta Correction", () => {
+    /**
+     * 验证技能排队 delta 修正生效。
+     *
+     * 构造一个谱面：position 0 用 7.0s 技能（10 notes），position 1 用 5.0s 技能（baseline 8 notes）。
+     * overlaps 中 pos=1, d_prev=7.0, d_cur=5.0 → delta=+2。
+     * 预期 position 1 覆盖 10 notes（= 8 + 2）。
+     *
+     * baseAutoScore = floor(3 × 1.0 × 200000 × 1.00 / 100) = 6000
+     * position 0: 10 × floor(6000 × 1.5) = 10 × 9000 = 90000
+     * position 1: (8+2) × floor(6000 × 1.5) = 10 × 9000 = 90000
+     * remaining: (100-20) × 6000 = 480000
+     * total = 660000
+     */
+    test("should add overlap delta to note count", () => {
+        const summary: SongLevelSummary = {
+            level: 5,
+            total: 100,
+            counts: (() => {
+                const c = makeEmptyCounts();
+                c["7.0"] = [10, 0, 0, 0, 0, 0];
+                c["5.0"] = [0, 8, 0, 0, 0, 0];
+                return c;
+            })(),
+            overlaps: {
+                1: { "7.0": { "5.0": 2 } }, // delta120=2, delta60=2
+            },
+        };
+
+        const skills: Skill[] = [
+            { duration: "7.0", scoreUp: 0.5 },
+            { duration: "5.0", scoreUp: 0.5 },
+            { duration: "7.0", scoreUp: 0 },
+            { duration: "7.0", scoreUp: 0 },
+            { duration: "7.0", scoreUp: 0 },
+            { duration: "7.0", scoreUp: 0 },
+        ];
+
+        const result = calcExactScoreInTurns(200000, skills, summary, 1.0);
+        expect(result).toEqual(660000);
+    });
+});

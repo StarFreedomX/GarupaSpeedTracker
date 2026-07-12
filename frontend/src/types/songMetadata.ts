@@ -49,6 +49,11 @@ export interface SongLevelSummary {
      * Value: 长度为 6 的数组，对应 6 个技能窗口覆盖的 Note 数量
      */
     counts: Record<SkillDuration, number[]>;
+    /**
+     * 技能排队偏移修正（仅存在连续触发间隔 < 8.8s 的 position）
+     * overlaps[pos][prevDuration][curDuration] = deltaNotes（4-bit 双 fps 编码）
+     */
+    overlaps?: Record<number, Partial<Record<SkillDuration, Partial<Record<SkillDuration, number>>>>>;
 }
 
 export type SongSummary = {

@@ -12,6 +12,8 @@ const TARGET_SKILL_COUNT = 6;
 const FPS_EPSILON = 1e-9;
 /** 4-bit binary: smmm/16. s=sign, mmm=magnitude(0-7). All fractions are powers of 2 → IEEE 754 exact. */
 const ENCODE_DENOM = 16;
+/** 最大排队延迟帧数 = ceil(8.0*fps-ε)+1(end) + ceil(0.75*fps)(finishing decrement) + 1(transition) + 1(trigger) */
+const MAX_FRAME_EXTENSION = Math.ceil(8.0 * 60 - FPS_EPSILON) + 1 + Math.ceil(0.75 * 60) + 1 + 1;
 
 type BeatEvent = {
     beat: number;
@@ -33,11 +35,13 @@ export class BestdoriChartParser {
     public buildLevelSummary(chart: Chart, level: number): SongLevelSummary {
         const normalized = this.normalizeChart(chart);
         const counts = this.buildCounts(normalized);
+        const overlaps = this.computeOverlaps(normalized);
 
         return {
             level,
             total: normalized.total,
             counts,
+            ...(overlaps && { overlaps }),
         };
     }
 
@@ -113,20 +117,116 @@ export class BestdoriChartParser {
     }
 
     /**
-     * 帧计数: note 受加成 ⇔ ceil(noteTime*fps) ∈ (ceil(skillTime*fps), ceil(skillTime*fps) + ceil(dur*fps) + 1]
+     * 计算技能排队偏移修正表。
+     *
+     * 当两个连续技能触发点的帧间隔 < MAX_FRAME_EXTENSION 时，前技能可能导致后技能排队。
+     * 对每个可能排队的 position 和每对 (d_prev, d_cur) 组合，计算：
+     *   delta = actualCount(排队窗口) - baselineCount(触发时刻窗口)
+     *
+     * 帧模型精确计算：prevEnd 和 GAP 全部 ceil(×fps) 量化到帧号。
+     * 仅返回 delta ≠ 0 的项，无排队则返回 undefined。
+     */
+    private computeOverlaps(normalized: NormalizedChart): Record<number, Record<string, Record<string, number>>> | undefined {
+        const skillEvents = normalized.skillEvents;
+        const noteEvents = normalized.noteEvents;
+
+        const overlaps: Record<number, Record<string, Record<string, number>>> = {};
+
+        for (let i = 1; i < skillEvents.length; i++) {
+            // 用 60fps 帧间隔做快速预检：间隔够大则任何 duration 都不会排队
+            const FsPrev = Math.ceil(skillEvents[i - 1].seconds * 60);
+            const FsCur = Math.ceil(skillEvents[i].seconds * 60);
+            if (FsCur - FsPrev >= MAX_FRAME_EXTENSION) continue;
+
+            const shifts = this.computePositionShifts(
+                noteEvents,
+                skillEvents[i - 1].seconds,
+                skillEvents[i].seconds,
+            );
+            if (Object.keys(shifts).length > 0) {
+                overlaps[i] = shifts;
+            }
+        }
+
+        return Object.keys(overlaps).length > 0 ? overlaps : undefined;
+    }
+
+    /**
+     * 帧模型精确版：对指定 position 计算 shifts 二维表。
+     * shifts[d_prev][d_cur] = encodeCount(delta120, delta60 - delta120)
+     * 复用 counts 的 4-bit 编码，同时存 60fps 和 120fps 的偏移量。
+     */
+    private computePositionShifts(
+        noteEvents: BeatEvent[],
+        triggerPrev: number,
+        triggerCur: number,
+    ): Record<string, Record<string, number>> {
+        const shifts: Record<string, Record<string, number>> = {};
+
+        for (const dPrev of SKILL_DURATIONS) {
+            const durPrev = Number(dPrev);
+
+            // 60fps 排队窗口
+            const Fs60Prev = Math.ceil(triggerPrev * 60);
+            const cov60 = Math.ceil(durPrev * 60 - FPS_EPSILON) + 1;
+            const gap60 = Math.ceil(0.75 * 60) + 1 + 1;
+            const Fs60Bonus = Fs60Prev + cov60 + gap60;
+            const Fs60Cur = Math.max(Math.ceil(triggerCur * 60), Fs60Bonus);
+            const delayed60 = Fs60Cur / 60;
+
+            // 120fps 排队窗口
+            const Fs120Prev = Math.ceil(triggerPrev * 120);
+            const cov120 = Math.ceil(durPrev * 120 - FPS_EPSILON) + 1;
+            const gap120 = Math.ceil(0.75 * 120) + 1 + 1;
+            const Fs120Bonus = Fs120Prev + cov120 + gap120;
+            const Fs120Cur = Math.max(Math.ceil(triggerCur * 120), Fs120Bonus);
+            const delayed120 = Fs120Cur / 120;
+
+            // 都没延迟则跳过
+            if (Fs60Cur === Math.ceil(triggerCur * 60) && Fs120Cur === Math.ceil(triggerCur * 120)) {
+                continue;
+            }
+
+            const shiftsForPrev: Record<string, number> = {};
+
+            for (const dCur of SKILL_DURATIONS) {
+                const durCur = Number(dCur);
+                const bl60 = this.countNotesInWindow(noteEvents, triggerCur, durCur, 60);
+                const ac60 = this.countNotesInWindow(noteEvents, delayed60, durCur, 60);
+                const bl120 = this.countNotesInWindow(noteEvents, triggerCur, durCur, 120);
+                const ac120 = this.countNotesInWindow(noteEvents, delayed120, durCur, 120);
+
+                const delta60 = ac60 - bl60;
+                const delta120 = ac120 - bl120;
+
+                if (delta60 !== 0 || delta120 !== 0) {
+                    shiftsForPrev[dCur] = this.encodeCount(delta120, delta60 - delta120);
+                }
+            }
+
+            if (Object.keys(shiftsForPrev).length > 0) {
+                shifts[dPrev] = shiftsForPrev;
+            }
+        }
+
+        return shifts;
+    }
+
+    /**
+     * 帧计数: note 受加成 ⇔ ceil(noteTime*fps) ∈ (ceil(skillStartTime*fps), ceil(skillStartTime*fps) + ceil(dur*fps) + 1]
      */
     private countNotesInWindow(
         noteEvents: BeatEvent[],
-        skillTime: number,
+        skillStartTime: number,
         durationSec: number,
         fps: number,
     ): number {
-        const Fs = Math.ceil(skillTime * fps);
+        const Fs = Math.ceil(skillStartTime * fps);
         const Fe = Fs + Math.ceil(durationSec * fps - FPS_EPSILON) + 1;
 
         let count = 0;
         for (const note of noteEvents) {
-            if (note.seconds <= skillTime) continue;
+            if (note.seconds <= skillStartTime) continue;
             const Fn = Math.ceil(note.seconds * fps);
             if (Fn > Fs && Fn <= Fe) count++;
             else if (Fn > Fe) break; // noteEvents are time-sorted; remaining notes are beyond the window

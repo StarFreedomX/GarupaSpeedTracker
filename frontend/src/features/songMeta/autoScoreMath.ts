@@ -96,19 +96,27 @@ export function calcScore(
     autoPara: number,
     fps: FpsOption = 120,
 ): { maxScore: number; minScore: number; maxPath: number[]; minPath: number[] } {
-    /**
-     * 构造增量矩阵 (5x5)
-     * 这里我们用简化模型：增量 = ⌊ 基础分 * 技能加成倍率 ⌋
-     * 虽然 ⌊base * (1+up)⌋ 和 base + ⌊base * up⌋ 在数学上不完全相等，
-     * 但对于“寻找最优顺序”这个任务来说，这个权重矩阵的单调性是足够的。
-     */
-    const bonusMatrix = skills.map((skill) => {
-        const countsRow = songLevelSummary.counts[skill.duration];
-        return [0, 1, 2, 3, 4].map((posIdx) => computeSkillWeight(skill, decodeNoteCount(countsRow[posIdx] ?? 0, fps)));
-    });
+    const { counts, overlaps } = songLevelSummary;
 
-    // 粗筛：寻找最优/最劣的路径 (索引映射)
-    const { max, min } = findExtremes(bonusMatrix);
+    /**
+     * 动态计算单个 (skill, position) 的 note 数（含排队偏移）
+     * 回溯时还不知道前一个技能是谁，用 null 表示"未确定"
+     */
+    const getNoteCount = (skill: Skill, pos: number, prevSkill: Skill | null): number => {
+        let notes = decodeNoteCount(counts[skill.duration]?.[pos] ?? 0, fps);
+        if (pos > 0 && prevSkill && overlaps?.[pos]) {
+            const deltaEncoded = overlaps[pos]?.[prevSkill.duration]?.[skill.duration];
+            if (deltaEncoded !== undefined) {
+                notes += decodeNoteCount(deltaEncoded, fps);
+            }
+        }
+        return notes;
+    };
+
+    // 回溯搜索（5! = 120 排列，剪枝无必要，直接穷举）
+    const { max, min } = findExtremes(skills, (skill, pos, prevSkill) => {
+        return computeSkillWeight(skill, getNoteCount(skill, pos, prevSkill));
+    });
 
     /**
      * 精算：根据粗筛出来的 Path，带入原本的精确公式计算
@@ -153,7 +161,16 @@ export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songL
         const skill = skills[i];
 
         // 技能覆盖的后续 Note (decoded from 4-bit binary encoding for the selected fps)
-        const notesAfterTrigger = decodeNoteCount(songLevelSummary.counts[skill.duration]?.[i] ?? 0, fps);
+        let notesAfterTrigger = decodeNoteCount(songLevelSummary.counts[skill.duration]?.[i] ?? 0, fps);
+
+        // 技能排队偏移修正：当两个连续触发点间隔 < 8.8s 时，后技能可能被排队延迟
+        if (i > 0 && songLevelSummary.overlaps?.[i]) {
+            const prevDuration = skills[i - 1].duration;
+            const deltaEncoded = songLevelSummary.overlaps[i]?.[prevDuration]?.[skills[i].duration];
+            if (deltaEncoded !== undefined) {
+                notesAfterTrigger += decodeNoteCount(deltaEncoded, fps);
+            }
+        }
         totalScore += computeSkillScore(baseAutoScore, skill, notesAfterTrigger);
 
         // 累计消耗的物量
@@ -170,69 +187,51 @@ export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songL
 }
 
 /**
- * 寻找技能分配的最优解（即最大分数/最小分数）
- * 使用回溯算法，配合剪枝优化
- * @param matrix
+ * 寻找技能分配的最优解（即最大分数/最小分数）。
+ * 5 个技能分配到位置 0-4，全排列 5! = 120，直接枚举。
+ *
+ * @param skills 五个技能的数组（队长的位置固定是 5，不在排列内）
+ * @param weightFn (skill, position, prevSkill | null) → 该位置的得分权重
+ *   prevSkill 为位置 pos-1 的技能，pos=0 时为 null
  */
-function findExtremes(matrix: number[][]) {
-    const n = matrix.length;
+function findExtremes(
+    skills: Skill[],
+    weightFn: (skill: Skill, pos: number, prevSkill: Skill | null) => number,
+): { max: { score: number; path: number[] }; min: { score: number; path: number[] } } {
+    const n = skills.length;
 
-    // 初始化最大/最小状态
     let maxScore = Number.NEGATIVE_INFINITY;
     let minScore = Number.POSITIVE_INFINITY;
     let bestMaxPath: number[] = new Array(n).fill(-1);
     let bestMinPath: number[] = new Array(n).fill(-1);
 
     const currentPath = new Array(n).fill(-1);
-    const usedCols = new Array(n).fill(false);
+    const used = new Array(n).fill(false);
+    // ordered[pos] = Skill，回溯过程中按位填充，作为 prevSkill 传递给下一行
+    const ordered = new Array(n).fill(null) as (Skill | null)[];
 
-    // --- 预处理：潜力评估表 ---
-    const rowMaxValues = matrix.map((row) => Math.max(...row));
-    const rowMinValues = matrix.map((row) => Math.min(...row));
-
-    const suffixMax = new Array(n + 1).fill(0);
-    const suffixMin = new Array(n + 1).fill(0);
-
-    for (let i = n - 1; i >= 0; i--) {
-        suffixMax[i] = suffixMax[i + 1] + rowMaxValues[i];
-        suffixMin[i] = suffixMin[i + 1] + rowMinValues[i];
-    }
-
-    function backtrack(row: number, currentSum: number) {
-        if (row === n) {
-            // 更新最大值
-            if (currentSum > maxScore) {
-                maxScore = currentSum;
-                bestMaxPath = [...currentPath];
-            }
-            // 更新最小值
-            if (currentSum < minScore) {
-                minScore = currentSum;
-                bestMinPath = [...currentPath];
-            }
+    function backtrack(pos: number, currentSum: number) {
+        if (pos === n) {
+            if (currentSum > maxScore) { maxScore = currentSum; bestMaxPath = [...currentPath]; }
+            if (currentSum < minScore) { minScore = currentSum; bestMinPath = [...currentPath]; }
             return;
         }
 
-        // 双向剪枝
-        // 如果当前路径既不可能比 max 更大，也不可能比 min 更小
-        // 那么这个分支才真正失去了搜索价值
-        const potentialMax = currentSum + suffixMax[row];
-        const potentialMin = currentSum + suffixMin[row];
+        const prevSkill = pos > 0 ? ordered[pos - 1] : null;
 
-        if (potentialMax <= maxScore && potentialMin >= minScore) {
-            return;
-        }
+        for (let si = 0; si < n; si++) {
+            if (used[si]) continue;
 
-        for (let col = 0; col < n; col++) {
-            if (!usedCols[col]) {
-                usedCols[col] = true;
-                currentPath[row] = col;
+            used[si] = true;
+            currentPath[si] = pos;
+            ordered[pos] = skills[si];
 
-                backtrack(row + 1, currentSum + matrix[row][col]);
+            const weight = weightFn(skills[si], pos, prevSkill);
+            backtrack(pos + 1, currentSum + weight);
 
-                usedCols[col] = false;
-                currentPath[row] = -1;
-            }
+            ordered[pos] = null;
+            currentPath[si] = -1;
+            used[si] = false;
         }
     }
 
