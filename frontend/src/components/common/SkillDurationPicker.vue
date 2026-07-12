@@ -8,7 +8,6 @@ const props = defineProps<{
 const emit = defineEmits<(e: "update:modelValue", value: string) => void>();
 
 const INTEGER_OPTIONS = [3, 4, 5, 6, 7, 8] as const;
-const DECIMAL_OPTIONS = Array.from({ length: 10 }, (_, i) => i);
 
 const open = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
@@ -32,9 +31,18 @@ const toggle = () => {
     open.value = !open.value;
 };
 
+/** 每个整数对应的有效小数位（基于 skills/all.10.json 实际出现的时长） */
+const VALID_DECIMALS: Record<number, number[]> = {
+    3: [0, 5],
+    4: [0, 5],
+    5: [0, 5, 6, 7],
+    6: [0, 2, 4, 5, 8],
+    7: [0, 2, 5],
+    8: [0],
+};
+
 const availableDecimals = computed(() => {
-    if (pendingInteger.value >= 8) return [0];
-    return DECIMAL_OPTIONS;
+    return VALID_DECIMALS[pendingInteger.value] ?? [0];
 });
 
 const selectInteger = (int: number) => {
@@ -95,19 +103,14 @@ watch(open, (isOpen) => {
                 <!-- 右栏：小数位（点击确认并关闭） -->
                 <div class="flex max-h-48 flex-col overflow-y-auto py-1">
                     <button
-                        v-for="dec in DECIMAL_OPTIONS"
+                        v-for="dec in availableDecimals"
                         :key="dec"
                         type="button"
                         class="min-w-[2.5rem] px-4 py-1.5 text-left text-sm transition-colors"
-                        :class="[
-                            !availableDecimals.includes(dec)
-                                ? 'cursor-not-allowed text-muted/40'
-                                : dec === parsed.decimal && pendingInteger === parsed.integer
-                                  ? 'bg-primary/15 text-primary font-medium'
-                                  : 'text-text hover:bg-primary/20',
-                        ]"
-                        :disabled="!availableDecimals.includes(dec)"
-                        @click.stop="availableDecimals.includes(dec) && selectDecimal(dec)"
+                        :class="dec === parsed.decimal && pendingInteger === parsed.integer
+                            ? 'bg-primary/15 text-primary font-medium'
+                            : 'text-text hover:bg-primary/20'"
+                        @click.stop="selectDecimal(dec)"
                     >
                         .{{ dec }}
                     </button>

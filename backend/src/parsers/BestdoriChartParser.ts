@@ -1,8 +1,12 @@
 import type { Chart, ChartItem, ConnectionNote } from "@/types/bestdori/chart";
 import type { SkillDuration, SongLevelSummary } from "@/types/songMetadata";
 
-/** 3.0 到 8.0，步长 0.1，共 51 个技能时长 */
-const SKILL_DURATIONS: SkillDuration[] = Array.from({ length: 51 }, (_, i) => ((30 + i) / 10).toFixed(1) as SkillDuration);
+/** 基于 skills/all.10.json 的实际技能时长，共 17 个 */
+const SKILL_DURATIONS: SkillDuration[] = [
+    "3.0", "3.5", "4.0", "4.5", "5.0",
+    "5.5", "5.6", "5.7", "6.0", "6.2", "6.4", "6.5", "6.8", "7.0", "7.2", "7.5",
+    "8.0",
+];
 const DEFAULT_BPM = 120;
 const TARGET_SKILL_COUNT = 6;
 const FPS_EPSILON = 1e-9;
