@@ -288,8 +288,17 @@ export class BestdoriSongMetadataService {
             if (!difficulty) continue;
 
             let chart: Chart;
+            const chartPath = path.join(this.rawDir, String(songId), `${definition.name}.json`);
             try {
-                chart = await fetchBestdoriChart(songId, definition.name, this.downloader);
+                // 本地已有谱面文件则直接读取，避免重复下载
+                if (this.rawChartStorage && (await fs.pathExists(chartPath))) {
+                    chart = await fs.readJson(chartPath);
+                } else {
+                    chart = await fetchBestdoriChart(songId, definition.name, this.downloader);
+                    if (this.rawChartStorage) {
+                        await writeJson(chartPath, chart);
+                    }
+                }
             } catch (error: unknown) {
                 const nodeError = error as { message?: string };
                 logger("bestdori", `chart fetch failed song=${songId} difficulty=${definition.name}: ${nodeError.message ?? "unknown error"}`);
@@ -297,9 +306,6 @@ export class BestdoriSongMetadataService {
             }
 
             chartCount += 1;
-            if (this.rawChartStorage) {
-                await writeJson(path.join(this.rawDir, String(songId), `${definition.name}.json`), chart);
-            }
 
             const level = levels[index] ?? difficulty.playLevel;
             summary[definition.key] = this.chartParser.buildLevelSummary(chart, level);
