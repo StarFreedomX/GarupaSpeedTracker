@@ -1,5 +1,26 @@
 import type { Skill, SongLevelSummary } from "@/types/songMetadata";
 
+/** 4-bit binary encoding denominator (smmm/16). */
+const ENCODE_DENOM = 16;
+
+export type FpsOption = 60 | 120;
+
+/**
+ * Decode a 4-bit binary-encoded note count.
+ * Encoding: integer part = 120fps count, fractional part = (smmm)/16.
+ *   s = sign (0=+, 1=-), mmm = |60fps - 120fps|.
+ */
+function decodeNoteCount(value: number, fps: FpsOption): number {
+    const count120 = Math.floor(value);
+    if (fps === 120) return count120;
+    // 60fps: decode diff from fractional part
+    const binaryValue = Math.round((value - count120) * ENCODE_DENOM);
+    const sign = (binaryValue >> 3) & 1;
+    const magnitude = binaryValue & 0b0111;
+    const diff = sign === 0 ? magnitude : -magnitude;
+    return count120 + diff;
+}
+
 /**
  * 计算技能在覆盖 noteCount 个Note时的近似权重，用于 findExtremes 回溯搜索。
  *
@@ -73,6 +94,7 @@ export function calcScore(
     centerSkill: Skill,
     songLevelSummary: SongLevelSummary,
     autoPara: number,
+    fps: FpsOption = 120,
 ): { maxScore: number; minScore: number; maxPath: number[]; minPath: number[] } {
     /**
      * 构造增量矩阵 (5x5)
@@ -82,7 +104,7 @@ export function calcScore(
      */
     const bonusMatrix = skills.map((skill) => {
         const countsRow = songLevelSummary.counts[skill.duration];
-        return [0, 1, 2, 3, 4].map((posIdx) => computeSkillWeight(skill, countsRow[posIdx] ?? 0));
+        return [0, 1, 2, 3, 4].map((posIdx) => computeSkillWeight(skill, decodeNoteCount(countsRow[posIdx] ?? 0, fps)));
     });
 
     // 粗筛：寻找最优/最劣的路径 (索引映射)
@@ -97,7 +119,7 @@ export function calcScore(
         path.forEach((posIdx, skillIdx) => {
             orderedSkills[posIdx] = skills[skillIdx];
         });
-        return calcExactScoreInTurns(totalPower, [...orderedSkills, centerSkill], songLevelSummary, autoPara);
+        return calcExactScoreInTurns(totalPower, [...orderedSkills, centerSkill], songLevelSummary, autoPara, fps);
     };
 
     return {
@@ -115,7 +137,7 @@ export function calcScore(
  * @param songLevelSummary 谱面数据
  * @param autoPara auto倍率参数
  */
-export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songLevelSummary: SongLevelSummary, autoPara: number): number {
+export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songLevelSummary: SongLevelSummary, autoPara: number, fps: FpsOption = 120): number {
     const songLevel = songLevelSummary.level;
     // 1. 计算基础自动分数 (整数)
     const baseAutoScore = Math.floor((3 * autoPara * totalPower * (1 + (songLevel - 5) / 100)) / songLevelSummary.total);
@@ -130,8 +152,8 @@ export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songL
         // 第 6 个时段固定取队长技能：skills[5]
         const skill = skills[i];
 
-        // 技能覆盖的后续 Note
-        const notesAfterTrigger = songLevelSummary.counts[skill.duration]?.[i] ?? 0;
+        // 技能覆盖的后续 Note (decoded from 4-bit binary encoding for the selected fps)
+        const notesAfterTrigger = decodeNoteCount(songLevelSummary.counts[skill.duration]?.[i] ?? 0, fps);
         totalScore += computeSkillScore(baseAutoScore, skill, notesAfterTrigger);
 
         // 累计消耗的物量

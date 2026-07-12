@@ -4,6 +4,7 @@ import { calcEventPT } from "@/features/PT/calcSinglePT";
 import { calcExactScoreInTurns } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
 import type { Skill, SongLevelSummary } from "@/types/songMetadata";
+import type { FpsOption } from "@/features/songMeta/autoScoreMath";
 import DraggableSkillList from "./DraggableSkillList.vue";
 
 const { t } = useI18n();
@@ -25,6 +26,7 @@ const props = defineProps<{
     activityType: ActivityType;
     supportBandPower: number;
     eventBonus: number;
+    fps: FpsOption;
 }>();
 
 const emit = defineEmits<(e: "close") => void>();
@@ -68,7 +70,7 @@ const calcError = ref("");
 const exactScore = computed(() => {
     try {
         calcError.value = "";
-        return calcExactScoreInTurns(props.totalPower, orderedSkills.value, props.songLevelSummary, props.autoPara);
+        return calcExactScoreInTurns(props.totalPower, orderedSkills.value, props.songLevelSummary, props.autoPara, props.fps);
     } catch (err) {
         calcError.value = t("auto.detail.error");
         console.error("Exact score calc error:", err);

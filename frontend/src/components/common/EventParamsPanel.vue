@@ -13,6 +13,7 @@ const props = withDefaults(
         eventBonus: number;
         autoPara: number;
         autoPreset: "cn" | "jp" | "others";
+        fps: 60 | 120;
         showSupportBand: boolean;
         showEventBonus: boolean;
         activityTypeEditable?: boolean;
@@ -20,6 +21,7 @@ const props = withDefaults(
     }>(),
     {
         activityTypeEditable: false,
+        fps: 120,
     },
 );
 
@@ -30,6 +32,7 @@ const emit = defineEmits<{
     (e: "update:eventBonus", value: number): void;
     (e: "update:autoPara", value: number): void;
     (e: "update:autoPreset", value: "cn" | "jp" | "others"): void;
+    (e: "update:fps", value: 60 | 120): void;
 }>();
 
 const AUTO_PRESETS = [
@@ -159,6 +162,19 @@ const onAutoPresetChange = (e: Event) => {
                         {{ t('auto.config.rateLabel') }} {{ autoPara }}
                     </span>
                 </div>
+            </div>
+
+            <!-- Frame rate -->
+            <div class="flex items-center gap-3">
+                <span class="w-20 shrink-0 text-sm text-muted">{{ t('auto.config.fps') }}</span>
+                <select
+                    :value="fps"
+                    class="w-28 rounded border border-border/80 bg-surface/90 px-2 py-1.5 text-sm text-text"
+                    @change="emit('update:fps', Number(($event.target as HTMLSelectElement).value) as 60 | 120)"
+                >
+                    <option :value="120">120 FPS</option>
+                    <option :value="60">60 FPS</option>
+                </select>
             </div>
 
             <!-- Slot for extra actions (e.g. calculate button) -->

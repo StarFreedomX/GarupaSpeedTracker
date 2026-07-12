@@ -5,6 +5,9 @@ import type { SkillDuration, SongLevelSummary } from "@/types/songMetadata";
 const SKILL_DURATIONS: SkillDuration[] = Array.from({ length: 51 }, (_, i) => ((30 + i) / 10).toFixed(1) as SkillDuration);
 const DEFAULT_BPM = 120;
 const TARGET_SKILL_COUNT = 6;
+const FPS_EPSILON = 1e-9;
+/** 4-bit binary: smmm/16. s=sign, mmm=magnitude(0-7). All fractions are powers of 2 → IEEE 754 exact. */
+const ENCODE_DENOM = 16;
 
 type BeatEvent = {
     beat: number;
@@ -77,36 +80,66 @@ export class BestdoriChartParser {
             .map((event) => [event.beat, event.bpm] as BpmPoint);
     }
 
+    /**
+     * 帧计数模型：技能窗口 = ceil(duration*fps) 次递减 + 1 帧结束红利。
+     *
+     * 输出编码: base + v/16，v 是 4-bit smmm:
+     *   s=符号位(0=+, 1=-), mmm=|60fps-120fps|(0-7)
+     * 例如 5.125 = 5 + 2/16 → 120fps=5, diff=+2, 60fps=7.
+     */
     private buildCounts(normalized: NormalizedChart): Record<SkillDuration, number[]> {
-        const counts = {} as Record<SkillDuration, number[]>;
         const skillEvents = normalized.skillEvents.slice();
 
-        // The game design requires exactly TARGET_SKILL_COUNT skill trigger points per chart.
-        // If the parsed chart does not contain exactly that many, fail fast so data issues
-        // (missing or extra skill markers) are surfaced instead of silently padding.
         if (skillEvents.length !== TARGET_SKILL_COUNT) {
             throw new Error(`Expected ${TARGET_SKILL_COUNT} skill events, but parsed ${skillEvents.length}.`);
         }
 
+        const counts = {} as Record<SkillDuration, number[]>;
+
         for (const duration of SKILL_DURATIONS) {
-            const windowSeconds = Number(duration);
+            const durSec = Number(duration);
             counts[duration] = skillEvents.map((skillEvent) => {
-                const windowEnd = skillEvent.seconds + windowSeconds;
-                return normalized.noteEvents.reduce((sum, noteEvent) => {
-                    if (noteEvent.seconds <= skillEvent.seconds) {
-                        return sum;
-                    }
-
-                    if (noteEvent.seconds > windowEnd) {
-                        return sum;
-                    }
-
-                    return sum + 1;
-                }, 0);
+                const c120 = this.countNotesInWindow(normalized.noteEvents, skillEvent.seconds, durSec, 120);
+                const c60 = this.countNotesInWindow(normalized.noteEvents, skillEvent.seconds, durSec, 60);
+                return this.encodeCount(c120, c60 - c120);
             });
         }
 
         return counts;
+    }
+
+    /**
+     * 帧计数: note 受加成 ⇔ ceil(noteTime*fps) ∈ (ceil(skillTime*fps), ceil(skillTime*fps) + ceil(dur*fps) + 1]
+     */
+    private countNotesInWindow(
+        noteEvents: BeatEvent[],
+        skillTime: number,
+        durationSec: number,
+        fps: number,
+    ): number {
+        const Fs = Math.ceil(skillTime * fps);
+        const Fe = Fs + Math.ceil(durationSec * fps - FPS_EPSILON) + 1;
+
+        let count = 0;
+        for (const note of noteEvents) {
+            if (note.seconds <= skillTime) continue;
+            const Fn = Math.ceil(note.seconds * fps);
+            if (Fn > Fs && Fn <= Fe) count++;
+            else if (Fn > Fe) break; // noteEvents are time-sorted; remaining notes are beyond the window
+        }
+        return count;
+    }
+
+    /**
+     * 4-bit binary encoding: base + (smmm)/16.
+     * s=sign(0=+,1=-), mmm=magnitude(0-7).
+     */
+    private encodeCount(base: number, diff: number): number {
+        if (diff === 0) return base; // clean integer
+        const signBit = diff > 0 ? 0 : 1;
+        const magnitude = Math.abs(diff);
+        const binaryValue = (signBit << 3) | magnitude;
+        return Math.round((base + binaryValue / ENCODE_DENOM) * 10000) / 10000;
     }
 
     private buildBpmTimeline(bpmList: BpmPoint[]): Array<{ beat: number; bpm: number; seconds: number }> {

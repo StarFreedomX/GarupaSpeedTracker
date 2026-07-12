@@ -56,6 +56,7 @@ const defaultFormData = {
     supportBandPower: 0,
     eventBonus: 0,
     autoPara: 0.75,
+    fps: 120 as 60 | 120,
 };
 
 const defaultSkills: Skill[] = [
@@ -470,7 +471,7 @@ function reverseCalcPower(
     let hi = 500_000;
     for (let i = 0; i < 32; i++) {
         const mid = Math.floor((lo + hi) / 2);
-        const score = calcExactScoreInTurns(mid, skills, songLevelSummary, autoPara);
+        const score = calcExactScoreInTurns(mid, skills, songLevelSummary, autoPara, formData.value.fps);
         if (score < targetScore) {
             lo = mid + 1;
         } else {
@@ -514,7 +515,7 @@ const bonusRows = computed(() => {
         if (!levelSummary) return [];
 
         // 计算最优技能顺序
-        const { maxPath } = calcScore(cfg.totalPower, cfg.skills, center, levelSummary, cfg.autoPara);
+        const { maxPath } = calcScore(cfg.totalPower, cfg.skills, center, levelSummary, cfg.autoPara, formData.value.fps);
         const orderedSkills = new Array<Skill>(5);
         maxPath.forEach((posIdx, skillIdx) => {
             orderedSkills[posIdx] = cfg.skills[skillIdx];
@@ -721,6 +722,7 @@ const bonusRows = computed(() => {
                 :event-bonus="formData.eventBonus"
                 :auto-para="formData.autoPara"
                 :auto-preset="autoPreset"
+                :fps="formData.fps"
                 :show-support-band="showSupportBand"
                 :show-event-bonus="showEventBonus"
                 :activity-type-editable="true"
@@ -731,6 +733,7 @@ const bonusRows = computed(() => {
                 @update:event-bonus="formData.eventBonus = $event"
                 @update:auto-para="formData.autoPara = $event"
                 @update:auto-preset="autoPreset = $event"
+                @update:fps="formData.fps = $event"
             />
 
             <SkillConfigPanel

@@ -98,6 +98,7 @@ const zhCN = {
             supportPower: "副队综合力",
             eventBonus: "加成(%)",
             autoRate: "Auto倍率",
+            fps: "帧率",
             rateLabel: "倍率 =",
             ratePlaceholder: "输入倍率",
             skillConfig: "技能配置",

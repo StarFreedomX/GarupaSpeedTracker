@@ -119,6 +119,7 @@ const enUS = {
             supportPower: "Support Band Power",
             eventBonus: "Event Bonus (%)",
             autoRate: "Auto Rate",
+            fps: "FPS",
             rateLabel: "Rate =",
             ratePlaceholder: "Enter rate",
             skillConfig: "Skill Configuration",

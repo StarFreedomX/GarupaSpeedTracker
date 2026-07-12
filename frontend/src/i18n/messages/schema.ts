@@ -97,6 +97,7 @@ export interface I18nMessages {
             supportPower: string;
             eventBonus: string;
             autoRate: string;
+            fps: string;
             rateLabel: string;
             ratePlaceholder: string;
             skillConfig: string;

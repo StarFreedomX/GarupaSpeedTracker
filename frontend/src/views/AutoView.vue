@@ -43,6 +43,7 @@ const defaultFormData = {
     supportBandPower: 0,
     eventBonus: 0,
     autoPara: 0.75,
+    fps: 120 as 60 | 120,
 };
 
 // 默认技能组
@@ -366,7 +367,7 @@ onMounted(() => {
 // 计算单个歌曲
 const calculateSong = (songId: number, songSummary: SongLevelSummary, difficultyKey: string) => {
     try {
-        const scoreResult = calcScore(formData.value.totalPower, skills.value, centerSkill.value, songSummary, formData.value.autoPara);
+        const scoreResult = calcScore(formData.value.totalPower, skills.value, centerSkill.value, songSummary, formData.value.autoPara, formData.value.fps);
 
         const minScore = Math.floor(scoreResult.minScore);
         const maxScore = Math.floor(scoreResult.maxScore);
@@ -491,6 +492,7 @@ const calculate = () => {
                 :event-bonus="formData.eventBonus"
                 :auto-para="formData.autoPara"
                 :auto-preset="autoPreset"
+                :fps="formData.fps"
                 :show-support-band="showSupportBand"
                 :show-event-bonus="showEventBonus"
                 :activity-type-editable="true"
@@ -501,6 +503,7 @@ const calculate = () => {
                 @update:event-bonus="formData.eventBonus = $event"
                 @update:auto-para="formData.autoPara = $event"
                 @update:auto-preset="autoPreset = $event"
+                @update:fps="formData.fps = $event"
             >
                 <template #actions>
                     <div class="flex gap-2 pt-2">
@@ -652,6 +655,7 @@ const calculate = () => {
             :activity-type="formData.activityType"
             :support-band-power="formData.supportBandPower"
             :event-bonus="formData.eventBonus"
+            :fps="formData.fps"
             @close="showScoreModal = false"
         />
     </div>
