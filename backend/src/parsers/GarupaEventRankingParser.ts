@@ -61,6 +61,11 @@ const buildMusicRankingFromVersus = (entry: GarupaVersusMusicRankingResponse): M
 const buildMedleyReport = (data: GarupaMedleyEventRankingResponse): EventRankingBandoriRaw => ({
     eventPointTopUsers: buildUsers(data.eventPointTopUsers),
     eventPointBorderUsers: buildUsers(data.eventPointBorderUsers),
+    medleyMusicRanking: {
+        musicId: 1,
+        scoreTopUsers: buildUsers(data.scoreTopUsers),
+        scoreBorderUsers: buildUsers(data.scoreBorderUsers),
+    },
 });
 
 const buildChallengeReport = (data: GarupaChallengeEventRankingResponse): EventRankingBandoriRaw => ({

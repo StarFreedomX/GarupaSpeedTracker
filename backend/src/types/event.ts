@@ -6,6 +6,8 @@ export interface EventRankingBandoriRaw {
     eventPointTopUsers?: RankingUserRaw[];
     eventPointBorderUsers?: RankingUserRaw[];
     musicRankings?: MusicRankingBandoriRaw[];
+    /** Medley score ranking data included in the same protobuf response (no secondary fetch needed). */
+    medleyMusicRanking?: MusicRankingBandoriRaw;
 }
 
 export interface MusicRankingBandoriRaw {

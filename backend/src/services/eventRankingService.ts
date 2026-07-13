@@ -90,8 +90,6 @@ const buildMusicBorderBuckets = (
     return byTier;
 };
 
-const MEDLEY_EVENT_TYPES = new Set(["medley"]);
-
 // ============================================================================
 // Service
 // ============================================================================
@@ -302,21 +300,11 @@ class EventRankingService {
                             this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw),
                         );
                     }
-                } else if (MEDLEY_EVENT_TYPES.has(eventType)) {
-                    // medley: fetch music ranking with mid=1
-                    try {
-                        const musicRaw = await fetchEventRanking(server, eventId, eventType, clientVersion, 1);
-                        // medley music ranking uses scoreTopUsers/scoreBorderUsers at top level
-                        const medleyMusic: MusicRankingBandoriRaw = {
-                            musicId: 1,
-                            scoreTopUsers: musicRaw.eventPointTopUsers,
-                            scoreBorderUsers: musicRaw.eventPointBorderUsers,
-                        };
-                        await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
-                        await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic));
-                    } catch (err) {
-                        logger("eventRanking", `medley music fetch failed event=${eventId}: ${(err as Error)?.message || err}`);
-                    }
+                } else if (raw.medleyMusicRanking) {
+                    // Medley score data included in the first response, no extra fetch needed
+                    const medleyMusic = raw.medleyMusicRanking;
+                    await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
+                    await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic));
                 }
 
                 logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
@@ -333,7 +321,7 @@ class EventRankingService {
      * Persists an event top ranking snapshot to MongoDB.
      *
      * Converts raw ranking data into timestamped point records, groups
-     * them into 8-day buckets, and upserts the bucket document. Also
+     * them into 8-day buckets, and upserts the bucket document. Also,
      * upserts individual player profiles to the shared player collection.
      *
      * @param server    The game server identifier
