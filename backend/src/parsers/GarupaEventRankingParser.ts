@@ -91,7 +91,7 @@ const buildStoryReport = (data: GarupaStoryEventRankingResponse): EventRankingBa
 
 const buildMissionLiveReport = (data: GarupaMissionLiveEventRankingResponse): EventRankingBandoriRaw => ({
     eventPointTopUsers: buildUsers(data.topUsers),
-    eventPointBorderUsers: buildUsers(data.eventPointBorderUsers),
+    eventPointBorderUsers: buildUsers(data.borderUsers),
 });
 
 const buildTeamLiveFestivalReport = (data: GarupaTeamLiveFestivalEventRankingResponse): EventRankingBandoriRaw => ({

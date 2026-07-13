@@ -98,7 +98,7 @@ export interface GarupaChallengeEventRankingResponse {
 export interface GarupaMissionLiveEventRankingResponse {
     nearUsers?: GarupaRankingUserList;
     topUsers?: GarupaRankingUserList;
-    eventPointBorderUsers?: GarupaRankingUserList;
+    borderUsers?: GarupaRankingUserList;
 }
 export interface GarupaTeamLiveFestivalEventRankingResponse {
     nearUsers?: GarupaRankingUserList;
