@@ -4,6 +4,8 @@ import {
     MONGODB_MONTHLY_BORDER_POINTS_COLLECTION,
     MONGODB_MONTHLY_TOP_POINTS_COLLECTION,
     MONGODB_RANKING_PLAYERS_COLLECTION,
+    MONTHLY_POST_END_MAX_DURATION_MS,
+    MONTHLY_POST_END_POLL_INTERVAL_MS,
     MONTHLY_RANKING_REFRESH_INTERVAL_MS,
 } from "@/config";
 import { logger } from "@/logger";
@@ -65,6 +67,8 @@ export const getMonthlyRankingServerCount = (): number => garupaService.getServe
  * bootstrap check that backfills any missing monthly data.
  */
 class MonthlyRankingService {
+    private postEndLastFetch = new Map<string, number>();
+
     constructor() {
         garupaService.start();
     }
@@ -262,8 +266,11 @@ class MonthlyRankingService {
         await Promise.allSettled(
             servers.map(async (server) => {
                 const monthlyId = await monthlyRankingInfoService.getActiveMonthlyId(server);
-                if (!monthlyId) return;
-                await this.refreshServer(server, monthlyId);
+                if (monthlyId) {
+                    await this.refreshServer(server, monthlyId);
+                } else {
+                    await this.refreshPostEndIfNeeded(server);
+                }
             }),
         );
     }
@@ -295,6 +302,53 @@ class MonthlyRankingService {
                 await this.retryPersist("persistBorderByTier", () => this.persistBorderByTier(server, monthlyId, timestamp, raw));
                 logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
                 return;
+            },
+            { timeoutMs: 2000 },
+        );
+    }
+
+    /**
+     * Checks for recently-ended monthly rankings and polls them at reduced post-end frequency.
+     * Skips rankings where the post-end duration has expired or the poll interval hasn't elapsed.
+     */
+    private async refreshPostEndIfNeeded(server: number): Promise<void> {
+        const now = Date.now();
+        const detailList = await monthlyRankingInfoService.getMonthlyRankingDetailList();
+        for (const [monthlyIdStr, detail] of Object.entries(detailList)) {
+            const monthlyId = Number(monthlyIdStr);
+            const endAt = detail.endAt?.[server];
+            if (typeof endAt !== "number") continue;
+
+            if (now <= endAt || now > endAt + MONTHLY_POST_END_MAX_DURATION_MS) continue;
+
+            const key = `${server}-${monthlyId}`;
+            const lastFetch = this.postEndLastFetch.get(key) ?? 0;
+            if (now - lastFetch < MONTHLY_POST_END_POLL_INTERVAL_MS) continue;
+
+            await this.refreshServerPostEnd(server, monthlyId, endAt);
+        }
+    }
+
+    /**
+     * Post-end polling variant of {@link refreshServer} for monthly rankings.
+     * Uses `endAt` as the snapshot timestamp and replaces existing endAt entries
+     * instead of appending.
+     */
+    private async refreshServerPostEnd(server: number, monthlyId: number, endAt: number): Promise<void> {
+        const key = `${server}-${monthlyId}`;
+        this.postEndLastFetch.set(key, Date.now());
+
+        await garupaService.runWithAvailability(
+            server,
+            async () => {
+                const currentVersion = getClientVersion(server);
+                const raw = await fetchMonthlyRanking(server, monthlyId, currentVersion);
+                const timestamp = endAt;
+
+                await this.retryPersist("persistTopSnapshotReplace", () => this.persistTopSnapshotReplace(server, monthlyId, timestamp, raw));
+                await this.retryPersist("persistBorderByTierReplace", () => this.persistBorderByTierReplace(server, monthlyId, timestamp, raw));
+
+                logger("monthlyRanking", `post-end stored monthly=${monthlyId} server=${server}`);
             },
             { timeoutMs: 2000 },
         );
@@ -441,6 +495,128 @@ class MonthlyRankingService {
         }
 
         await Promise.all(writes);
+    }
+
+    // ========================================================================
+    // Persistence Helpers — Replace (Post-End)
+    // ========================================================================
+
+    /**
+     * Replaces point entries in a bucket document at the given timestamp.
+     * Filters out existing entries with the same timestamp and inserts new ones.
+     * Skips the write entirely if the new entries are identical to existing ones.
+     */
+    private async replacePointsInBucket(
+        collection: ReturnType<typeof database.collection>,
+        filter: Record<string, unknown>,
+        timestamp: number,
+        newPoints: Array<{ timestamp: number; uid: number; value: number }>,
+    ): Promise<void> {
+        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
+        if (existing && Array.isArray(existing.points)) {
+            const oldEntries = existing.points.filter((p: { timestamp: number }) => p.timestamp === timestamp);
+            if (
+                oldEntries.length === newPoints.length &&
+                oldEntries.every((p: { uid: number; value: number }, i: number) => p.uid === newPoints[i].uid && p.value === newPoints[i].value)
+            ) {
+                return; // no change
+            }
+        }
+        // Atomic: filter out old entries at this timestamp, then concat new ones
+        await collection.updateOne(
+            filter,
+            [
+                {
+                    $set: {
+                        points: {
+                            $concatArrays: [
+                                {
+                                    $filter: {
+                                        input: { $ifNull: ["$points", []] },
+                                        as: "item",
+                                        cond: { $ne: ["$$item.timestamp", timestamp] },
+                                    },
+                                },
+                                { $literal: newPoints },
+                            ],
+                        },
+                        updatedAt: { $literal: Date.now() },
+                    },
+                },
+            ],
+            { upsert: true },
+        );
+    }
+
+    /**
+     * Replaces cutoff entries in a border document at the given timestamp.
+     * Same replace-or-skip logic as {@link replacePointsInBucket}.
+     */
+    private async replaceCutoffsInBucket(
+        collection: ReturnType<typeof database.collection>,
+        filter: Record<string, unknown>,
+        timestamp: number,
+        newCutoffs: Array<{ time: number; ep: number }>,
+    ): Promise<void> {
+        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
+        if (existing && Array.isArray(existing.cutoffs)) {
+            const oldEntries = existing.cutoffs.filter((c: { time: number }) => c.time === timestamp);
+            if (oldEntries.length === newCutoffs.length && oldEntries.every((c: { ep: number }, i: number) => c.ep === newCutoffs[i].ep)) {
+                return;
+            }
+        }
+        // Atomic: filter out old entries at this timestamp, then concat new ones
+        await collection.updateOne(
+            filter,
+            [
+                {
+                    $set: {
+                        cutoffs: {
+                            $concatArrays: [
+                                {
+                                    $filter: {
+                                        input: { $ifNull: ["$cutoffs", []] },
+                                        as: "item",
+                                        cond: { $ne: ["$$item.time", timestamp] },
+                                    },
+                                },
+                                { $literal: newCutoffs },
+                            ],
+                        },
+                        updatedAt: { $literal: Date.now() },
+                    },
+                },
+            ],
+            { upsert: true },
+        );
+    }
+
+    // ========================================================================
+    // Persistence — Top Snapshot (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces monthly top snapshot entries at the given timestamp (post-end mode).
+     */
+    private async persistTopSnapshotReplace(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
+        const users = raw.monthlyRankingPointTopUsers;
+        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
+        await this.replacePointsInBucket(topCollection, { server, monthlyId, bucket }, timestamp, newPoints);
+    }
+
+    // ========================================================================
+    // Persistence — Border (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces monthly border cutoff entries at the given timestamp (post-end mode).
+     */
+    private async persistBorderByTierReplace(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
+        const byTier = buildBorderBuckets(raw, timestamp);
+        for (const [tier, cutoff] of byTier) {
+            await this.replaceCutoffsInBucket(borderCollection, { server, monthlyId, tier }, timestamp, [cutoff]);
+        }
     }
 
     // scheduling handled by garupaService poller

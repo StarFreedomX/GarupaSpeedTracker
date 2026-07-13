@@ -197,3 +197,14 @@ export const MONGODB_EVENT_INFO_COLLECTION = process.env.MONGODB_EVENT_INFO_COLL
 export const EVENT_RANKING_INFO_POLL_INTERVAL_MS = toNumber(process.env.EVENT_RANKING_INFO_POLL_INTERVAL_MS, 60 * 60 * 1000);
 /** Interval in ms between event ranking data refreshes. */
 export const EVENT_RANKING_REFRESH_INTERVAL_MS = toNumber(process.env.EVENT_RANKING_REFRESH_INTERVAL_MS, GARUPA_REFRESH_INTERVAL_SECONDS * 1000);
+
+// --- Post-end polling ---
+
+/** Polling interval in ms for event ranking after the event ends. */
+export const EVENT_POST_END_POLL_INTERVAL_MS = toNumber(process.env.EVENT_POST_END_POLL_INTERVAL_MS, 3_600_000);
+/** Max duration in ms to continue polling event ranking after the event ends. */
+export const EVENT_POST_END_MAX_DURATION_MS = toNumber(process.env.EVENT_POST_END_MAX_DURATION_MS, 86_400_000);
+/** Polling interval in ms for monthly ranking after the month ends. */
+export const MONTHLY_POST_END_POLL_INTERVAL_MS = toNumber(process.env.MONTHLY_POST_END_POLL_INTERVAL_MS, 3_600_000);
+/** Max duration in ms to continue polling monthly ranking after the month ends. */
+export const MONTHLY_POST_END_MAX_DURATION_MS = toNumber(process.env.MONTHLY_POST_END_MAX_DURATION_MS, 43_200_000);

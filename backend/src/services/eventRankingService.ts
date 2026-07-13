@@ -1,6 +1,8 @@
 import { fetchEventRanking } from "@/api/garupa";
 import {
     BESTDORI_API,
+    EVENT_POST_END_MAX_DURATION_MS,
+    EVENT_POST_END_POLL_INTERVAL_MS,
     EVENT_RANKING_REFRESH_INTERVAL_MS,
     MONGODB_EVENT_BORDER_POINTS_COLLECTION,
     MONGODB_EVENT_TOP_POINTS_COLLECTION,
@@ -103,6 +105,9 @@ const buildMusicBorderBuckets = (
  * active event data from the Bestdori API as a bootstrap step.
  */
 class EventRankingService {
+    /** Last post-end fetch timestamp per server-event key ("{server}-{eventId}"). */
+    private postEndLastFetch = new Map<string, number>();
+
     constructor() {
         garupaService.start();
     }
@@ -249,8 +254,11 @@ class EventRankingService {
         await Promise.allSettled(
             servers.map(async (server) => {
                 const eventId = await eventInfoService.getActiveEventId(server);
-                if (!eventId) return;
-                await this.refreshServer(server, eventId);
+                if (eventId) {
+                    await this.refreshServer(server, eventId);
+                } else {
+                    await this.refreshPostEndIfNeeded(server);
+                }
             }),
         );
     }
@@ -308,6 +316,82 @@ class EventRankingService {
                 }
 
                 logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
+            },
+            { timeoutMs: 2000 },
+        );
+    }
+
+    /**
+     * Checks for recently-ended events and polls them at reduced post-end frequency.
+     * Skips events where the post-end duration has expired or the poll interval hasn't elapsed.
+     */
+    private async refreshPostEndIfNeeded(server: number): Promise<void> {
+        const now = Date.now();
+        const detailList = await eventInfoService.getEventDetailList();
+        for (const [eventIdStr, detail] of Object.entries(detailList)) {
+            const eventId = Number(eventIdStr);
+            const endAt = detail.endAt?.[server];
+            if (typeof endAt !== "number") continue;
+
+            // Must be within post-end window: endAt < now <= endAt + maxDuration
+            if (now <= endAt || now > endAt + EVENT_POST_END_MAX_DURATION_MS) continue;
+
+            const key = `${server}-${eventId}`;
+            // Respect poll interval
+            const lastFetch = this.postEndLastFetch.get(key) ?? 0;
+            if (now - lastFetch < EVENT_POST_END_POLL_INTERVAL_MS) continue;
+
+            await this.refreshServerPostEnd(server, eventId, endAt);
+        }
+    }
+
+    /**
+     * Post-end polling variant of {@link refreshServer}.
+     * Uses `endAt` as the snapshot timestamp and replaces existing endAt entries
+     * instead of appending.
+     */
+    private async refreshServerPostEnd(server: number, eventId: number, endAt: number): Promise<void> {
+        const key = `${server}-${eventId}`;
+        this.postEndLastFetch.set(key, Date.now());
+
+        await garupaService.runWithAvailability(
+            server,
+            async () => {
+                const clientVersion = getClientVersion(server);
+                const eventType = await eventInfoService.getEventType(eventId);
+                if (!eventType) {
+                    logger("eventRanking", `post-end: eventId=${eventId} has no eventType, skipping`);
+                    return;
+                }
+
+                const raw = await fetchEventRanking(server, eventId, eventType, clientVersion);
+                const timestamp = endAt;
+
+                // Persist with replace mode
+                await this.retryPersist("persistEventTopSnapshotReplace", () => this.persistEventTopSnapshotReplace(server, eventId, timestamp, raw));
+                await this.retryPersist("persistEventBorderByTierReplace", () => this.persistEventBorderByTierReplace(server, eventId, timestamp, raw));
+
+                // Music rankings — same replace logic
+                if (raw.musicRankings && raw.musicRankings.length > 0) {
+                    for (const musicRaw of raw.musicRankings) {
+                        await this.retryPersist("persistMusicTopSnapshotReplace", () =>
+                            this.persistMusicTopSnapshotReplace(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                        );
+                        await this.retryPersist("persistMusicBorderByTierReplace", () =>
+                            this.persistMusicBorderByTierReplace(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                        );
+                    }
+                } else if (raw.medleyMusicRanking) {
+                    const medleyMusic = raw.medleyMusicRanking;
+                    await this.retryPersist("persistMusicTopSnapshotReplace", () =>
+                        this.persistMusicTopSnapshotReplace(server, eventId, 1, timestamp, medleyMusic),
+                    );
+                    await this.retryPersist("persistMusicBorderByTierReplace", () =>
+                        this.persistMusicBorderByTierReplace(server, eventId, 1, timestamp, medleyMusic),
+                    );
+                }
+
+                logger("eventRanking", `post-end stored event=${eventId} server=${server} type=${eventType}`);
             },
             { timeoutMs: 2000 },
         );
@@ -506,6 +590,175 @@ class EventRankingService {
         }
 
         await Promise.all(writes);
+    }
+
+    // ========================================================================
+    // Persistence Helpers — Replace (Post-End)
+    // ========================================================================
+
+    /**
+     * Replaces point entries in a bucket document at the given timestamp.
+     * Filters out existing entries with the same timestamp and inserts new ones.
+     * Skips to write entirely if the new entries are identical to existing ones.
+     */
+    private async replacePointsInBucket(
+        collection: ReturnType<typeof database.collection>,
+        filter: Record<string, unknown>,
+        timestamp: number,
+        newPoints: Array<{ timestamp: number; uid: number; value: number }>,
+    ): Promise<void> {
+        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
+        if (existing && Array.isArray(existing.points)) {
+            const oldEntries = existing.points.filter((p: { timestamp: number }) => p.timestamp === timestamp);
+            if (
+                oldEntries.length === newPoints.length &&
+                oldEntries.every((p: { uid: number; value: number }, i: number) => p.uid === newPoints[i].uid && p.value === newPoints[i].value)
+            ) {
+                return; // no change
+            }
+        }
+        // Atomic: filter out old entries at this timestamp, then concat new ones
+        await collection.updateOne(
+            filter,
+            [
+                {
+                    $set: {
+                        points: {
+                            $concatArrays: [
+                                {
+                                    $filter: {
+                                        input: { $ifNull: ["$points", []] },
+                                        as: "item",
+                                        cond: { $ne: ["$$item.timestamp", timestamp] },
+                                    },
+                                },
+                                { $literal: newPoints },
+                            ],
+                        },
+                        updatedAt: { $literal: Date.now() },
+                    },
+                },
+            ],
+            { upsert: true },
+        );
+    }
+
+    /**
+     * Replaces cutoff entries in a border document at the given timestamp.
+     * Same replace-or-skip logic as {@link replacePointsInBucket}.
+     */
+    private async replaceCutoffsInBucket(
+        collection: ReturnType<typeof database.collection>,
+        filter: Record<string, unknown>,
+        timestamp: number,
+        newCutoffs: Array<{ time: number; ep: number }>,
+    ): Promise<void> {
+        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
+        if (existing && Array.isArray(existing.cutoffs)) {
+            const oldEntries = existing.cutoffs.filter((c: { time: number }) => c.time === timestamp);
+            if (oldEntries.length === newCutoffs.length && oldEntries.every((c: { ep: number }, i: number) => c.ep === newCutoffs[i].ep)) {
+                return;
+            }
+        }
+        // Atomic: filter out old entries at this timestamp, then concat new ones
+        await collection.updateOne(
+            filter,
+            [
+                {
+                    $set: {
+                        cutoffs: {
+                            $concatArrays: [
+                                {
+                                    $filter: {
+                                        input: { $ifNull: ["$cutoffs", []] },
+                                        as: "item",
+                                        cond: { $ne: ["$$item.time", timestamp] },
+                                    },
+                                },
+                                { $literal: newCutoffs },
+                            ],
+                        },
+                        updatedAt: { $literal: Date.now() },
+                    },
+                },
+            ],
+            { upsert: true },
+        );
+    }
+
+    // ========================================================================
+    // Persistence — Event Top (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces event top snapshot entries at the given timestamp (post-end mode).
+     * Compares against existing entries with the same timestamp; skips write if unchanged.
+     */
+    private async persistEventTopSnapshotReplace(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
+        const users = raw.eventPointTopUsers ?? [];
+        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
+        await this.replacePointsInBucket(eventTopCollection, { server, eventId, bucket }, timestamp, newPoints);
+    }
+
+    // ========================================================================
+    // Persistence — Event Border (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces event border cutoff entries at the given timestamp (post-end mode).
+     */
+    private async persistEventBorderByTierReplace(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
+        const users = raw.eventPointBorderUsers ?? [];
+        const byTier = buildBorderBuckets(users, timestamp);
+        for (const [tier, cutoff] of byTier) {
+            const filter = { server, eventId, tier };
+            const newCutoffs = [cutoff];
+            await this.replaceCutoffsInBucket(eventBorderCollection, filter, timestamp, newCutoffs);
+        }
+    }
+
+    // ========================================================================
+    // Persistence — Music Top (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces music top snapshot entries at the given timestamp (post-end mode).
+     */
+    private async persistMusicTopSnapshotReplace(
+        server: number,
+        eventId: number,
+        musicId: number,
+        timestamp: number,
+        musicRaw: MusicRankingBandoriRaw,
+    ): Promise<void> {
+        const users = musicRaw.scoreTopUsers ?? [];
+        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
+        await this.replacePointsInBucket(musicTopCollection, { server, eventId, musicId, bucket }, timestamp, newPoints);
+    }
+
+    // ========================================================================
+    // Persistence — Music Border (Replace)
+    // ========================================================================
+
+    /**
+     * Replaces music border cutoff entries at the given timestamp (post-end mode).
+     */
+    private async persistMusicBorderByTierReplace(
+        server: number,
+        eventId: number,
+        musicId: number,
+        timestamp: number,
+        musicRaw: MusicRankingBandoriRaw,
+    ): Promise<void> {
+        const users = musicRaw.scoreBorderUsers ?? [];
+        const byTier = buildMusicBorderBuckets(users, timestamp);
+        for (const [tier, cutoff] of byTier) {
+            const filter = { server, eventId, musicId, tier };
+            const newCutoffs = [cutoff];
+            await this.replaceCutoffsInBucket(musicBorderCollection, filter, timestamp, newCutoffs);
+        }
     }
 
     // ========================================================================
