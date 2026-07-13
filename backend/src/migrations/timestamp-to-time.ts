@@ -17,11 +17,7 @@ import type { GarupaMetaDocument } from "@/types/garupaMeta";
 
 const MIGRATION_KEY = "timestamp-to-time";
 
-const topPointCollections = [
-    MONGODB_EVENT_TOP_POINTS_COLLECTION,
-    MONGODB_MUSIC_TOP_POINTS_COLLECTION,
-    MONGODB_MONTHLY_TOP_POINTS_COLLECTION,
-];
+const topPointCollections = [MONGODB_EVENT_TOP_POINTS_COLLECTION, MONGODB_MUSIC_TOP_POINTS_COLLECTION, MONGODB_MONTHLY_TOP_POINTS_COLLECTION];
 
 export async function migrateTimestampToTime(): Promise<void> {
     await database.ready();
@@ -46,10 +42,10 @@ export async function migrateTimestampToTime(): Promise<void> {
                         $map: {
                             input: { $ifNull: ["$points", []] },
                             as: "p",
-                                in: {
-                                    time: { $ifNull: ["$$p.time", "$$p.timestamp", 0] },
-                                    uid: "$$p.uid",
-                                    value: "$$p.value",
+                            in: {
+                                time: { $ifNull: ["$$p.time", "$$p.timestamp", 0] },
+                                uid: "$$p.uid",
+                                value: "$$p.value",
                             },
                         },
                     },

@@ -75,29 +75,23 @@ class MonthlyRankingService {
     }
 
     /**
-     * Initializes the service by running legacy data migrations, then
-     * launches a bootstrap check to backfill missing monthly data, and
-     * registers a poller to periodically refresh all active servers.
+     * Registers a poller with the Garupa service for periodic ranking refreshes.
+     * Call {@link bootstrap} first to run legacy migrations and backfill missing data.
      */
     start(): void {
         garupaService.start();
-
-        // 先迁移旧数据，再执行启动检查和注册轮询
-        this.migrateLegacyPlayers()
-            .then(() => this.migrateRenamePlayersCollection())
-            .then(() => {
-                // 异步触发启动检查：如果发现当前月榜没数据，立即抓取一次
-                this.bootstrapCheck().catch((err) => {
-                    logger("monthlyRanking", `Bootstrap check failed: ${err?.message || err}`);
-                });
-            })
-            .catch((err) => {
-                logger("monthlyRanking", `Legacy player migration failed: ${err?.message || err}`);
-                // 迁移失败不阻塞启动，但需要记录
-            });
-
-        // 注册定时轮询
         garupaService.registerPoller("monthlyRanking", async () => this.refreshAll(), MONTHLY_RANKING_REFRESH_INTERVAL_MS);
+    }
+
+    /**
+     * Runs legacy player data migrations, then backfills missing monthly
+     * ranking periods from the Garupa API. Call once before {@link start}
+     * to avoid race conditions with normal polling.
+     */
+    async bootstrap(): Promise<void> {
+        await this.migrateLegacyPlayers();
+        await this.migrateRenamePlayersCollection();
+        await this.bootstrapCheck();
     }
 
     /**

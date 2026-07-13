@@ -114,18 +114,27 @@ class EventRankingService {
     }
 
     /**
-     * Initializes the service by starting the Garupa service, registering
-     * a poller to periodically refresh all active servers, and launching
-     * a one-time bootstrap sync from Bestdori to seed historical event data.
+     * Registers a poller with the Garupa service for periodic ranking refreshes.
+     * Call {@link bootstrap} first to seed historical data from Bestdori.
      */
     start(): void {
         garupaService.start();
         garupaService.registerPoller("eventRanking", async () => this.refreshAll(), EVENT_RANKING_REFRESH_INTERVAL_MS);
+    }
 
-        // Bootstrap: fire-and-forget; during the window, requests 302 to Bestdori
-        this.bootstrapFromBestdori().catch((err) => {
-            logger("eventRanking", `Bestdori bootstrap sync failed: ${(err as Error)?.message || err}`);
-        });
+    /**
+     * Seeds active event data from the Bestdori API on first startup.
+     *
+     * For each configured server, checks whether local event top data
+     * already exists; if not, fetches event top points, player profiles,
+     * and border cutoffs for all tiers from Bestdori and persists them
+     * to MongoDB so that historical data is available immediately.
+     *
+     * Should complete before {@link start} to avoid race conditions
+     * with normal polling.
+     */
+    async bootstrap(): Promise<void> {
+        return this.bootstrapFromBestdori();
     }
 
     /**
