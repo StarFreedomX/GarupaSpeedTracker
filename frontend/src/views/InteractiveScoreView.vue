@@ -751,7 +751,7 @@ const bonusRows = computed(() => {
         <!-- ═══════ Step 3: Results ═══════ -->
         <div v-if="currentStep === 3">
             <!-- BPM rounding warning -->
-            <div class="rounded border border-yellow-400 bg-yellow-100 p-3 mb-3">
+<!--            <div class="rounded border border-yellow-400 bg-yellow-100 p-3 mb-3">
                 <div class="flex items-start gap-2">
                     <span class="text-lg shrink-0">⚠️</span>
                     <div class="space-y-1">
@@ -769,7 +769,7 @@ const bonusRows = computed(() => {
                         </p>
                     </div>
                 </div>
-            </div>
+            </div>-->
 
             <!-- Loading -->
             <div
