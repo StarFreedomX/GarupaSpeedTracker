@@ -11,6 +11,7 @@ import {
 import { logger } from "@/logger";
 import { garupaService } from "@/services/garupaService";
 import { monthlyRankingInfoService } from "@/services/monthlyRankingInfoService";
+import { buildTopSnapshot, queryBorderPoints, replaceCutoffsInBucket, replacePointsInBucket } from "@/services/rankingPersistenceHelpers";
 import { database } from "@/storage/dataBaseAdapter/mongodb";
 import type {
     MonthlyRankingBandoriRaw,
@@ -355,40 +356,15 @@ class MonthlyRankingService {
     }
 
     /**
-     * Retrieves the full monthly ranking top history for a given server
-     * and monthly ID. Aggregates point snapshots from all buckets, sorts
-     * them by timestamp, and resolves associated player metadata from the
-     * shared player collection.
+     * Retrieves the full monthly ranking top history for a given server and
+     * monthly ID. Delegates to {@link buildTopSnapshot}.
      *
      * @param server    The game server identifier
      * @param monthlyId The monthly ranking identifier
      * @returns Combined points array and player metadata
      */
     async getTopSnapshot(server: number, monthlyId: number): Promise<MonthlyRankingTopResponse> {
-        const query = await topCollection.find({ server, monthlyId });
-        const records = await query.sort({ bucket: 1 }).toArray();
-        if (records.length === 0) {
-            return { points: [], users: [] };
-        }
-
-        const points = records.flatMap((record) => record.points ?? []);
-        points.sort((a, b) => a.timestamp - b.timestamp);
-
-        // 只查 points 中实际出现过的 UID 对应的玩家信息
-        const uidSet = new Set(points.map((p) => p.uid));
-        const uids = Array.from(uidSet);
-
-        let users: RankingUser[] = [];
-        if (uids.length > 0) {
-            const playerQuery = await playerCollection.find({ server, uid: { $in: uids } });
-            const docs = await playerQuery.toArray();
-            users = docs.map(({ server: _s, updatedAt: _u, ...player }) => {
-                delete (player as Record<string, unknown>)._id;
-                return player;
-            });
-        }
-
-        return { points, users };
+        return buildTopSnapshot(topCollection, playerCollection, { server, monthlyId }, server);
     }
 
     /**
@@ -437,7 +413,7 @@ class MonthlyRankingService {
 
     /**
      * Retrieves monthly ranking border cutoff history for a given server,
-     * monthly ID, and tier. Returns cutoffs sorted by time.
+     * monthly ID, and tier. Delegates to {@link queryBorderPoints}.
      *
      * @param server    The game server identifier
      * @param monthlyId The monthly ranking identifier
@@ -445,17 +421,7 @@ class MonthlyRankingService {
      * @returns Border cutoff data with sorted time series
      */
     async getBorderPoints(server: number, monthlyId: number, tier: MonthlyRankingBorderTier): Promise<MonthlyRankingBorderResponse> {
-        const record = await borderCollection.findOne({ server, monthlyId, tier });
-        if (!record) {
-            return { result: true, cutoffs: [] };
-        }
-
-        record.cutoffs.sort((a, b) => a.time - b.time);
-
-        return {
-            result: record.result,
-            cutoffs: record.cutoffs,
-        };
+        return queryBorderPoints(borderCollection, { server, monthlyId, tier });
     }
 
     /**
@@ -498,100 +464,6 @@ class MonthlyRankingService {
     }
 
     // ========================================================================
-    // Persistence Helpers — Replace (Post-End)
-    // ========================================================================
-
-    /**
-     * Replaces point entries in a bucket document at the given timestamp.
-     * Filters out existing entries with the same timestamp and inserts new ones.
-     * Skips the write entirely if the new entries are identical to existing ones.
-     */
-    private async replacePointsInBucket(
-        collection: ReturnType<typeof database.collection>,
-        filter: Record<string, unknown>,
-        timestamp: number,
-        newPoints: Array<{ timestamp: number; uid: number; value: number }>,
-    ): Promise<void> {
-        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
-        if (existing && Array.isArray(existing.points)) {
-            const oldEntries = existing.points.filter((p: { timestamp: number }) => p.timestamp === timestamp);
-            if (
-                oldEntries.length === newPoints.length &&
-                oldEntries.every((p: { uid: number; value: number }, i: number) => p.uid === newPoints[i].uid && p.value === newPoints[i].value)
-            ) {
-                return; // no change
-            }
-        }
-        // Atomic: filter out old entries at this timestamp, then concat new ones
-        await collection.updateOne(
-            filter,
-            [
-                {
-                    $set: {
-                        points: {
-                            $concatArrays: [
-                                {
-                                    $filter: {
-                                        input: { $ifNull: ["$points", []] },
-                                        as: "item",
-                                        cond: { $ne: ["$$item.timestamp", timestamp] },
-                                    },
-                                },
-                                { $literal: newPoints },
-                            ],
-                        },
-                        updatedAt: { $literal: Date.now() },
-                    },
-                },
-            ],
-            { upsert: true },
-        );
-    }
-
-    /**
-     * Replaces cutoff entries in a border document at the given timestamp.
-     * Same replace-or-skip logic as {@link replacePointsInBucket}.
-     */
-    private async replaceCutoffsInBucket(
-        collection: ReturnType<typeof database.collection>,
-        filter: Record<string, unknown>,
-        timestamp: number,
-        newCutoffs: Array<{ time: number; ep: number }>,
-    ): Promise<void> {
-        const existing = (await collection.findOne(filter)) as Record<string, unknown> | undefined;
-        if (existing && Array.isArray(existing.cutoffs)) {
-            const oldEntries = existing.cutoffs.filter((c: { time: number }) => c.time === timestamp);
-            if (oldEntries.length === newCutoffs.length && oldEntries.every((c: { ep: number }, i: number) => c.ep === newCutoffs[i].ep)) {
-                return;
-            }
-        }
-        // Atomic: filter out old entries at this timestamp, then concat new ones
-        await collection.updateOne(
-            filter,
-            [
-                {
-                    $set: {
-                        cutoffs: {
-                            $concatArrays: [
-                                {
-                                    $filter: {
-                                        input: { $ifNull: ["$cutoffs", []] },
-                                        as: "item",
-                                        cond: { $ne: ["$$item.time", timestamp] },
-                                    },
-                                },
-                                { $literal: newCutoffs },
-                            ],
-                        },
-                        updatedAt: { $literal: Date.now() },
-                    },
-                },
-            ],
-            { upsert: true },
-        );
-    }
-
-    // ========================================================================
     // Persistence — Top Snapshot (Replace)
     // ========================================================================
 
@@ -602,7 +474,7 @@ class MonthlyRankingService {
         const users = raw.monthlyRankingPointTopUsers;
         const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
-        await this.replacePointsInBucket(topCollection, { server, monthlyId, bucket }, timestamp, newPoints);
+        await replacePointsInBucket(topCollection, { server, monthlyId, bucket }, timestamp, newPoints);
     }
 
     // ========================================================================
@@ -615,7 +487,7 @@ class MonthlyRankingService {
     private async persistBorderByTierReplace(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const byTier = buildBorderBuckets(raw, timestamp);
         for (const [tier, cutoff] of byTier) {
-            await this.replaceCutoffsInBucket(borderCollection, { server, monthlyId, tier }, timestamp, [cutoff]);
+            await replaceCutoffsInBucket(borderCollection, { server, monthlyId, tier }, timestamp, [cutoff]);
         }
     }
 
