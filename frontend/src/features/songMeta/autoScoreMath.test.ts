@@ -9,10 +9,7 @@ import type { Skill, SkillDuration, SongLevelSummary } from "@/types/songMetadat
 function makeEmptyCounts(): Record<SkillDuration, number[]> {
     const zeroes: number[] = [0, 0, 0, 0, 0, 0];
     const result = {} as Record<SkillDuration, number[]>;
-    const validDurations = [
-        "3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "5.6", "5.7",
-        "6.0", "6.2", "6.4", "6.5", "6.8", "7.0", "7.2", "7.5", "8.0",
-    ];
+    const validDurations = ["3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "5.6", "5.7", "6.0", "6.2", "6.4", "6.5", "6.8", "7.0", "7.2", "7.5", "8.0"];
     for (const key of validDurations) {
         result[key as SkillDuration] = [...zeroes];
     }

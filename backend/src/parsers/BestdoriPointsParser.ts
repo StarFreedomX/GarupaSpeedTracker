@@ -1,7 +1,25 @@
 import type { BestdoriPointRaw, BestdoriTopPointsRaw, BestdoriUserRaw, PlayerPointsData, PointsTrackResponse } from "@/types/bestdori";
 import { groupPointsByTime, toMs } from "@/utils";
 
+/**
+ * Parses and processes Bestdori event top-points tracker data.
+ *
+ * The raw payload contains per-time-slot point snapshots for the top 10 players.
+ * This parser:
+ * - **Sanitizes** points by filtering out time slots that have fewer than 10 players
+ *   (incomplete snapshots are discarded).
+ * - **Builds a time window** within the last N minutes, optionally incremental from a
+ *   previous timestamp.
+ * - **Constructs per-player point tracks** sorted by the last known point value (descending)
+ *   then by UID.
+ */
 export class BestdoriPointsParser {
+    /**
+     * Filters points to only include time slots where exactly 10 players have data.
+     * Slots with fewer than 10 records are considered incomplete and dropped.
+     * @param points - Raw point entries from the Bestdori API
+     * @returns Points from valid (complete) time slots only
+     */
     public sanitizePoints(points: BestdoriPointRaw[]): BestdoriPointRaw[] {
         const grouped = groupPointsByTime(points);
         const validTimes = new Set<number>();
@@ -15,6 +33,18 @@ export class BestdoriPointsParser {
         return points.filter((point) => validTimes.has(point.time));
     }
 
+    /**
+     * Builds a time-windowed point track from the raw Bestdori top-points payload.
+     *
+     * Only the last N minutes of data (relative to the latest timestamp in the payload)
+     * are included. If `lastTimeStamp` is provided, only points newer than that timestamp
+     * are returned (incremental mode).
+     *
+     * @param payload - Raw Bestdori top-points data
+     * @param windowMinutes - Time window size in minutes
+     * @param lastTimeStamp - Optional previous snapshot timestamp for incremental updates
+     * @returns Array of per-player point tracks sorted by latest point value (desc) then UID
+     */
     public buildPointTrack(payload: BestdoriTopPointsRaw, windowMinutes: number, lastTimeStamp?: number): PointsTrackResponse {
         const validPoints = this.sanitizePoints(payload.points);
         if (validPoints.length === 0) {
@@ -70,6 +100,11 @@ export class BestdoriPointsParser {
         });
     }
 
+    /**
+     * Returns the maximum timestamp (most recent snapshot) from the raw payload.
+     * @param payload - Raw Bestdori top-points data
+     * @returns The highest timestamp value, or 0 if no points exist
+     */
     public getMaxTimestamp(payload: BestdoriTopPointsRaw): number {
         if (payload.points.length === 0) {
             return 0;

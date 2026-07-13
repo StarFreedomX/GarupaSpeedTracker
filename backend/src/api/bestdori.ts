@@ -4,6 +4,7 @@ import type { BestdoriEventFullRaw, BestdoriEventsAllRaw, BestdoriTopPointsRaw, 
 import type { Chart } from "@/types/bestdori/chart";
 import type { MusicDataResponse } from "@/types/bestdori/songs";
 
+/** Dependency-injection interface for downloading Bestdori API data, allowing tests to substitute a custom downloader. */
 export interface BestdoriDownloaderLike {
     download<T>(url: string): Promise<T>;
     downloadCache<T>(url: string, options?: DownloadCacheOptions<T>): Promise<T>;
@@ -24,27 +25,47 @@ const buildTopPointsUrl = (params: Pick<PointsQueryParams, "server" | "eventId" 
     return url.toString();
 };
 
+/**
+ * Fetches the Bestdori events summary (all.5.json).
+ * Uses downloader cache with default caching strategy.
+ */
 export const fetchBestdoriEvents = async (deps: BestdoriDownloaderLike = downloader): Promise<BestdoriEventsAllRaw> =>
     deps.downloadCache<BestdoriEventsAllRaw>(buildEventsUrl());
 
+/**
+ * Fetches full Bestdori event details (all.5.json) with per-event expanded objects.
+ * Uses downloader cache with default caching strategy.
+ */
 export const fetchBestdoriEventsFull = async (deps: BestdoriDownloaderLike = downloader): Promise<Record<string, BestdoriEventFullRaw>> =>
     deps.downloadCache<Record<string, BestdoriEventFullRaw>>(buildEventsUrl());
 
+/**
+ * Fetches the Bestdori song/music data (all.5.json).
+ * Accepts optional cache options (e.g. `{ forceUpdate: true }`) to bypass cache.
+ */
 export const fetchBestdoriSongs = async (
     options?: DownloadCacheOptions<MusicDataResponse>,
     deps: BestdoriDownloaderLike = downloader,
 ): Promise<MusicDataResponse> => deps.downloadCache<MusicDataResponse>(buildSongsUrl(), options);
 
+/**
+ * Fetches Bestdori event top points tracker data for a given server, event ID, and interval.
+ * Accepts optional cache options (e.g. `{ forceUpdate: true }`) to force a refresh.
+ */
 export const fetchBestdoriTopPoints = async (
     params: Pick<PointsQueryParams, "server" | "eventId" | "interval">,
     options?: DownloadCacheOptions<BestdoriTopPointsRaw>,
     deps: BestdoriDownloaderLike = downloader,
 ): Promise<BestdoriTopPointsRaw> => deps.downloadCache<BestdoriTopPointsRaw>(buildTopPointsUrl(params), options);
 
+/**
+ * Fetches a single chart JSON from Bestdori by song ID and difficulty name.
+ * Uses direct download (no cache) as chart data is typically immutable.
+ */
 export const fetchBestdoriChart = async (songId: number, difficultyName: string, deps: BestdoriDownloaderLike = downloader): Promise<Chart> =>
     deps.download<Chart>(buildChartUrl(songId, difficultyName));
 
-/** 获取玩家档案 */
+/** Fetches a player profile from Bestdori by server name and player ID. */
 export const fetchBestdoriPlayer = async (serverName: string, playerId: number, deps: BestdoriDownloaderLike = downloader) => {
     const url = toBestdoriUrl(`player/${serverName}/${playerId}?mode=2`);
     return deps.download<{
@@ -53,18 +74,18 @@ export const fetchBestdoriPlayer = async (serverName: string, playerId: number, 
     }>(url);
 };
 
-/** 获取全部卡片元数据（批量，缓存优先；传 { forceUpdate: true } 可强制刷新） */
+/** Fetches all card metadata in bulk (all.5.json). Uses cache by default; pass `{ forceUpdate: true }` to force a refresh. */
 export const fetchBestdoriCardsBulk = async (opts?: DownloadCacheOptions<Record<string, Record<string, unknown>>>, deps: BestdoriDownloaderLike = downloader) =>
     deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("cards/all.5.json"), opts);
 
-/** 获取区域道具 */
+/** Fetches area items data from Bestdori. */
 export const fetchBestdoriAreaItems = async (deps: BestdoriDownloaderLike = downloader) =>
     deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("areaItems/main.5.json"));
 
-/** 获取技能（缓存优先；传 { forceUpdate: true } 可强制刷新） */
+/** Fetches skill data from Bestdori. Uses cache by default; pass `{ forceUpdate: true }` to force a refresh. */
 export const fetchBestdoriSkills = async (opts?: DownloadCacheOptions<Record<string, Record<string, unknown>>>, deps: BestdoriDownloaderLike = downloader) =>
     deps.downloadCache<Record<string, Record<string, unknown>>>(toBestdoriUrl("skills/all.10.json"), opts);
 
-/** 获取角色→乐队映射 */
+/** Fetches the character-to-band mapping from Bestdori. */
 export const fetchBestdoriCharacters = async (deps: BestdoriDownloaderLike = downloader) =>
     deps.downloadCache<Record<string, { bandId: number }>>(toBestdoriUrl("characters/main.2.json"));

@@ -1,3 +1,10 @@
+/**
+ * GarupaSpeedTracker — Main API entry point.
+ *
+ * Bootstraps the Koa application, warms up song metadata, starts all background
+ * services (monthly ranking, event info, event ranking), and begins listening
+ * for HTTP requests on the configured host and port.
+ */
 import { createApp } from "@/app";
 import { HOST, PORT } from "@/config";
 import { logger } from "@/logger";

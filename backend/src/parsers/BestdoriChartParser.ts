@@ -3,8 +3,22 @@ import type { SkillDuration, SongLevelSummary } from "@/types/songMetadata";
 
 /** 基于 skills/all.10.json 的实际技能时长，共 17 个 */
 const SKILL_DURATIONS: SkillDuration[] = [
-    "3.0", "3.5", "4.0", "4.5", "5.0",
-    "5.5", "5.6", "5.7", "6.0", "6.2", "6.4", "6.5", "6.8", "7.0", "7.2", "7.5",
+    "3.0",
+    "3.5",
+    "4.0",
+    "4.5",
+    "5.0",
+    "5.5",
+    "5.6",
+    "5.7",
+    "6.0",
+    "6.2",
+    "6.4",
+    "6.5",
+    "6.8",
+    "7.0",
+    "7.2",
+    "7.5",
     "8.0",
 ];
 const DEFAULT_BPM = 120;
@@ -89,7 +103,7 @@ export class BestdoriChartParser {
     }
 
     /**
-     * 帧计数模型：技能窗口 = ceil(duration*fps) 次递减 + 1 帧结束红利。
+     * 帧计数模型：技能窗口 = ceil(duration*fps) 次递减 + 1 帧结束帧。
      *
      * 输出编码: base + v/16，v 是 4-bit smmm:
      *   s=符号位(0=+, 1=-), mmm=|60fps-120fps|(0-7)
@@ -138,11 +152,7 @@ export class BestdoriChartParser {
             const FsCur = Math.ceil(skillEvents[i].seconds * 60);
             if (FsCur - FsPrev >= MAX_FRAME_EXTENSION) continue;
 
-            const shifts = this.computePositionShifts(
-                noteEvents,
-                skillEvents[i - 1].seconds,
-                skillEvents[i].seconds,
-            );
+            const shifts = this.computePositionShifts(noteEvents, skillEvents[i - 1].seconds, skillEvents[i].seconds);
             if (Object.keys(shifts).length > 0) {
                 overlaps[i] = shifts;
             }
@@ -156,11 +166,7 @@ export class BestdoriChartParser {
      * shifts[d_prev][d_cur] = encodeCount(delta120, delta60 - delta120)
      * 复用 counts 的 4-bit 编码，同时存 60fps 和 120fps 的偏移量。
      */
-    private computePositionShifts(
-        noteEvents: BeatEvent[],
-        triggerPrev: number,
-        triggerCur: number,
-    ): Record<string, Record<string, number>> {
+    private computePositionShifts(noteEvents: BeatEvent[], triggerPrev: number, triggerCur: number): Record<string, Record<string, number>> {
         const shifts: Record<string, Record<string, number>> = {};
 
         for (const dPrev of SKILL_DURATIONS) {
@@ -214,13 +220,9 @@ export class BestdoriChartParser {
 
     /**
      * 帧计数: note 受加成 ⇔ ceil(noteTime*fps) ∈ (ceil(skillStartTime*fps), ceil(skillStartTime*fps) + ceil(dur*fps) + 1]
+     * 也就是，note 受加成 ⇔  note所处的帧位置    ∈ (技能开始的帧位置, 技能开始的帧位置 + 技能时长导致的递减帧数 + 结束帧]
      */
-    private countNotesInWindow(
-        noteEvents: BeatEvent[],
-        skillStartTime: number,
-        durationSec: number,
-        fps: number,
-    ): number {
+    private countNotesInWindow(noteEvents: BeatEvent[], skillStartTime: number, durationSec: number, fps: number): number {
         const Fs = Math.ceil(skillStartTime * fps);
         const Fe = Fs + Math.ceil(durationSec * fps - FPS_EPSILON) + 1;
 

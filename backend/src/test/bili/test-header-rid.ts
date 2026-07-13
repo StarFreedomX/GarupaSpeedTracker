@@ -22,14 +22,14 @@ async function main() {
     // Step 2: 用 rid1 请求 monthly 18，检查响应头的 x-requestid
     console.log("\nStep 2: 用 rid1 请求 monthly 18");
     const url18 = new URL(`user/${CN_UID}/monthlyranking/18/ranking`, CN_BASE_URL).toString();
-    const res1 = await fetch(url18, { headers: buildCnRankingHeaders(rid1!) });
+    const res1 = await fetch(url18, { headers: buildCnRankingHeaders(rid1 as string) });
     const rid2 = res1.headers.get("x-requestid");
     console.log(`  HTTP ${res1.status}, 响应头 x-requestid: ${rid2}`);
-    const data1Size = Buffer.from(await res1.arrayBuffer()).length;
+    const _data1Size = Buffer.from(await res1.arrayBuffer()).length;
 
     // Step 3: 用响应头的 rid2 请求 monthly 18，拿到数据
     console.log("\nStep 3: 用响应头的 rid2 请求 monthly 18");
-    const res2 = await fetch(url18, { headers: buildCnRankingHeaders(rid2!) });
+    const res2 = await fetch(url18, { headers: buildCnRankingHeaders(rid2 as string) });
     console.log(`  HTTP ${res2.status}`);
     const data2Size = Buffer.from(await res2.arrayBuffer()).length;
     console.log(`  data size: ${data2Size}B`);
@@ -37,7 +37,7 @@ async function main() {
     // Step 4: 再用 rid2 请求 monthly 1（不同 monthlyId），看是否触发缓存
     console.log("\nStep 4: 用 rid2 请求 monthly 1（跨 monthlyId）");
     const url1 = new URL(`user/${CN_UID}/monthlyranking/1/ranking`, CN_BASE_URL).toString();
-    const res3 = await fetch(url1, { headers: buildCnRankingHeaders(rid2!) });
+    const res3 = await fetch(url1, { headers: buildCnRankingHeaders(rid2 as string) });
     console.log(`  HTTP ${res3.status}`);
     const data3Size = Buffer.from(await res3.arrayBuffer()).length;
     const rid3 = res3.headers.get("x-requestid");
@@ -46,7 +46,7 @@ async function main() {
 
     // Step 5: 用 rid2 再请求 monthly 18，看是否还是原来的数据
     console.log("\nStep 5: 再用 rid2 请求 monthly 18（同一个 rid 用两次不同 endpoint）");
-    const res4 = await fetch(url18, { headers: buildCnRankingHeaders(rid2!) });
+    const res4 = await fetch(url18, { headers: buildCnRankingHeaders(rid2 as string) });
     console.log(`  HTTP ${res4.status}, data size: ${Buffer.from(await res4.arrayBuffer()).length}B`);
     const rid4 = res4.headers.get("x-requestid");
     console.log(`  响应头 x-requestid: ${rid4}`);

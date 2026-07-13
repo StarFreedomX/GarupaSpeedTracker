@@ -1,3 +1,4 @@
+// noinspection DuplicatedCode
 /**
  * 全谱面验证：
  * 1. 新模型 >= 旧模型（所有 fps）
@@ -6,23 +7,61 @@
  * 运行: npx ts-node -r tsconfig-paths/register src/test/research-verify-all-charts.ts
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ============================================================
 // 从 research-skill-frame-model 复制的核心逻辑
 // ============================================================
 
-interface NotePoint { lane: number; beat: number; flick?: boolean; hidden?: boolean; charge?: boolean; skill?: boolean; }
-interface SingleNote { type: "Single"; lane: number; beat: number; flick?: boolean; skill?: boolean; charge?: boolean; }
-interface ConnectionNote { type: "Long" | "Slide"; connections: NotePoint[]; }
-interface DirectionalNote { type: "Directional"; lane: number; beat: number; direction: string; width: number; }
-interface BPMEvent { type: "BPM"; bpm: number; beat: number; }
-interface SystemEvent { type: "System"; data: string; beat: number; }
+interface NotePoint {
+    lane: number;
+    beat: number;
+    flick?: boolean;
+    hidden?: boolean;
+    charge?: boolean;
+    skill?: boolean;
+}
+interface SingleNote {
+    type: "Single";
+    lane: number;
+    beat: number;
+    flick?: boolean;
+    skill?: boolean;
+    charge?: boolean;
+}
+interface ConnectionNote {
+    type: "Long" | "Slide";
+    connections: NotePoint[];
+}
+interface DirectionalNote {
+    type: "Directional";
+    lane: number;
+    beat: number;
+    direction: string;
+    width: number;
+}
+interface BPMEvent {
+    type: "BPM";
+    bpm: number;
+    beat: number;
+}
+interface SystemEvent {
+    type: "System";
+    data: string;
+    beat: number;
+}
 type ChartItem = BPMEvent | SystemEvent | SingleNote | ConnectionNote | DirectionalNote;
 
-interface BeatEvent { beat: number; seconds: number; }
-interface NormalizedChart { total: number; noteEvents: BeatEvent[]; skillEvents: BeatEvent[]; }
+interface BeatEvent {
+    beat: number;
+    seconds: number;
+}
+interface NormalizedChart {
+    total: number;
+    noteEvents: BeatEvent[];
+    skillEvents: BeatEvent[];
+}
 
 const SKILL_DURATION_SECONDS = Array.from({ length: 51 }, (_, i) => (30 + i) / 10);
 const TARGET_SKILL_COUNT = 6;
@@ -33,12 +72,16 @@ function extractBpmList(items: ChartItem[]): Array<{ beat: number; bpm: number; 
     const bpmEvents = items.filter((item): item is BPMEvent => item.type === "BPM").sort((a, b) => a.beat - b.beat || a.bpm - b.bpm);
     if (bpmEvents.length === 0) return [{ beat: 0, bpm: DEFAULT_BPM, seconds: 0 }];
     const timeline: Array<{ beat: number; bpm: number; seconds: number }> = [];
-    let cs = 0, cb = bpmEvents[0].beat, cBpm = bpmEvents[0].bpm > 0 ? bpmEvents[0].bpm : DEFAULT_BPM;
+    let cs = 0,
+        cb = bpmEvents[0].beat,
+        cBpm = bpmEvents[0].bpm > 0 ? bpmEvents[0].bpm : DEFAULT_BPM;
     timeline.push({ beat: cb, bpm: cBpm, seconds: cs });
     for (let i = 1; i < bpmEvents.length; i++) {
-        const nb = bpmEvents[i].beat, nBpm = bpmEvents[i].bpm > 0 ? bpmEvents[i].bpm : DEFAULT_BPM;
+        const nb = bpmEvents[i].beat,
+            nBpm = bpmEvents[i].bpm > 0 ? bpmEvents[i].bpm : DEFAULT_BPM;
         cs += ((nb - cb) * 60) / cBpm;
-        cb = nb; cBpm = nBpm;
+        cb = nb;
+        cBpm = nBpm;
         timeline.push({ beat: cb, bpm: cBpm, seconds: cs });
     }
     if (timeline[0].beat > 0) timeline.unshift({ beat: 0, bpm: timeline[0].bpm, seconds: 0 });
@@ -47,28 +90,39 @@ function extractBpmList(items: ChartItem[]): Array<{ beat: number; bpm: number; 
 
 function beatToSeconds(beat: number, tl: Array<{ beat: number; bpm: number; seconds: number }>): number {
     let s = tl[0];
-    for (const p of tl) { if (p.beat <= beat) s = p; else break; }
+    for (const p of tl) {
+        if (p.beat <= beat) s = p;
+        else break;
+    }
     return s.seconds + ((beat - s.beat) * 60) / s.bpm;
 }
 
 function normalizeChart(items: ChartItem[]): NormalizedChart {
     const tl = extractBpmList(items);
-    let skillEvents = items.flatMap((it) => {
-        if (it.type === "Single") return it.skill ? [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }] : [];
-        if (it.type === "Long" || it.type === "Slide") return (it as ConnectionNote).connections.filter((p) => p.skill).map((p) => ({ beat: p.beat, seconds: beatToSeconds(p.beat, tl) }));
-        return [];
-    }).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+    let skillEvents = items
+        .flatMap((it) => {
+            if (it.type === "Single") return it.skill ? [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }] : [];
+            if (it.type === "Long" || it.type === "Slide")
+                return (it as ConnectionNote).connections.filter((p) => p.skill).map((p) => ({ beat: p.beat, seconds: beatToSeconds(p.beat, tl) }));
+            return [];
+        })
+        .sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
     const deduped: BeatEvent[] = [];
     for (const se of skillEvents) {
         if (deduped.length === 0 || Math.abs(deduped[deduped.length - 1].beat - se.beat) > 1e-6) deduped.push(se);
     }
     skillEvents = deduped;
-    const noteEvents = items.flatMap((it) => {
-        if (it.type === "Single") return it.skill ? [] : [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }];
-        if (it.type === "Directional") return [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }];
-        if (it.type === "Long" || it.type === "Slide") return (it as ConnectionNote).connections.filter((p) => !p.hidden && !p.skill).map((p) => ({ beat: p.beat, seconds: beatToSeconds(p.beat, tl) }));
-        return [];
-    }).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+    const noteEvents = items
+        .flatMap((it) => {
+            if (it.type === "Single") return it.skill ? [] : [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }];
+            if (it.type === "Directional") return [{ beat: it.beat, seconds: beatToSeconds(it.beat, tl) }];
+            if (it.type === "Long" || it.type === "Slide")
+                return (it as ConnectionNote).connections
+                    .filter((p) => !p.hidden && !p.skill)
+                    .map((p) => ({ beat: p.beat, seconds: beatToSeconds(p.beat, tl) }));
+            return [];
+        })
+        .sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
     return { total: skillEvents.length + noteEvents.length, noteEvents, skillEvents };
 }
 
@@ -96,7 +150,11 @@ function buildCountsOld(n: NormalizedChart): number[][] {
         n.skillEvents.map((se) => {
             const we = se.seconds + ws;
             let c = 0;
-            for (const ne of n.noteEvents) { if (ne.seconds <= se.seconds) continue; if (ne.seconds > we) break; c++; }
+            for (const ne of n.noteEvents) {
+                if (ne.seconds <= se.seconds) continue;
+                if (ne.seconds > we) break;
+                c++;
+            }
             return c;
         }),
     );
@@ -130,7 +188,17 @@ function scanAll(): void {
 
     const diffDistNewVsOld: Record<number, number> = {};
     const diffDist60vs120: Record<number, number> = {};
-    const allResults: Array<{ songId: string; difficulty: string; duration: string; skillIdx: number; old: number; new120: number; new60: number; dNewVsOld: number; d60vs120: number }> = [];
+    const allResults: Array<{
+        songId: string;
+        difficulty: string;
+        duration: string;
+        skillIdx: number;
+        old: number;
+        new120: number;
+        new60: number;
+        dNewVsOld: number;
+        d60vs120: number;
+    }> = [];
     let maxNewVsOld = 0;
     let max60vs120 = 0;
 
@@ -176,7 +244,17 @@ function scanAll(): void {
                     diffDistNewVsOld[dNewVsOld] = (diffDistNewVsOld[dNewVsOld] || 0) + 1;
                     diffDist60vs120[d60vs120] = (diffDist60vs120[d60vs120] || 0) + 1;
                     if (dNewVsOld >= 3 || d60vs120 >= 3) {
-                        allResults.push({ songId, difficulty: diff, duration: dur, skillIdx: si, old: cOld[di][si], new120: c120[di][si], new60: c60[di][si], dNewVsOld, d60vs120 });
+                        allResults.push({
+                            songId,
+                            difficulty: diff,
+                            duration: dur,
+                            skillIdx: si,
+                            old: cOld[di][si],
+                            new120: c120[di][si],
+                            new60: c60[di][si],
+                            dNewVsOld,
+                            d60vs120,
+                        });
                     }
 
                     // 不变式 1: 新120 >= 旧
@@ -222,7 +300,9 @@ function scanAll(): void {
     const printDist = (label: string, dist: Record<number, number>, max: number) => {
         const totalCells = Object.values(dist).reduce((a, b) => a + b, 0);
         console.log(`  ${label}:`);
-        const keys = Object.keys(dist).map(Number).sort((a, b) => a - b);
+        const keys = Object.keys(dist)
+            .map(Number)
+            .sort((a, b) => a - b);
         for (const k of keys) {
             const pct = ((dist[k] / totalCells) * 100).toFixed(3);
             console.log(`    +${k}: ${dist[k].toLocaleString()} (${pct}%)`);

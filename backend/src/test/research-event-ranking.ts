@@ -1,3 +1,5 @@
+// noinspection DuplicatedCode
+
 /**
  * 活动 Ranking 接口探查脚本
  *

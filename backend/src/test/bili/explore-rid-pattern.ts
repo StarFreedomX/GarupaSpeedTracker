@@ -57,7 +57,7 @@ async function main() {
     console.log(`  rid0 == rid1: ${r0 === r1}`);
 
     // 再消费 rid1，获取 rid2
-    const ok1 = await fetchOk(r1);
+    const _ok1 = await fetchOk(r1);
     const { rid: r2 } = await getRid();
     console.log(`  rid2: ${r2}`);
 
@@ -76,9 +76,9 @@ async function main() {
 
     // 4. 是否 MD5 模式？检查单个字符变化时 newRequestId 是否完全不同
     console.log("\n4. 相近错误 rid 是否返回相同 newRequestId:");
-    const baseRid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0";
+    const _baseRid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0";
     for (const suffix of ["0", "1", "2", "f"]) {
-        const testRid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + suffix;
+        const testRid = `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa${suffix}`;
         const url = new URL(`user/${CN_UID}/monthlyranking/18/ranking`, CN_BASE_URL).toString();
         const res = await fetch(url, { headers: buildCnRankingHeaders(testRid) });
         const dec = decryptCn(Buffer.from(await res.arrayBuffer()));

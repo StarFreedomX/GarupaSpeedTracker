@@ -13,57 +13,81 @@ import type { Stat } from "@/types/bestdori/stat";
 import { addStat, emptyStat, statTotal } from "@/types/bestdori/stat";
 
 // ============================================================================
-// 类型
+// Types
 // ============================================================================
 
+/** Describes a card's skill effect including bonus percentage and duration. */
 interface CardSkillInfo {
     bonusPercent: number;
     durationSeconds: number;
+    /** Progressive skill info if applicable (step rate and max cap). */
     progressive: { stepRate: number; maxCap: number } | null;
 }
 
+/** Full deck status returned to the client. */
 export interface PlayerDeckStatusResult {
     eventType: string;
     eventName: string;
     eventId: number | null;
+    /** Whether the player allows their total deck power to be published. */
     publishTotalDeckPowerFlg: boolean;
+    /** Base deck power without event bonuses. */
     normalPower: number;
+    /** Deck power including event bonuses. */
     eventPower: number;
+    /** Auto-live deck power. */
     autoPower: number;
+    /** Total event bonus percentage. */
     eventBonusPct: number;
+    /** Skill info for each card in UI display order. */
     skills: CardSkillInfo[];
 }
 
 // ============================================================================
-// 硬编码数据
+// Hard-coded data
 // ============================================================================
 
 const SERVER_NAMES = ["jp", "en", "tw", "cn", "kr"] as const;
 
+/** Maps skill IDs to their progressive stat definitions (step rate, max cap). */
 const PROGRESSIVE_MAP: Record<number, { stepRate: number; maxCap: number }> = {
     61: { stepRate: 0.5, maxCap: 150 },
 };
 
 // ============================================================================
-// 批量数据加载（缺 ID 时尝试刷新 / 单张回退）
+// Bulk data loading (with fallback on cache miss)
 // ============================================================================
 
 type CardBulkMap = Record<string, Record<string, unknown>>;
 type SkillBulkMap = Record<string, Record<string, unknown>>;
 
+/**
+ * Loads the card bulk cache, falling back to a force-update fetch if any of
+ * the requested card IDs are missing from the cached dataset.
+ *
+ * @param cardIds - The set of card IDs needed.
+ * @returns The card bulk map (from cache or fresh fetch).
+ */
 async function loadCardsWithFallback(cardIds: number[]): Promise<CardBulkMap> {
-    // 先走缓存
+    // Try cache first
     let cards = await fetchBestdoriCardsBulk();
     const missing = cardIds.filter((id) => !cards[String(id)]);
 
     if (missing.length > 0) {
-        // 强制抓取并更新缓存
+        // Force re-fetch to populate missing entries
         cards = await fetchBestdoriCardsBulk({ forceUpdate: true });
     }
 
     return cards;
 }
 
+/**
+ * Loads the skill bulk cache, falling back to a force-update fetch if any of
+ * the requested skill IDs are missing from the cached dataset.
+ *
+ * @param skillIds - The set of skill IDs needed.
+ * @returns The skill bulk map (from cache or fresh fetch).
+ */
 async function loadSkillsWithFallback(skillIds: number[]): Promise<SkillBulkMap> {
     let skills = await fetchBestdoriSkills();
     const missing = skillIds.filter((id) => !skills[String(id)]);
@@ -76,21 +100,43 @@ async function loadSkillsWithFallback(skillIds: number[]): Promise<SkillBulkMap>
 }
 
 // ============================================================================
-// 辅助函数
+// Helper functions
 // ============================================================================
 
+/**
+ * Scales each stat dimension by the given percentage.
+ *
+ * @param stat - The base stat values.
+ * @param percent - The percentage to apply.
+ * @returns A new stat with all three dimensions scaled.
+ */
 function scalePct(stat: Stat, percent: number): Stat {
     return { performance: (stat.performance * percent) / 100, technique: (stat.technique * percent) / 100, visual: (stat.visual * percent) / 100 };
 }
 
+/**
+ * Safely retrieves an element from a nullable array at the given index.
+ *
+ * @param arr - The array (may contain nulls).
+ * @param index - The index to retrieve.
+ * @returns The value at the index, or null if out of bounds or undefined.
+ */
 function getAtIndex(arr: (number | null)[], index: number): number | null {
     return arr[index] ?? null;
 }
 
 // ============================================================================
-// 普通综合力
+// Base stat calculation
 // ============================================================================
 
+/**
+ * Computes the base (unbuffed) stat of a card at a given level, including
+ * any user-appended parameters (potential, character bonuses).
+ *
+ * @param cardStatRaw - The raw card stat data from Bestdori.
+ * @param entry - The player's card entry with level and optional append parameters.
+ * @returns The base stat.
+ */
 function calcBaseStat(cardStatRaw: Record<string, unknown>, entry: { level: number; userAppendParameter?: Record<string, number> }): Stat {
     const stat = cardStatRaw.stat as Record<string, { performance: number; technique: number; visual: number }> | undefined;
     const base = stat?.[String(entry.level)];
@@ -104,9 +150,25 @@ function calcBaseStat(cardStatRaw: Record<string, unknown>, entry: { level: numb
 }
 
 // ============================================================================
-// 活动加成
+// Event bonus calculation
 // ============================================================================
 
+/**
+ * Calculates the event power bonus for a single card based on the active event.
+ *
+ * Considers character match, attribute match, member bonuses, limit break
+ * bonuses, and character+attribute double bonuses (including parameter bonuses
+ * for applicable event types).
+ *
+ * @param baseStat - The card's base stat.
+ * @param chId - The card's character ID.
+ * @param attr - The card's attribute.
+ * @param cardId - The card's situation ID.
+ * @param rarity - The card's rarity.
+ * @param lbRank - The card's limit break rank.
+ * @param event - The active event definition from Bestdori.
+ * @returns The total event bonus stat for this card.
+ */
 function calcCardEventBonus(baseStat: Stat, chId: number, attr: string, cardId: number, rarity: number, lbRank: number, event: BestdoriEventFullRaw): Stat {
     const bonus = emptyStat();
     const charMatch = event.characters.some((c) => c.characterId === chId);
@@ -142,6 +204,22 @@ function calcCardEventBonus(baseStat: Stat, chId: number, attr: string, cardId: 
     return bonus;
 }
 
+/**
+ * Calculates the total event bonus percentage for a single card.
+ *
+ * The bonus percentage is derived from character match, attribute match,
+ * member bonuses, limit break bonuses, and the doubled character+attribute
+ * bonus. For "versus", "festival", and "medley" event types, the double bonus
+ * uses `parameterPercent`; for other types it uses `pointPercent`.
+ *
+ * @param chId - The card's character ID.
+ * @param attr - The card's attribute.
+ * @param cardId - The card's situation ID.
+ * @param rarity - The card's rarity.
+ * @param lbRank - The card's limit break rank.
+ * @param event - The active event definition.
+ * @returns The total bonus percentage and whether both character and attribute match.
+ */
 function calcCardBonusPct(
     chId: number,
     attr: string,
@@ -182,25 +260,52 @@ function calcCardBonusPct(
 }
 
 // ============================================================================
-// 技能
+// Skill calculation
 // ============================================================================
 
-/** 用于技能统一加成判定的卡片摘要 */
+/** Minimal card summary used for skill unification condition checking. */
 interface CardBrief {
     bandId: number;
     attribute: string;
 }
 
+/** Skill effect types that produce a scoring bonus. */
 const SCORING_TYPES = ["score", "score_only_perfect", "score_over_life", "score_under_life", "score_continued_note_judge", "score_under_great_half"] as const;
 
+/**
+ * Returns true if the skill condition is a gameplay judgment condition
+ * (PERFECT, GREAT, GOOD, BAD) that is considered always met.
+ *
+ * @param condition - The activation condition string.
+ * @returns True if it is a gameplay judgment condition.
+ */
 function isGameplayCondition(condition: string): boolean {
     return condition === "perfect" || condition === "great" || condition === "good" || condition === "bad";
 }
 
+/**
+ * Returns true if the skill has a life threshold condition that is considered met.
+ *
+ * @param conditionLife - The life threshold value.
+ * @returns True if the threshold is positive.
+ */
 function isLifeCondition(conditionLife: number | undefined): boolean {
     return conditionLife != null && conditionLife > 0;
 }
 
+/**
+ * Calculates the skill effect for a single card.
+ *
+ * Searches through all scoring effect types to find the highest applicable
+ * bonus percentage. Skill unification effects (e.g. "all Poppin'Party cards")
+ * are checked against the full team and override the base bonus if satisfied.
+ *
+ * @param card - The card's skill ID and level.
+ * @param skillsRaw - The bulk skill data from Bestdori.
+ * @param server - The server index.
+ * @param allCards - Brief summaries of all cards in the team (for unification checks).
+ * @returns The computed skill info including bonus percent and duration.
+ */
 function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: SkillBulkMap, server: number, allCards: CardBrief[]): CardSkillInfo {
     const skill = skillsRaw[String(card.skillId)];
     if (!skill) return { bonusPercent: 0, durationSeconds: 0, progressive: null };
@@ -211,8 +316,8 @@ function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: Ski
     const effectTypes = (ae?.activateEffectTypes ?? {}) as Record<string, Record<string, unknown> | undefined>;
     const progressive = PROGRESSIVE_MAP[card.skillId] ?? null;
 
-    // 遍历计分效果，取最高倍率
-    // 条件判定：游戏内判定条件（PERFECT/GREAT/LIFE 阈值等）默认全满足
+    // Iterate scoring effects, pick the highest bonus that is applicable.
+    // Gameplay judgment conditions and life conditions are always assumed met.
     let bestBonus = 0;
     for (const type of SCORING_TYPES) {
         const eff = effectTypes[type];
@@ -221,7 +326,7 @@ function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: Ski
         const rawValue = getAtIndex(eff.activateEffectValue as (number | null)[], serverIndex);
         if (rawValue == null) continue;
 
-        // 检查条件是否可触发（游戏内判定 / 血量条件 / 无条件的均视为适用）
+        // Check if the activation condition is applicable
         const condition = (eff.activateCondition as string | undefined) ?? "good";
         const conditionLife = eff.activateConditionLife as number | undefined;
         const isApplicable = condition === "none" || isGameplayCondition(condition) || isLifeCondition(conditionLife);
@@ -231,14 +336,14 @@ function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: Ski
         }
     }
 
-    // 统一加成（unification）：当整队满足特定条件时触发更高倍率
-    // 例如：skill 74 的 "编队仅有 Poppin'Party 时 155%UP"（否则 145%）
+    // Unification bonus: higher bonus when the whole team satisfies a band or attribute condition.
+    // Example: skill 74 gives 155% when the entire team is Poppin'Party, otherwise 145%.
     const unificationValue = ae?.unificationActivateEffectValue as number | undefined;
     if (unificationValue != null && unificationValue > bestBonus) {
         const bandId = ae?.unificationActivateConditionBandId as number | undefined;
         const attrType = ae?.unificationActivateConditionType as string | undefined;
 
-        // 条件检查：bandId 和 attrType 可同时存在，此时需同时满足
+        // Check conditions: bandId and attrType can be combined (both must match)
         let satisfied = bandId != null || attrType != null;
         if (bandId != null && !allCards.every((c) => c.bandId === bandId)) {
             satisfied = false;
@@ -259,14 +364,36 @@ function calcSkill(card: { skillId: number; skillLevel: number }, skillsRaw: Ski
 }
 
 // ============================================================================
-// 主服务
+// Main service
 // ============================================================================
 
+/**
+ * Computes a player's deck status from Bestdori player data, including card
+ * stats, area item bonuses, event bonuses, and skill effects.
+ *
+ * The service handles multi-event-type logic:
+ * - "versus", "festival", "medley": event power includes event bonuses; auto power matches event power.
+ * - "challenge": event power includes event bonuses; auto power uses base (normal) power.
+ * - Other types: no event bonus applied to either power.
+ *
+ * Skill results are reordered to match the UI display order (member3 →
+ * member1 → leader → member2 → member4).
+ */
 export const playerDeckService = {
+    /**
+     * Computes the full deck status for a given player on a given server.
+     *
+     * @param server - The server index (0 = JP, 1 = EN, etc.).
+     * @param playerId - The player's Bestdori numeric ID.
+     * @param eventId - Optional explicit event ID; if not provided, the current
+     *   event is determined automatically.
+     * @returns The deck status result including powers, bonus percentages, and skill info.
+     * @throws If the player's deck is empty.
+     */
     async getPlayerDeckStatus(server: number, playerId: number, eventId?: number | null): Promise<PlayerDeckStatusResult> {
         const serverName = SERVER_NAMES[server] ?? "jp";
 
-        // 并行加载基础数据
+        // Load base data in parallel
         const [eventsFull, playerApi] = await Promise.all([fetchBestdoriEventsFull(), fetchBestdoriPlayer(serverName, playerId)]);
 
         const profile = (playerApi.data?.profile ?? {}) as Record<string, unknown>;
@@ -276,11 +403,11 @@ export const playerDeckService = {
 
         if (entries.length === 0) throw new Error("Player deck is empty");
 
-        // 确定活动
+        // Determine the active event
         const resolvedEventId = eventId && eventId > 0 ? eventId : getPresentEvent(eventsFull, server);
         const event = resolvedEventId ? eventsFull[String(resolvedEventId)] : null;
 
-        // 收集需要的 card ID 和 skill ID
+        // Collect card IDs and player card entries
         const cardIds: number[] = [];
         const playerCards: Array<{
             situationId: number;
@@ -301,17 +428,17 @@ export const playerDeckService = {
             });
         }
 
-        // 批量加载卡牌、区域道具、角色映射（并行）
+        // Bulk load cards, area items, characters in parallel
         const [cardsBulk, areaItemsRaw, charactersRaw] = await Promise.all([
             loadCardsWithFallback(cardIds),
             fetchBestdoriAreaItems(),
             fetchBestdoriCharacters(),
         ]);
 
-        // 初始化角色→乐队映射（确保 bandId 与 Bestdori 的 targetBandIds 一致）
+        // Initialize character → band mapping
         setBandIdMap(charactersRaw);
 
-        // 收集需要的 skill ID，批量加载技能
+        // Collect skill IDs, then bulk load skills
         const skillIds = cardIds
             .map((id) => {
                 const c = cardsBulk[String(id)];
@@ -320,7 +447,7 @@ export const playerDeckService = {
             .filter((s) => s > 0);
         const skillsRaw = await loadSkillsWithFallback(skillIds);
 
-        // 构建整队卡片摘要（用于技能统一加成判定）
+        // Build team-wide card briefs for skill unification checks
         const allCardBriefs: CardBrief[] = cardIds.map((id) => {
             const c = cardsBulk[String(id)];
             if (!c) return { bandId: 0, attribute: "" };
@@ -331,7 +458,7 @@ export const playerDeckService = {
             };
         });
 
-        // 区域道具 map
+        // Build area item metadata map
         const areaItemMetaMap = new Map<number, AreaItemMeta>();
         for (const [catStr, raw] of Object.entries(areaItemsRaw)) {
             const r = raw as Record<string, unknown>;
@@ -345,7 +472,7 @@ export const playerDeckService = {
             });
         }
 
-        // 处理每张卡
+        // Process each card
         let normalPower = 0;
         let eventPower = 0;
         let autoPower = 0;
@@ -355,7 +482,7 @@ export const playerDeckService = {
         for (const pc of playerCards) {
             const cardRaw = cardsBulk[String(pc.situationId)];
             if (!cardRaw) {
-                // 批量+刷新+单张回退都失败 → 跳过
+                // Card not found even after fallback — skip with empty skill
                 skills.push({ bonusPercent: 0, durationSeconds: 0, progressive: null });
                 continue;
             }
@@ -367,7 +494,7 @@ export const playerDeckService = {
 
             const baseStat = calcBaseStat(cardRaw, pc);
 
-            // 区域道具
+            // Area item bonuses
             const areaBonus = emptyStat();
             for (const ai of areaItemEntries) {
                 const am = areaItemMetaMap.get(ai.areaItemCategory);
@@ -378,7 +505,7 @@ export const playerDeckService = {
             const cardNormal = statTotal(baseStat) + statTotal(areaBonus);
             normalPower += cardNormal;
 
-            // 活动加成
+            // Event bonuses
             if (event) {
                 const eventBonus = calcCardEventBonus(baseStat, chId, attr, pc.situationId, rarity, pc.limitBreakRank, event);
                 const { totalPct, hasCharAttr } = calcCardBonusPct(chId, attr, pc.situationId, rarity, pc.limitBreakRank, event);
@@ -405,13 +532,14 @@ export const playerDeckService = {
                 autoPower += cardNormal;
             }
 
-            // 技能
+            // Skill calculation
             skills.push(calcSkill({ skillId: cardRaw.skillId as number, skillLevel: pc.skillLevel }, skillsRaw, server, allCardBriefs));
         }
 
         if (!event && autoPower === 0) eventPower = normalPower;
 
-        // 技能重排序：后端按 leader→member1-4 排列，前端 UI 从上到下为 member3→member1→leader→member2→member4
+        // Reorder skills for UI display: backend order is leader→member1-4,
+        // frontend UI order top-to-bottom is member3→member1→leader→member2→member4
         const UI_SKILL_ORDER = [3, 1, 0, 2, 4];
         const reorderedSkills = skills.length === UI_SKILL_ORDER.length ? UI_SKILL_ORDER.map((i) => skills[i]) : skills;
 
@@ -433,6 +561,18 @@ export const playerDeckService = {
 // getPresentEvent
 // ============================================================================
 
+/**
+ * Finds the currently active (or soonest upcoming) event ID for a given server.
+ *
+ * An event is considered present if it is currently ongoing (now is between
+ * `startAt - 1 day` and `endAt`). If no event is ongoing, the event whose
+ * start time is closest to now is returned.
+ *
+ * @param events - The full event map from Bestdori.
+ * @param server - The server index.
+ * @param time - Optional reference timestamp (defaults to `Date.now()`).
+ * @returns The event ID, or null if no events exist for the server.
+ */
 function getPresentEvent(events: Record<string, BestdoriEventFullRaw>, server: number, time?: number): number | null {
     const now = time ?? Date.now();
     const eventIds = Object.keys(events).map(Number);

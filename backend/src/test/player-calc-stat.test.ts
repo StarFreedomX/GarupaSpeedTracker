@@ -1,3 +1,5 @@
+// noinspection DuplicatedCode
+
 /**
  * 综合力计算单元测试
  *

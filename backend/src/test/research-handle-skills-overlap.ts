@@ -1,3 +1,4 @@
+// noinspection DuplicatedCode
 /**
  * 研究：对存在技能排队重叠的谱面，计算 shifts[d_prev][d_cur] = deltaNotes
  *
@@ -11,7 +12,7 @@
  * 用法: npx tsx src/test/research-handle-skills-overlap.ts
  */
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ============ 配置 ============
@@ -34,11 +35,7 @@ const FPS_EPSILON = 1e-9;
 const OVERLAP_THRESHOLD = 8.75 + 1 / 60;
 
 /** 17 个有效技能时长 */
-const SKILL_DURATIONS = [
-    "3.0", "3.5", "4.0", "4.5", "5.0",
-    "5.5", "5.6", "5.7", "6.0", "6.2", "6.4", "6.5", "6.8",
-    "7.0", "7.2", "7.5", "8.0",
-] as const;
+const SKILL_DURATIONS = ["3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "5.6", "5.7", "6.0", "6.2", "6.4", "6.5", "6.8", "7.0", "7.2", "7.5", "8.0"] as const;
 
 // ============ 类型 ============
 
@@ -120,7 +117,10 @@ function buildBpmTimeline(bpmList: BpmPoint[]): TimelineEntry[] {
 function beatToSeconds(beat: number, timeline: TimelineEntry[]): number {
     let selected = timeline[0];
     for (const point of timeline) {
-        if (point.beat <= beat) { selected = point; continue; }
+        if (point.beat <= beat) {
+            selected = point;
+            continue;
+        }
         break;
     }
     return selected.seconds + ((beat - selected.beat) * 60) / selected.bpm;
@@ -147,7 +147,10 @@ function extractSkillEvents(items: ChartItem[], timeline: TimelineEntry[]): Skil
     // 同 beat 去重
     const deduped: SkillEvent[] = [];
     for (const e of events) {
-        if (deduped.length === 0) { deduped.push(e); continue; }
+        if (deduped.length === 0) {
+            deduped.push(e);
+            continue;
+        }
         const prev = deduped[deduped.length - 1];
         if (Math.abs(prev.beat - e.beat) <= 1e-6) continue;
         deduped.push(e);
@@ -237,11 +240,7 @@ function countNotesInWindow(noteEvents: NoteEvent[], skillTime: number, duration
  *
  * 然后 delayedStart = FsCur / fps （使得 ceil(delayedStart * fps) = FsCur）
  */
-function computePositionShifts(
-    noteEvents: NoteEvent[],
-    triggerTimePrev: number,
-    triggerTimeCur: number,
-): Record<string, Record<string, number>> {
+function computePositionShifts(noteEvents: NoteEvent[], triggerTimePrev: number, triggerTimeCur: number): Record<string, Record<string, number>> {
     const shifts: Record<string, Record<string, number>> = {};
 
     for (const dPrev of SKILL_DURATIONS) {
@@ -334,11 +333,7 @@ for (const dir of songDirs) {
             for (let i = 1; i < skillEvents.length; i++) {
                 const gap = skillEvents[i].seconds - skillEvents[i - 1].seconds;
                 if (gap < OVERLAP_THRESHOLD) {
-                    const shifts = computePositionShifts(
-                        noteEvents,
-                        skillEvents[i - 1].seconds,
-                        skillEvents[i].seconds,
-                    );
+                    const shifts = computePositionShifts(noteEvents, skillEvents[i - 1].seconds, skillEvents[i].seconds);
                     if (Object.keys(shifts).length > 0) {
                         overlaps[i] = shifts;
                     }
@@ -357,7 +352,7 @@ for (const dir of songDirs) {
 // ============ 级联排队验证 ============
 // 对存在连续重叠位置的谱面（如 pos=1,2 或 pos=4,5），验证一阶模型 vs 真实链模型
 
-console.log("\n" + "=".repeat(60));
+console.log(`\n${"=".repeat(60)}`);
 console.log("级联排队验证：一阶模型(d_prev only) vs 真实链(累积所有前驱)");
 console.log("=".repeat(60));
 
@@ -372,7 +367,9 @@ interface CascadeCase {
 const cascadeCases: CascadeCase[] = [];
 
 for (const r of results) {
-    const positions = Object.keys(r.overlaps).map(Number).sort((a, b) => a - b);
+    const positions = Object.keys(r.overlaps)
+        .map(Number)
+        .sort((a, b) => a - b);
     for (let i = 0; i < positions.length - 1; i++) {
         if (positions[i + 1] === positions[i] + 1) {
             cascadeCases.push({
@@ -391,7 +388,7 @@ if (cascadeCases.length === 0) {
     // 对每个级联案例，采样代表性的 duration 组合
     const SAMPLE_DURATIONS = ["5.0", "6.0", "7.0", "8.0"]; // 只采样 4 个最常见时长
 
-    let totalCompared = 0;
+    let _totalCompared = 0;
     let mismatchCount = 0;
     let maxMismatch = 0;
 
@@ -414,8 +411,8 @@ if (cascadeCases.length === 0) {
         const { skillEvents: se, noteEvents: ne } = normalizeChart(items);
 
         const trigger0 = se[pos1 - 1].seconds; // 第一个排队位置的前驱触发时刻
-        const trigger1 = se[pos1].seconds;     // 第一个排队位置的触发时刻
-        const trigger2 = se[pos2].seconds;     // 第二个排队位置的触发时刻
+        const trigger1 = se[pos1].seconds; // 第一个排队位置的触发时刻
+        const trigger2 = se[pos2].seconds; // 第二个排队位置的触发时刻
 
         const mismatches: Array<{ d0: string; d1: string; d2: string; simpleDelta: number; chainDelta: number }> = [];
 
@@ -442,7 +439,7 @@ if (cascadeCases.length === 0) {
                     const chainDelta = chainCount - baseline;
 
                     if (simpleDelta !== chainDelta) {
-                        totalCompared++;
+                        _totalCompared++;
                         mismatchCount++;
                         if (Math.abs(simpleDelta - chainDelta) > maxMismatch) {
                             maxMismatch = Math.abs(simpleDelta - chainDelta);
@@ -456,14 +453,16 @@ if (cascadeCases.length === 0) {
         if (mismatches.length > 0) {
             // 只输出 mismatches
             console.log(`\n[song=${cc.songId}] [${cc.difficulty}] pos ${pos1},${pos2} 级联排队：`);
-            console.log(`  trigger: #${pos1-1}=${trigger0.toFixed(2)}s  #${pos1}=${trigger1.toFixed(2)}s  #${pos2}=${trigger2.toFixed(2)}s`);
+            console.log(`  trigger: #${pos1 - 1}=${trigger0.toFixed(2)}s  #${pos1}=${trigger1.toFixed(2)}s  #${pos2}=${trigger2.toFixed(2)}s`);
             console.log(`  一阶 vs 链 不一致的 (d_prevPrev, d_prev, d_cur) 组合: ${mismatches.length} 个`);
 
             // 按简单 delta 和链 delta 的差异排序，输出最严重的几个
             mismatches.sort((a, b) => Math.abs(b.simpleDelta - b.chainDelta) - Math.abs(a.simpleDelta - a.chainDelta));
             const topN = mismatches.slice(0, 6);
             for (const m of topN) {
-                console.log(`    (${m.d0}, ${m.d1}, ${m.d2}): 一阶=${m.simpleDelta > 0 ? "+" : ""}${m.simpleDelta}  链=${m.chainDelta > 0 ? "+" : ""}${m.chainDelta}`);
+                console.log(
+                    `    (${m.d0}, ${m.d1}, ${m.d2}): 一阶=${m.simpleDelta > 0 ? "+" : ""}${m.simpleDelta}  链=${m.chainDelta > 0 ? "+" : ""}${m.chainDelta}`,
+                );
             }
         }
     }
@@ -477,13 +476,16 @@ if (cascadeCases.length === 0) {
 
 // ============ FPS 对 delta 的影响 ==========
 
-console.log("\n" + "=".repeat(60));
+console.log(`\n${"=".repeat(60)}`);
 console.log("60fps vs 120fps delta 差异分析（代表性谱面）");
 console.log("=".repeat(60));
 
-interface FpsConfig { fps: number; gap: number; }
+interface FpsConfig {
+    fps: number;
+    gap: number;
+}
 const FPS_CONFIGS: FpsConfig[] = [
-    { fps: 60,  gap: 0.75 + 2 / 60 },
+    { fps: 60, gap: 0.75 + 2 / 60 },
     { fps: 120, gap: 0.75 + 2 / 120 },
 ];
 
@@ -503,16 +505,19 @@ function countNotesAtFps(notes: NoteEvent[], st: number, dur: number, fps: numbe
 
 // 挑有代表性的谱面
 const COMPARE_CHARTS = [
-    { songId: "66",  difficulty: "expert" },  // 两个重叠位
-    { songId: "127", difficulty: "expert" },   // 连续排队
-    { songId: "162", difficulty: "expert" },   // 单次排队
-    { songId: "681", difficulty: "expert" },   // 大偏移
-    { songId: "8",   difficulty: "expert" },   // 短间隔
+    { songId: "66", difficulty: "expert" }, // 两个重叠位
+    { songId: "127", difficulty: "expert" }, // 连续排队
+    { songId: "162", difficulty: "expert" }, // 单次排队
+    { songId: "681", difficulty: "expert" }, // 大偏移
+    { songId: "8", difficulty: "expert" }, // 短间隔
 ];
 
 const DUR_PAIRS = [
-    ["5.0", "5.0"], ["7.0", "7.0"], ["8.0", "8.0"],
-    ["7.0", "5.0"], ["8.0", "5.0"],
+    ["5.0", "5.0"],
+    ["7.0", "7.0"],
+    ["8.0", "8.0"],
+    ["7.0", "5.0"],
+    ["8.0", "5.0"],
 ] as const;
 
 let totalDiffs = 0;
@@ -530,7 +535,10 @@ for (const ref of COMPARE_CHARTS) {
     // 第一个排队位置
     let pos = -1;
     for (let i = 1; i < se2.length; i++) {
-        if (se2[i].seconds - se2[i - 1].seconds < OVERLAP_THRESHOLD) { pos = i; break; }
+        if (se2[i].seconds - se2[i - 1].seconds < OVERLAP_THRESHOLD) {
+            pos = i;
+            break;
+        }
     }
     if (pos < 0) continue;
 
@@ -572,7 +580,10 @@ if (totalDiffs > 0) {
 
         let pos = -1;
         for (let i = 1; i < se2.length; i++) {
-            if (se2[i].seconds - se2[i - 1].seconds < OVERLAP_THRESHOLD) { pos = i; break; }
+            if (se2[i].seconds - se2[i - 1].seconds < OVERLAP_THRESHOLD) {
+                pos = i;
+                break;
+            }
         }
         if (pos < 0) continue;
 
@@ -618,12 +629,16 @@ if (totalDiffs > 0) {
             const min120End = st120 + dcn;
 
             const count60 = ne2.reduce((c, n) => {
-                const eps = 1e-9; const Fs = Math.ceil(st60 * 60); const Fe = Fs + Math.ceil(dcn * 60 - eps) + 1;
+                const eps = 1e-9;
+                const Fs = Math.ceil(st60 * 60);
+                const Fe = Fs + Math.ceil(dcn * 60 - eps) + 1;
                 const Fn = Math.ceil(n.seconds * 60);
                 return c + (n.seconds > st60 && Fn > Fs && Fn <= Fe ? 1 : 0);
             }, 0);
             const count120 = ne2.reduce((c, n) => {
-                const eps = 1e-9; const Fs = Math.ceil(st120 * 120); const Fe = Fs + Math.ceil(dcn * 120 - eps) + 1;
+                const eps = 1e-9;
+                const Fs = Math.ceil(st120 * 120);
+                const Fe = Fs + Math.ceil(dcn * 120 - eps) + 1;
                 const Fn = Math.ceil(n.seconds * 120);
                 return c + (n.seconds > st120 && Fn > Fs && Fn <= Fe ? 1 : 0);
             }, 0);
@@ -646,7 +661,7 @@ if (totalDiffs > 0) {
     }
 }
 
-console.log("\n" + "=".repeat(60));
+console.log(`\n${"=".repeat(60)}`);
 console.log(`技能排队偏移分析  (FINISH_GAP=${FINISH_GAP.toFixed(3)}s, fps=${FPS}, 阈值=${OVERLAP_THRESHOLD.toFixed(3)}s)`);
 console.log("=".repeat(60));
 
@@ -686,18 +701,20 @@ if (results.length === 0) {
             const curDurs = [...allCurDurs].sort((a, b) => Number(a) - Number(b));
 
             // 表头
-            const header = "    d_prev\\d_cur " + curDurs.map((d) => d.padStart(5)).join("");
+            const header = `    d_prev\\d_cur ${curDurs.map((d) => d.padStart(5)).join("")}`;
             console.log(header);
-            console.log("    " + "-".repeat(header.length - 4));
+            console.log(`    ${"-".repeat(header.length - 4)}`);
 
             // 表体
             for (const pd of prevDurations) {
-                const row = curDurs.map((cd) => {
-                    const val = shifts[pd]?.[cd];
-                    if (val === undefined) return "     ";
-                    const sign = val > 0 ? "+" : "";
-                    return `${sign}${val}`.padStart(5);
-                }).join("");
+                const row = curDurs
+                    .map((cd) => {
+                        const val = shifts[pd]?.[cd];
+                        if (val === undefined) return "     ";
+                        const sign = val > 0 ? "+" : "";
+                        return `${sign}${val}`.padStart(5);
+                    })
+                    .join("");
                 console.log(`    ${pd.padStart(5)}  ${row}`);
             }
         }

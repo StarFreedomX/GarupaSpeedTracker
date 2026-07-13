@@ -5,9 +5,9 @@ import https from "node:https";
 import path from "node:path";
 import axios from "axios";
 import {
-    BESTDORI_TIMEOUT_MS,
     DISK_CACHE_CLEANUP_INTERVAL_MS,
     DISK_CACHE_MAX_BYTES,
+    DOWNLOADER_TIMEOUT_MS,
     INFO_CACHE_TIME,
     MEMORY_CACHE_MAX_BYTES,
     MEMORY_CACHE_MAX_ENTRIES,
@@ -42,12 +42,15 @@ interface MemoryDownloadCacheEntry<T> {
 }
 
 export interface DownloadCacheOptions<T> {
+    /** Custom expiry callback that computes expireAt from the downloaded body. */
     getExpireAt?: (body: T) => number;
-    /** 后台异步刷新缓存（仍返回当前缓存数据） */
+    /** When true, serves the current cache entry while refreshing in the background. */
     backUpdate?: boolean;
-    /** 强制抓取并更新缓存（忽略已有缓存） */
+    /** When true, bypasses cache and forces a fresh download. */
     forceUpdate?: boolean;
+    /** When true, returns an expired cache entry if still available (fallback). */
     allowExpired?: boolean;
+    /** Fallback TTL in ms when the body does not provide an expiry. */
     fallbackTtlMs?: number;
 }
 
@@ -60,7 +63,7 @@ interface ReadCacheResult<T> {
 const defaultTtlMs = INFO_CACHE_TIME * 1000;
 
 const axiosClient = axios.create({
-    timeout: BESTDORI_TIMEOUT_MS,
+    timeout: DOWNLOADER_TIMEOUT_MS,
     httpAgent: new http.Agent({
         keepAlive: true,
         keepAliveMsecs: 30_000, // 空闲 30s 后关闭 socket
@@ -101,6 +104,16 @@ const toCachePath = (key: string): string => {
 
 const toMetaPath = (key: string): string => toCachePath(key).replace(/\.json$/, ".meta.json");
 
+/**
+ * HTTP downloader with a two-tier in-memory + on-disk cache.
+ *
+ * Maintains an LRU memory cache and a file-based disk cache keyed by URL.
+ * Supports background refresh, forced re-fetch, and expired-entry fallback.
+ * Disk cache cleanup runs on a configurable interval, evicting the oldest files
+ * when total bytes exceed the limit.
+ *
+ * The class is a singleton — use the exported {@link downloader} instance.
+ */
 class Downloader {
     private readonly memory = new Map<string, MemoryDownloadCacheEntry<unknown>>();
     private readonly inFlight = new Map<string, Promise<DownloadCacheEntry<unknown>>>();
@@ -116,22 +129,89 @@ class Downloader {
         }
     }
 
-    public async download<T>(url: string): Promise<T> {
-        logger("bestdori", `fetching ${url}`);
+    /**
+     * Fetches a URL directly (no cache). Used for uncacheable data or as the
+     * underlying fetch inside {@link downloadCache}.
+     *
+     * @param url - The URL to fetch.
+     * @param headers - Optional custom request headers.
+     * @throws An error with status 504 (timeout) or 502 (other upstream failure).
+     */
+    public async download<T>(url: string, headers?: Record<string, string>): Promise<T> {
+        logger("downloader", `fetching ${url}`);
 
         try {
-            const response = await axiosClient.get<T>(url);
+            const response = await axiosClient.get<T>(url, headers ? { headers } : undefined);
             return response.data;
         } catch (error: unknown) {
             const axiosError = error as { code?: string; message?: string };
-            logger("bestdori", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
+            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
 
-            const upstreamError = new Error("Bestdori upstream request failed") as Error & { status?: number };
+            const upstreamError = new Error("downloader upstream request failed") as Error & { status?: number };
             upstreamError.status = axiosError.code === "ECONNABORTED" ? 504 : 502;
             throw upstreamError;
         }
     }
 
+    /**
+     * Fetches a URL and returns the raw binary response without parsing or caching.
+     * The caller is responsible for interpreting the response body.
+     *
+     * Uses an `arraybuffer` response type and accepts all HTTP status codes
+     * (non-2xx responses are returned rather than thrown).
+     *
+     * @param url - The URL to fetch.
+     * @param headers - Optional custom request headers.
+     * @param timeoutMs - Optional per-request timeout in milliseconds (overrides the global axios timeout).
+     * @throws An error with status 504 (timeout) or 502 (other upstream/transport failure).
+     */
+    public async downloadRaw(
+        url: string,
+        headers?: Record<string, string>,
+        timeoutMs?: number,
+    ): Promise<{ status: number; body: Buffer; headers: Record<string, string> }> {
+        logger("downloader", `fetching raw ${url}`);
+
+        try {
+            const config: Record<string, unknown> = {
+                headers,
+                responseType: "arraybuffer",
+                validateStatus: () => true,
+            };
+            if (timeoutMs !== undefined) {
+                config.timeout = timeoutMs;
+            }
+
+            const response = await axiosClient.get(url, config);
+            return {
+                status: response.status,
+                body: Buffer.from(response.data as ArrayBuffer),
+                headers: (response.headers as Record<string, string>) ?? {},
+            };
+        } catch (error: unknown) {
+            const axiosError = error as { code?: string; message?: string };
+            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
+
+            const upstreamError = new Error("downloader upstream request failed") as Error & { status?: number };
+            upstreamError.status = axiosError.code === "ECONNABORTED" ? 504 : 502;
+            throw upstreamError;
+        }
+    }
+
+    /**
+     * Downloads a URL through the caching layer.
+     *
+     * Behaviour depends on the provided {@link DownloadCacheOptions}:
+     * - **forceUpdate**: ignores cache, fetches fresh, and persists the result.
+     * - **cache hit (not expired)**: returns cached data immediately; optionally
+     *   refreshes in the background when `backUpdate` is set.
+     * - **expired cache**: if `allowExpired` is set returns the stale entry while
+     *   refreshing in the background; otherwise fetches fresh data.
+     * - **cache miss**: fetches fresh data and persists it.
+     *
+     * Concurrent requests for the same URL are coalesced — only one network
+     * request is in-flight at a time per key.
+     */
     public async downloadCache<T>(url: string, options?: DownloadCacheOptions<T>): Promise<T> {
         const key = toCacheKey(url);
 
@@ -161,6 +241,9 @@ class Downloader {
         return fresh.body;
     }
 
+    /**
+     * Formats a byte count into a human-readable string (MB and raw bytes).
+     */
     public formatBytes(value: number): string {
         return `${(value / 1024 / 1024).toFixed(2)}MB (${value.toLocaleString()} bytes)`;
     }
@@ -551,4 +634,7 @@ class Downloader {
     }
 }
 
+/**
+ * Singleton downloader instance shared across the application.
+ */
 export const downloader = new Downloader();

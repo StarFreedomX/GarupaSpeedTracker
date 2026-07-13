@@ -1,3 +1,5 @@
+// noinspection DuplicatedCode
+
 /**
  * 活动综合力探究脚本
  *

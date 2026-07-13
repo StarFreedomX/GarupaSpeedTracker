@@ -6,7 +6,30 @@ interface ProtoFieldRaw {
     data: number | Buffer;
 }
 
+/**
+ * A low-level protobuf decoder that reads wire-format binary data without requiring
+ * precompiled `.proto` definitions. It parses raw tag/wire-type/length-value fields
+ * from a Buffer and then maps them to typed JavaScript values according to a runtime
+ * {@link SchemaDefinition}.
+ *
+ * **Decoding approach:**
+ * 1. **Raw field parsing** (`parseRawFields`): Iterates through the buffer byte by byte,
+ *    reading varint-encoded field keys and extracting wire-type-specific payloads
+ *    (varint, length-delimited, 64-bit fixed, or 32-bit fixed).
+ * 2. **Field grouping**: Groups raw fields by their protobuf field number.
+ * 3. **Schema-driven conversion** (`decode`): For each field in the provided schema, the
+ *    grouped raw fields are converted to the target type (`int`, `long`, `bool`, `string`,
+ *    `bytes`, `double`, `float`, or nested `message`). Repeated fields produce arrays;
+ *    non-repeated fields take the last valid occurrence (robust to trailing garbage).
+ * 4. **Wire-type validation**: Each raw field's wire type is checked against the expected
+ *    type; mismatches are silently skipped to tolerate malformed or extra data.
+ */
 export class GarupaParser {
+    /**
+     * Reads a protobuf varint from the buffer starting at the given offset.
+     * Returns the decoded value and the new offset position.
+     * @throws If the varint exceeds 56 bits or the buffer ends unexpectedly
+     */
     private readVarint(buffer: Buffer, offset: number): { value: number; offset: number } {
         let value = 0;
         let shift = 0;
@@ -27,6 +50,11 @@ export class GarupaParser {
         throw new Error("Unexpected end of buffer while reading varint");
     }
 
+    /**
+     * Parses the entire buffer into a flat list of raw protobuf fields.
+     * Each entry contains the field number, wire type, and raw data (number for varint, Buffer for length-delimited/fixed).
+     * A field key of zero or an unrecoverable parse error terminates the loop.
+     */
     private parseRawFields(buffer: Buffer): ProtoFieldRaw[] {
         const results: ProtoFieldRaw[] = [];
         let offset = 0;
@@ -107,6 +135,17 @@ export class GarupaParser {
         return results;
     }
 
+    /**
+     * Decodes a protobuf-encoded Buffer into a typed JavaScript object using the provided schema.
+     *
+     * The schema maps field numbers to their names, types, and optional nested sub-schemas.
+     * Wire-type validation ensures only correctly-typed fields are assigned; mismatches are
+     * silently skipped. For non-repeated fields, the last valid occurrence wins.
+     *
+     * @param buffer - Raw protobuf binary data
+     * @param schema - Schema definition mapping field numbers to type descriptors
+     * @returns The decoded object cast to the generic type `T`
+     */
     public decode<T = unknown>(buffer: Buffer, schema: SchemaDefinition): T {
         const rawFields = this.parseRawFields(buffer);
         const result: Record<string, unknown> = {};

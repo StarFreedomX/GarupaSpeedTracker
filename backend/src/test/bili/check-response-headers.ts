@@ -24,21 +24,27 @@ async function main() {
     const res = await fetch(url, { headers: buildCnRankingHeaders(rid) });
     console.log(`HTTP ${res.status}`);
     console.log(`\n=== 所有响应头 ===`);
-    res.headers.forEach((v, k) => console.log(`  ${k}: ${v}`));
+    res.headers.forEach((v, k) => {
+        console.log(`  ${k}: ${v}`);
+    });
 
     // 也检查 application 的响应头
     console.log(`\n=== application 响应头 ===`);
     const appUrl = new URL("application", CN_BASE_URL).toString();
     const appRes = await fetch(appUrl, { headers: buildCnRankingHeaders(rid) });
     console.log(`HTTP ${appRes.status}`);
-    appRes.headers.forEach((v, k) => console.log(`  ${k}: ${v}`));
+    appRes.headers.forEach((v, k) => {
+        console.log(`  ${k}: ${v}`);
+    });
 
     // 检查 event info 响应头
     console.log(`\n=== event info 响应头 ===`);
     const evtUrl = new URL("event", CN_BASE_URL).toString();
     const evtRes = await fetch(evtUrl, { headers: buildCnRankingHeaders(rid) });
     console.log(`HTTP ${evtRes.status}`);
-    evtRes.headers.forEach((v, k) => console.log(`  ${k}: ${v}`));
+    evtRes.headers.forEach((v, k) => {
+        console.log(`  ${k}: ${v}`);
+    });
 }
 
 main().catch(console.error);

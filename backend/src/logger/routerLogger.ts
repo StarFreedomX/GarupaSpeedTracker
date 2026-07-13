@@ -1,5 +1,12 @@
 import type { Context } from "koa";
 
+/**
+ * Koa middleware that logs every incoming HTTP request and its response.
+ *
+ * Logs the client IP, HTTP method, and URL on request start. After the
+ * downstream middleware completes, logs the response status, elapsed time,
+ * and approximate body size in KB.
+ */
 export const loggerMiddleware = async (ctx: Context, next: () => Promise<void>) => {
     const start = Date.now();
     const timeString = new Date().toLocaleTimeString("en-GB", { hour12: false });

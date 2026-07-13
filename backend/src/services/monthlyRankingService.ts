@@ -1,6 +1,4 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { fetchMonthlyRanking, fetchMonthlyRankingBuffer } from "@/api/garupa";
+import { fetchMonthlyRanking } from "@/api/garupa";
 import {
     MONGODB_GARUPA_META_COLLECTION,
     MONGODB_MONTHLY_BORDER_POINTS_COLLECTION,
@@ -58,11 +56,24 @@ export const getCurrentMonthlyId = async (server: number, date: Date = new Date(
 
 export const getMonthlyRankingServerCount = (): number => garupaService.getServerCount();
 
+/**
+ * Manages monthly ranking data collection, persistence, and queries.
+ *
+ * Polls the Garupa API at a regular interval, stores top/border snapshots
+ * for monthly point rankings in MongoDB, and provides methods to retrieve
+ * historical ranking data. On startup, runs legacy data migrations and a
+ * bootstrap check that backfills any missing monthly data.
+ */
 class MonthlyRankingService {
     constructor() {
         garupaService.start();
     }
 
+    /**
+     * Initializes the service by running legacy data migrations, then
+     * launches a bootstrap check to backfill missing monthly data, and
+     * registers a poller to periodically refresh all active servers.
+     */
     start(): void {
         garupaService.start();
 
@@ -241,6 +252,11 @@ class MonthlyRankingService {
         }
     }
 
+    /**
+     * Iterates all active servers, fetches the active monthly ID for each,
+     * and refreshes ranking data. Uses {@link Promise.allSettled} so that
+     * a failure on one server does not block others.
+     */
     async refreshAll(): Promise<void> {
         const servers = garupaService.getActiveServerIds();
         await Promise.allSettled(
@@ -252,65 +268,48 @@ class MonthlyRankingService {
         );
     }
 
+    /**
+     * Wraps ranking fetches in {@link garupaService.runWithAvailability}
+     * to respect per-server rate limits. Fetches monthly point ranking,
+     * clamps timestamps past the ranking end time, and persists snapshots
+     * via the corresponding persistence methods.
+     *
+     * @param server    The game server identifier
+     * @param monthlyId The monthly ranking identifier
+     */
     async refreshServer(server: number, monthlyId: number): Promise<void> {
         await garupaService.runWithAvailability(
             server,
             async () => {
                 const currentVersion = getClientVersion(server);
 
-                try {
-                    const raw = await fetchMonthlyRanking(server, monthlyId, currentVersion);
-                    let timestamp = Date.now();
-                    const info = await monthlyRankingInfoService.getMonthlyRankingDetail(monthlyId);
-                    const endAt = info?.endAt?.[server];
-                    if (endAt && timestamp > endAt) {
-                        timestamp = endAt;
-                        logger("monthlyRanking", `monthly=${monthlyId} has ended. Clamping timestamp to endAt: ${new Date(timestamp).toISOString()}`);
-                    }
-                    await this.retryPersist("persistTopSnapshot", () => this.persistTopSnapshot(server, monthlyId, timestamp, raw));
-                    await this.retryPersist("persistBorderByTier", () => this.persistBorderByTier(server, monthlyId, timestamp, raw));
-                    logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
-                    return;
-                } catch (error) {
-                    const diagDir = path.join("cache", "diag");
-                    await fs.mkdir(diagDir, { recursive: true });
-                    const ts = Date.now();
-                    const binFile = path.join(diagDir, `monthly-${server}-${monthlyId}-${ts}.bin`);
-                    const metaFile = path.join(diagDir, `monthly-${server}-${monthlyId}-${ts}.json`);
-                    try {
-                        const diag = await fetchMonthlyRankingBuffer(server, monthlyId, currentVersion);
-                        await fs.writeFile(binFile, diag.decrypted);
-                        await fs.writeFile(
-                            metaFile,
-                            JSON.stringify({
-                                error: (error as Error)?.message || String(error),
-                                server,
-                                monthlyId,
-                                status: diag.status,
-                                length: diag.length,
-                                timestamp: ts,
-                            }),
-                        );
-                        logger("monthlyRanking", `diagnostic saved: ${binFile} (${diag.length}B)`);
-                    } catch {
-                        await fs.writeFile(
-                            metaFile,
-                            JSON.stringify({
-                                error: (error as Error)?.message || String(error),
-                                server,
-                                monthlyId,
-                                diagnosticFetchFailed: true,
-                                timestamp: ts,
-                            }),
-                        );
-                    }
-                    throw error;
+                const raw = await fetchMonthlyRanking(server, monthlyId, currentVersion);
+                let timestamp = Date.now();
+                const info = await monthlyRankingInfoService.getMonthlyRankingDetail(monthlyId);
+                const endAt = info?.endAt?.[server];
+                if (endAt && timestamp > endAt) {
+                    timestamp = endAt;
+                    logger("monthlyRanking", `monthly=${monthlyId} has ended. Clamping timestamp to endAt: ${new Date(timestamp).toISOString()}`);
                 }
+                await this.retryPersist("persistTopSnapshot", () => this.persistTopSnapshot(server, monthlyId, timestamp, raw));
+                await this.retryPersist("persistBorderByTier", () => this.persistBorderByTier(server, monthlyId, timestamp, raw));
+                logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
+                return;
             },
             { timeoutMs: 2000 },
         );
     }
 
+    /**
+     * Retrieves the full monthly ranking top history for a given server
+     * and monthly ID. Aggregates point snapshots from all buckets, sorts
+     * them by timestamp, and resolves associated player metadata from the
+     * shared player collection.
+     *
+     * @param server    The game server identifier
+     * @param monthlyId The monthly ranking identifier
+     * @returns Combined points array and player metadata
+     */
     async getTopSnapshot(server: number, monthlyId: number): Promise<MonthlyRankingTopResponse> {
         const query = await topCollection.find({ server, monthlyId });
         const records = await query.sort({ bucket: 1 }).toArray();
@@ -338,7 +337,18 @@ class MonthlyRankingService {
         return { points, users };
     }
 
-    //  持久化
+    /**
+     * Persists a monthly ranking top snapshot to MongoDB.
+     *
+     * Converts raw ranking data into timestamped point records, groups
+     * them into 8-day buckets, and upserts the bucket document. Also
+     * upserts individual player profiles to the shared player collection.
+     *
+     * @param server    The game server identifier
+     * @param monthlyId The monthly ranking identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param raw       The raw ranking data from the Garupa API
+     */
     private async persistTopSnapshot(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const newPoints = raw.monthlyRankingPointTopUsers.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
         const currentTopUsers: RankingUser[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
@@ -371,6 +381,15 @@ class MonthlyRankingService {
         );
     }
 
+    /**
+     * Retrieves monthly ranking border cutoff history for a given server,
+     * monthly ID, and tier. Returns cutoffs sorted by time.
+     *
+     * @param server    The game server identifier
+     * @param monthlyId The monthly ranking identifier
+     * @param tier      The ranking tier (e.g., 100, 1000, 5000)
+     * @returns Border cutoff data with sorted time series
+     */
     async getBorderPoints(server: number, monthlyId: number, tier: MonthlyRankingBorderTier): Promise<MonthlyRankingBorderResponse> {
         const record = await borderCollection.findOne({ server, monthlyId, tier });
         if (!record) {
@@ -385,6 +404,17 @@ class MonthlyRankingService {
         };
     }
 
+    /**
+     * Persists monthly ranking border cutoffs by tier to MongoDB.
+     *
+     * Builds tier-bucketed cutoff points from raw border user data
+     * and upserts each tier's cutoffs array into the border collection.
+     *
+     * @param server    The game server identifier
+     * @param monthlyId The monthly ranking identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param raw       The raw ranking data from the Garupa API
+     */
     private async persistBorderByTier(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const byTier = buildBorderBuckets(raw, timestamp);
         logger("monthlyRanking", `border tiers parsed server=${server} monthly=${monthlyId}: [${Array.from(byTier.keys()).join(",")}]`);

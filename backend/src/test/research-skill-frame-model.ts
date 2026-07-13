@@ -1,12 +1,13 @@
+// noinspection DuplicatedCode
 /**
  * 技能帧计数模型研究
- * 
+ *
  * 研究目标：
  * 1. 验证 ceil(t * fps) 帧计数模型正确性
  * 2. 对比 60fps vs 120fps 覆盖差异
  * 3. 验证 delta 编码方案（diff 范围 0-9）
  * 4. 交叉验证 fumeinn-verification 数据
- * 
+ *
  * 运行: npx ts-node -r tsconfig-paths/register src/test/research-skill-frame-model.ts
  */
 
@@ -131,10 +132,7 @@ function beatToSeconds(beat: number, timeline: Array<{ beat: number; bpm: number
     return selected.seconds + ((beat - selected.beat) * 60) / selected.bpm;
 }
 
-function extractSkillEvents(
-    item: ChartItem,
-    timeline: Array<{ beat: number; bpm: number; seconds: number }>,
-): BeatEvent[] {
+function extractSkillEvents(item: ChartItem, timeline: Array<{ beat: number; bpm: number; seconds: number }>): BeatEvent[] {
     if (item.type === "Single") {
         return item.skill ? [{ beat: item.beat, seconds: beatToSeconds(item.beat, timeline) }] : [];
     }
@@ -145,10 +143,7 @@ function extractSkillEvents(
     return [];
 }
 
-function extractNoteEvents(
-    item: ChartItem,
-    timeline: Array<{ beat: number; bpm: number; seconds: number }>,
-): BeatEvent[] {
+function extractNoteEvents(item: ChartItem, timeline: Array<{ beat: number; bpm: number; seconds: number }>): BeatEvent[] {
     switch (item.type) {
         case "Single":
             return item.skill ? [] : [{ beat: item.beat, seconds: beatToSeconds(item.beat, timeline) }];
@@ -167,9 +162,7 @@ function extractNoteEvents(
 function normalizeChart(chart: Chart): NormalizedChart {
     const timeline = extractBpmList(chart);
 
-    let skillEvents = chart
-        .flatMap((item) => extractSkillEvents(item, timeline))
-        .sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+    let skillEvents = chart.flatMap((item) => extractSkillEvents(item, timeline)).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
 
     // 同一 beat 的多技能点去重（big-keys / 多轨技能）
     const deduped: BeatEvent[] = [];
@@ -187,9 +180,7 @@ function normalizeChart(chart: Chart): NormalizedChart {
     }
     skillEvents = deduped;
 
-    const noteEvents = chart
-        .flatMap((item) => extractNoteEvents(item, timeline))
-        .sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
+    const noteEvents = chart.flatMap((item) => extractNoteEvents(item, timeline)).sort((a, b) => a.beat - b.beat || a.seconds - b.seconds);
 
     return {
         total: skillEvents.length + noteEvents.length,
@@ -204,19 +195,14 @@ function normalizeChart(chart: Chart): NormalizedChart {
 
 /**
  * 计算单个技能窗口在指定 fps 下覆盖的 note 数量。
- * 
+ *
  * 帧模型:
  *   F_s   = ceil(skillTime * fps)           // 触发帧（本帧无加成）
  *   F_end = F_s + ⌈duration * fps⌉ + 1      // dur*fps 次递减 + 1 帧结束红利
  *                                           // 实现: ceil(duration*fps - 1e-9) 防浮点误差
  *   note 受加成 ⇔  ceil(noteTime * fps) ∈ (F_s, F_end]
  */
-function countNotesInSkillWindow(
-    noteEvents: BeatEvent[],
-    skillTime: number,
-    durationSec: number,
-    fps: number,
-): number {
+function countNotesInSkillWindow(noteEvents: BeatEvent[], skillTime: number, durationSec: number, fps: number): number {
     const F_s = Math.ceil(skillTime * fps);
     const FPS_EPSILON = 1e-9;
     const F_end = F_s + Math.ceil(durationSec * fps - FPS_EPSILON) + 1;
@@ -326,8 +312,8 @@ function verifyFumeinnData(): boolean {
     const skillBeat = 288;
     const noteBeat = 303.5;
 
-    const skillTime = skillBeat * 60 / BPM;
-    const noteTime = noteBeat * 60 / BPM;
+    const skillTime = (skillBeat * 60) / BPM;
+    const noteTime = (noteBeat * 60) / BPM;
 
     const noteEvent: BeatEvent = { beat: noteBeat, seconds: noteTime };
 
@@ -371,11 +357,7 @@ function printMatrix(label: string, matrix: number[][]) {
  * 打印差值矩阵: to - from
  * 返回 [最小差, 最大差]
  */
-function printDiffMatrix(
-    label: string,
-    from: number[][],
-    to: number[][],
-): { fromMin: number; fromMax: number } {
+function printDiffMatrix(label: string, from: number[][], to: number[][]): { fromMin: number; fromMax: number } {
     console.log(`  ${label}`);
     let fromMin = 0;
     let fromMax = 0;

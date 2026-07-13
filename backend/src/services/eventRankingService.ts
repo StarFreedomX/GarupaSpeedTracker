@@ -1,6 +1,4 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { fetchEventRanking, fetchEventRankingBuffer } from "@/api/garupa";
+import { fetchEventRanking } from "@/api/garupa";
 import {
     BESTDORI_API,
     EVENT_RANKING_REFRESH_INTERVAL_MS,
@@ -14,6 +12,7 @@ import { logger } from "@/logger";
 import { eventInfoService } from "@/services/eventInfoService";
 import { garupaService } from "@/services/garupaService";
 import { database } from "@/storage/dataBaseAdapter/mongodb";
+import { downloader } from "@/storage/downloader";
 import type {
     EventRankingBandoriRaw,
     EventRankingBorderDocument,
@@ -97,11 +96,24 @@ const MEDLEY_EVENT_TYPES = new Set(["medley"]);
 // Service
 // ============================================================================
 
+/**
+ * Manages event ranking data collection, persistence, and queries.
+ *
+ * Polls the Garupa API at a regular interval, stores top/border snapshots
+ * for event point rankings and music rankings in MongoDB, and provides
+ * methods to retrieve historical ranking data. On first startup, seeds
+ * active event data from the Bestdori API as a bootstrap step.
+ */
 class EventRankingService {
     constructor() {
         garupaService.start();
     }
 
+    /**
+     * Initializes the service by starting the Garupa service, registering
+     * a poller to periodically refresh all active servers, and launching
+     * a one-time bootstrap sync from Bestdori to seed historical event data.
+     */
     start(): void {
         garupaService.start();
         garupaService.registerPoller("eventRanking", async () => this.refreshAll(), EVENT_RANKING_REFRESH_INTERVAL_MS);
@@ -112,10 +124,14 @@ class EventRankingService {
         });
     }
 
-    // ========================================================================
-    // Bestdori bootstrap — seed active event data on first startup
-    // ========================================================================
-
+    /**
+     * Seeds active event data from the Bestdori API on first startup.
+     *
+     * For each configured server, checks whether local event top data
+     * already exists; if not, fetches event top points, player profiles,
+     * and border cutoffs for all tiers from Bestdori and persists them
+     * to MongoDB so that historical data is available immediately.
+     */
     private async bootstrapFromBestdori(): Promise<void> {
         await database.ready();
         const servers = garupaService.getConfiguredServerIds();
@@ -136,12 +152,7 @@ class EventRankingService {
             try {
                 // Fetch event top from Bestdori
                 const topUrl = `${BESTDORI_API}eventtop/data?server=${server}&event=${eventId}`;
-                const topRes = await fetch(topUrl);
-                if (!topRes.ok) {
-                    logger("eventRanking", `Bootstrap: Bestdori top fetch failed for event=${eventId} HTTP ${topRes.status}`);
-                    continue;
-                }
-                const topData = (await topRes.json()) as EventRankingTopResponse;
+                const topData = await downloader.download<EventRankingTopResponse>(topUrl);
                 if (!topData.points || topData.points.length === 0) {
                     logger("eventRanking", `Bootstrap: Bestdori returned empty top data for event=${eventId}`);
                     continue;
@@ -177,9 +188,7 @@ class EventRankingService {
                 for (const tier of EVENT_RANKING_BORDER_TIERS) {
                     try {
                         const borderUrl = `${BESTDORI_API}tracker/data?server=${server}&event=${eventId}&tier=${tier}`;
-                        const borderRes = await fetch(borderUrl);
-                        if (!borderRes.ok) continue;
-                        const borderData = (await borderRes.json()) as EventRankingBorderResponse;
+                        const borderData = await downloader.download<EventRankingBorderResponse>(borderUrl);
                         if (!borderData.cutoffs || borderData.cutoffs.length === 0) continue;
 
                         await eventBorderCollection.updateOne(
@@ -232,6 +241,11 @@ class EventRankingService {
     // Polling
     // ========================================================================
 
+    /**
+     * Iterates all active servers, fetches the active event ID for each,
+     * and refreshes ranking data. Uses {@link Promise.allSettled} so that
+     * a failure on one server does not block others.
+     */
     async refreshAll(): Promise<void> {
         const servers = garupaService.getActiveServerIds();
         await Promise.allSettled(
@@ -243,6 +257,16 @@ class EventRankingService {
         );
     }
 
+    /**
+     * Wraps ranking fetches in {@link garupaService.runWithAvailability}
+     * to respect per-server rate limits. Fetches event point ranking and,
+     * depending on the event type (challenge, versus, or medley), also
+     * fetches music ranking data, then persists snapshots via the
+     * corresponding persistence methods.
+     *
+     * @param server  The game server identifier
+     * @param eventId The active event ID to fetch rankings for
+     */
     async refreshServer(server: number, eventId: number): Promise<void> {
         await garupaService.runWithAvailability(
             server,
@@ -254,89 +278,48 @@ class EventRankingService {
                     return;
                 }
 
-                try {
-                    // 1. Fetch event point ranking (without mid)
-                    const raw = await fetchEventRanking(server, eventId, eventType, clientVersion);
-                    let timestamp = Date.now();
-                    const info = await eventInfoService.getEventDetail(eventId);
-                    const endAt = info?.endAt?.[server];
-                    if (endAt && timestamp > endAt) {
-                        timestamp = endAt;
-                        logger("eventRanking", `event=${eventId} has ended. Clamping timestamp to endAt.`);
-                    }
-
-                    await this.retryPersist("persistEventTopSnapshot", () => this.persistEventTopSnapshot(server, eventId, timestamp, raw));
-                    await this.retryPersist("persistEventBorderByTier", () => this.persistEventBorderByTier(server, eventId, timestamp, raw));
-
-                    // 2. Handle music rankings
-                    if (raw.musicRankings && raw.musicRankings.length > 0) {
-                        // challenge/versus: music rankings nested in response
-                        for (const musicRaw of raw.musicRankings) {
-                            await this.retryPersist("persistMusicTopSnapshot", () =>
-                                this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw),
-                            );
-                            await this.retryPersist("persistMusicBorderByTier", () =>
-                                this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw),
-                            );
-                        }
-                    } else if (MEDLEY_EVENT_TYPES.has(eventType)) {
-                        // medley: fetch music ranking with mid=1
-                        try {
-                            const musicRaw = await fetchEventRanking(server, eventId, eventType, clientVersion, 1);
-                            // medley music ranking uses scoreTopUsers/scoreBorderUsers at top level
-                            const medleyMusic: MusicRankingBandoriRaw = {
-                                musicId: 1,
-                                scoreTopUsers: musicRaw.eventPointTopUsers,
-                                scoreBorderUsers: musicRaw.eventPointBorderUsers,
-                            };
-                            await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
-                            await this.retryPersist("persistMusicBorderByTier", () =>
-                                this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic),
-                            );
-                        } catch (err) {
-                            logger("eventRanking", `medley music fetch failed event=${eventId}: ${(err as Error)?.message || err}`);
-                        }
-                    }
-
-                    logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
-                } catch (error) {
-                    // Save full payload to cache for offline analysis
-                    const diagDir = path.join("cache", "diag");
-                    await fs.mkdir(diagDir, { recursive: true });
-                    const ts = Date.now();
-                    const binFile = path.join(diagDir, `event-${server}-${eventId}-${ts}.bin`);
-                    const metaFile = path.join(diagDir, `event-${server}-${eventId}-${ts}.json`);
-                    try {
-                        const diag = await fetchEventRankingBuffer(server, eventId, eventType, clientVersion);
-                        await fs.writeFile(binFile, diag.decrypted);
-                        await fs.writeFile(
-                            metaFile,
-                            JSON.stringify({
-                                error: (error as Error)?.message || String(error),
-                                server,
-                                eventId,
-                                eventType,
-                                status: diag.status,
-                                length: diag.length,
-                                timestamp: ts,
-                            }),
-                        );
-                        logger("eventRanking", `diagnostic saved: ${binFile} (${diag.length}B)`);
-                    } catch {
-                        await fs.writeFile(
-                            metaFile,
-                            JSON.stringify({
-                                error: (error as Error)?.message || String(error),
-                                server,
-                                eventId,
-                                eventType,
-                                diagnosticFetchFailed: true,
-                                timestamp: ts,
-                            }),
-                        );
-                    }
-                    throw error;
+                // 1. Fetch event point ranking (without mid)
+                const raw = await fetchEventRanking(server, eventId, eventType, clientVersion);
+                let timestamp = Date.now();
+                const info = await eventInfoService.getEventDetail(eventId);
+                const endAt = info?.endAt?.[server];
+                if (endAt && timestamp > endAt) {
+                    timestamp = endAt;
+                    logger("eventRanking", `event=${eventId} has ended. Clamping timestamp to endAt.`);
                 }
+
+                await this.retryPersist("persistEventTopSnapshot", () => this.persistEventTopSnapshot(server, eventId, timestamp, raw));
+                await this.retryPersist("persistEventBorderByTier", () => this.persistEventBorderByTier(server, eventId, timestamp, raw));
+
+                // 2. Handle music rankings
+                if (raw.musicRankings && raw.musicRankings.length > 0) {
+                    // challenge/versus: music rankings nested in response
+                    for (const musicRaw of raw.musicRankings) {
+                        await this.retryPersist("persistMusicTopSnapshot", () =>
+                            this.persistMusicTopSnapshot(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                        );
+                        await this.retryPersist("persistMusicBorderByTier", () =>
+                            this.persistMusicBorderByTier(server, eventId, musicRaw.musicId, timestamp, musicRaw),
+                        );
+                    }
+                } else if (MEDLEY_EVENT_TYPES.has(eventType)) {
+                    // medley: fetch music ranking with mid=1
+                    try {
+                        const musicRaw = await fetchEventRanking(server, eventId, eventType, clientVersion, 1);
+                        // medley music ranking uses scoreTopUsers/scoreBorderUsers at top level
+                        const medleyMusic: MusicRankingBandoriRaw = {
+                            musicId: 1,
+                            scoreTopUsers: musicRaw.eventPointTopUsers,
+                            scoreBorderUsers: musicRaw.eventPointBorderUsers,
+                        };
+                        await this.retryPersist("persistMusicTopSnapshot", () => this.persistMusicTopSnapshot(server, eventId, 1, timestamp, medleyMusic));
+                        await this.retryPersist("persistMusicBorderByTier", () => this.persistMusicBorderByTier(server, eventId, 1, timestamp, medleyMusic));
+                    } catch (err) {
+                        logger("eventRanking", `medley music fetch failed event=${eventId}: ${(err as Error)?.message || err}`);
+                    }
+                }
+
+                logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
             },
             { timeoutMs: 2000 },
         );
@@ -346,6 +329,18 @@ class EventRankingService {
     // Persistence — Event Top
     // ========================================================================
 
+    /**
+     * Persists an event top ranking snapshot to MongoDB.
+     *
+     * Converts raw ranking data into timestamped point records, groups
+     * them into 8-day buckets, and upserts the bucket document. Also
+     * upserts individual player profiles to the shared player collection.
+     *
+     * @param server    The game server identifier
+     * @param eventId   The event identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param raw       The raw ranking data from the Garupa API
+     */
     private async persistEventTopSnapshot(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
         const users = raw.eventPointTopUsers ?? [];
         const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
@@ -383,6 +378,18 @@ class EventRankingService {
     // Persistence — Event Border
     // ========================================================================
 
+    /**
+     * Persists event border cutoffs by tier to MongoDB.
+     *
+     * Builds tier-bucketed cutoff points from the raw border user data
+     * and upserts each tier's cutoffs array into the event border
+     * collection.
+     *
+     * @param server    The game server identifier
+     * @param eventId   The event identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param raw       The raw ranking data from the Garupa API
+     */
     private async persistEventBorderByTier(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
         const byTier = buildBorderBuckets(raw.eventPointBorderUsers, timestamp);
         logger("eventRanking", `event border tiers parsed server=${server} event=${eventId}: [${Array.from(byTier.keys()).join(",")}]`);
@@ -415,6 +422,19 @@ class EventRankingService {
     // Persistence — Music Top
     // ========================================================================
 
+    /**
+     * Persists a music ranking top snapshot to MongoDB.
+     *
+     * Similar to {@link persistEventTopSnapshot} but scoped to a specific
+     * music track within an event. Groups points into 8-day buckets and
+     * upserts player data to the shared player collection.
+     *
+     * @param server    The game server identifier
+     * @param eventId   The event identifier
+     * @param musicId   The music track identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param musicRaw  The raw music ranking data from the Garupa API
+     */
     private async persistMusicTopSnapshot(
         server: number,
         eventId: number,
@@ -454,6 +474,18 @@ class EventRankingService {
     // Persistence — Music Border
     // ========================================================================
 
+    /**
+     * Persists music ranking border cutoffs by tier to MongoDB.
+     *
+     * Builds tier-bucketed cutoff points from raw music border user data
+     * and upserts into the music border collection.
+     *
+     * @param server    The game server identifier
+     * @param eventId   The event identifier
+     * @param musicId   The music track identifier
+     * @param timestamp The snapshot timestamp (ms)
+     * @param musicRaw  The raw music ranking data from the Garupa API
+     */
     private async persistMusicBorderByTier(
         server: number,
         eventId: number,
@@ -492,6 +524,16 @@ class EventRankingService {
     // Query — Event Top
     // ========================================================================
 
+    /**
+     * Retrieves the full event top ranking history for a given server
+     * and event. Aggregates point snapshots from all buckets, sorts them
+     * by timestamp, and resolves associated player metadata from the
+     * shared player collection.
+     *
+     * @param server  The game server identifier
+     * @param eventId The event identifier
+     * @returns Combined points array and player metadata
+     */
     async getEventTopSnapshot(server: number, eventId: number): Promise<EventRankingTopResponse> {
         const query = await eventTopCollection.find({ server, eventId });
         const records = await query.sort({ bucket: 1 }).toArray();
@@ -521,6 +563,15 @@ class EventRankingService {
     // Query — Event Border
     // ========================================================================
 
+    /**
+     * Retrieves event border cutoff history for a given server, event,
+     * and tier. Returns cutoffs sorted by time.
+     *
+     * @param server  The game server identifier
+     * @param eventId The event identifier
+     * @param tier    The ranking tier (e.g., 100, 1000, 10000)
+     * @returns Border cutoff data with sorted time series
+     */
     async getEventBorderPoints(server: number, eventId: number, tier: EventRankingBorderTier): Promise<EventRankingBorderResponse> {
         const record = await eventBorderCollection.findOne({ server, eventId, tier });
         if (!record) {
@@ -535,6 +586,17 @@ class EventRankingService {
     // Query — Music Top
     // ========================================================================
 
+    /**
+     * Retrieves the full music ranking top history for a given server,
+     * event, and music track. Aggregates point snapshots from all buckets,
+     * sorts by timestamp, and resolves associated player metadata from the
+     * shared player collection.
+     *
+     * @param server  The game server identifier
+     * @param eventId The event identifier
+     * @param musicId The music track identifier
+     * @returns Combined points array and player metadata
+     */
     async getMusicTopSnapshot(server: number, eventId: number, musicId: number): Promise<MusicRankingTopResponse> {
         const query = await musicTopCollection.find({ server, eventId, musicId });
         const records = await query.sort({ bucket: 1 }).toArray();
@@ -564,6 +626,16 @@ class EventRankingService {
     // Query — Music Border
     // ========================================================================
 
+    /**
+     * Retrieves music ranking border cutoff history for a given server,
+     * event, music track, and tier. Returns cutoffs sorted by time.
+     *
+     * @param server  The game server identifier
+     * @param eventId The event identifier
+     * @param musicId The music track identifier
+     * @param tier    The ranking tier (e.g., 100, 1000, 10000)
+     * @returns Border cutoff data with sorted time series
+     */
     async getMusicBorderPoints(server: number, eventId: number, musicId: number, tier: MusicRankingBorderTier): Promise<MusicRankingBorderResponse> {
         const record = await musicBorderCollection.findOne({ server, eventId, musicId, tier });
         if (!record) {

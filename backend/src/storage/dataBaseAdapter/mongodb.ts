@@ -10,6 +10,9 @@ import {
 import { logger } from "@/logger";
 import type { Database, DatabaseCollection, DatabaseFilter, DatabaseFindQuery, DatabaseProjection, DatabaseSort, DatabaseUpdate } from "@/storage/database";
 
+/**
+ * MongoDB implementation of {@link DatabaseFindQuery} wrapping a native FindCursor.
+ */
 class MongoFindQuery<TDocument> implements DatabaseFindQuery<TDocument> {
     constructor(private readonly cursor: FindCursor<Document>) {}
 
@@ -31,6 +34,9 @@ class MongoFindQuery<TDocument> implements DatabaseFindQuery<TDocument> {
     }
 }
 
+/**
+ * MongoDB implementation of {@link DatabaseCollection} delegating to a named collection.
+ */
 class MongoCollection<TDocument> implements DatabaseCollection<TDocument> {
     constructor(
         private readonly database: MongoDatabase,
@@ -62,6 +68,13 @@ class MongoCollection<TDocument> implements DatabaseCollection<TDocument> {
     }
 }
 
+/**
+ * MongoDB implementation of the {@link Database} interface.
+ *
+ * Handles automatic connection recovery: on construction it starts a background
+ * retry loop, and reconnects when heartbeats fail. Callers can await
+ * {@link ready} before issuing queries to ensure the database is available.
+ */
 class MongoDatabase implements Database {
     private client!: MongoClient;
     private db!: import("mongodb").Db;
@@ -70,11 +83,11 @@ class MongoDatabase implements Database {
 
     constructor() {
         this.initClient();
-        // 构造时立即启动后台重试——不阻塞模块加载和服务启动
+        // Start background recovery immediately — do not block module loading or server startup.
         this.startRecovery();
     }
 
-    /** 创建/重建 MongoClient 实例。失败后重试时也会调用此方法以获得干净的连接状态。 */
+    /** Creates or recreates the MongoClient instance. Called on retry after failures to get a clean connection state. */
     private initClient(): void {
         if (this.client) {
             this.client.removeAllListeners();
@@ -111,9 +124,10 @@ class MongoDatabase implements Database {
         });
     }
 
-    /** 尝试建立连接并验证可用性。使用短超时探针快速失败，便于重试循环及时响应。 */
+    /** Attempts to establish a connection and verify availability. Uses a short-timeout probe for fast failure, allowing the retry loop to respond quickly. */
     async connect(): Promise<void> {
-        // 先用短超时探针检测数据库是否可达，避免重试循环每次等 MONGODB_SERVER_SELECTION_TIMEOUT_MS
+        // Use a short-timeout probe to check whether the database is reachable,
+        // avoiding the retry loop waiting for the full MONGODB_SERVER_SELECTION_TIMEOUT_MS each time.
         const probe = new MongoClient(MONGODB_URI, {
             serverSelectionTimeoutMS: MONGODB_CONNECT_TIMEOUT_MS,
             maxPoolSize: 1,
@@ -125,15 +139,15 @@ class MongoDatabase implements Database {
             await probe.close();
         }
 
-        // 探针通过后，连接主客户端（使用正常的 serverSelectionTimeoutMS）
+        // Probe passed — connect the main client (with normal serverSelectionTimeoutMS).
         await this.client.connect();
         await this.db.admin().ping();
         this.connected = true;
     }
 
     /**
-     * 阻塞等待数据库就绪，自动重试直到超时或成功。
-     * 不传 timeoutMs 则无限重试（用于后台恢复）。
+     * Blocks until the database is ready, retrying automatically until timeout or success.
+     * When `timeoutMs` is omitted the method retries indefinitely (used for background recovery).
      */
     async waitForReady(options?: { timeoutMs?: number; retryIntervalMs?: number }): Promise<void> {
         const timeout = options?.timeoutMs; // undefined = 无限重试
@@ -153,7 +167,7 @@ class MongoDatabase implements Database {
                     throw new Error(`MongoDB unavailable after ${elapsed}ms: ${message}`);
                 }
 
-                // 拓扑已关闭时需要重建客户端；普通连接失败（如 ECONNREFUSED）直接重试即可
+                // Topology closed — recreate the client. For ordinary connection failures (e.g. ECONNREFUSED) a simple retry is sufficient.
                 if (message.includes("Topology is closed")) {
                     logger("database", `mongodb topology closed, recreating client. retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
                     this.initClient();
@@ -166,7 +180,7 @@ class MongoDatabase implements Database {
         }
     }
 
-    /** 后台无限重试连接，防止并发重复启动。构造时和心跳断线时自动调用。 */
+    /** Background retry loop with no timeout. Prevents concurrent recovery attempts. Called automatically during construction and on heartbeat loss. */
     private startRecovery(): void {
         if (this.connected || this.recoveryPromise) {
             return;
@@ -184,9 +198,10 @@ class MongoDatabase implements Database {
     }
 
     /**
-     * 返回一个在数据库就绪时 resolve 的 Promise。
-     * 已连接时立即返回；未连接时等待后台恢复完成。
-     * 服务在需要 DB 的操作前 await database.ready() 可避免启动时因数据库未就绪而报错。
+     * Returns a Promise that resolves when the database is ready.
+     * Resolves immediately when already connected; otherwise waits for background recovery.
+     * Services should `await database.ready()` before DB-dependent operations to avoid
+     * errors due to an unavailable database at startup.
      */
     async ready(): Promise<void> {
         while (!this.connected) {
@@ -197,15 +212,24 @@ class MongoDatabase implements Database {
         }
     }
 
+    /**
+     * Returns a typed collection handle for the given name.
+     */
     collection<TDocument = Record<string, unknown>>(name: string): DatabaseCollection<TDocument> {
         return new MongoCollection<TDocument>(this, name);
     }
 
+    /**
+     * Closes the underlying MongoClient connection.
+     */
     async close(): Promise<void> {
         await this.client.close();
         logger("database", "mongodb connection closed");
     }
 
+    /**
+     * Renames a collection. No-op if the target name already exists.
+     */
     async renameCollection(oldName: string, newName: string): Promise<void> {
         const existing = await this.db.listCollections({ name: newName }).toArray();
         if (existing.length > 0) {
@@ -214,13 +238,22 @@ class MongoDatabase implements Database {
         await this.db.renameCollection(oldName, newName);
     }
 
+    /**
+     * Lists all collection names in the current database.
+     */
     async listCollectionNames(): Promise<string[]> {
         return (await this.db.listCollections().toArray()).map((c) => c.name);
     }
 
+    /**
+     * Returns a raw MongoDB Collection handle for internal/advanced usage.
+     */
     getCollectionRaw(name: string): Collection<Document> {
         return this.db.collection(name);
     }
 }
 
+/**
+ * Singleton MongoDB database adapter instance.
+ */
 export const database = new MongoDatabase();

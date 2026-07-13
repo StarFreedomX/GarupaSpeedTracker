@@ -212,8 +212,14 @@ function findExtremes(
 
     function backtrack(pos: number, currentSum: number) {
         if (pos === n) {
-            if (currentSum > maxScore) { maxScore = currentSum; bestMaxPath = [...currentPath]; }
-            if (currentSum < minScore) { minScore = currentSum; bestMinPath = [...currentPath]; }
+            if (currentSum > maxScore) {
+                maxScore = currentSum;
+                bestMaxPath = [...currentPath];
+            }
+            if (currentSum < minScore) {
+                minScore = currentSum;
+                bestMinPath = [...currentPath];
+            }
             return;
         }
 

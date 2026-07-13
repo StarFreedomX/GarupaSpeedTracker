@@ -2,7 +2,7 @@
  * 验证：同一 rid 请求不同 monthlyId 是否触发服务端缓存
  */
 import { Buffer } from "node:buffer";
-import { buildCnRankingHeaders, CN_BASE_URL, CN_UID, decryptCn } from "./config";
+import { buildCnRankingHeaders, CN_BASE_URL, decryptCn } from "./config";
 
 function readVarint(b: Buffer, o: number): { value: number; offset: number } {
     let v = 0,

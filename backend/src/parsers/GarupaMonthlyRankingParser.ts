@@ -1,41 +1,22 @@
-import { GarupaParser } from "@/parsers/GarupaParser";
-import type { GarupaMonthlyRankingRankingResponse, GarupaRankingUser } from "@/types/garupaSchema";
+import { buildUsers, garupaParser } from "@/parsers/GarupaRankingParser";
+import type { GarupaMonthlyRankingRankingResponse } from "@/types/garupaSchema";
 import { userMonthlyRankingRankingResponseSchema } from "@/types/garupaSchema";
 import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
-import type { RankingUserRaw } from "@/types/rankingUser";
 
-const garupaParser = new GarupaParser();
-
-const toNumber = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
-
-const buildDegrees = (user: GarupaRankingUser): number[] => {
-    const entries = user.userProfileDegreeMap?.entries ?? [];
-    return entries.map((entry) => toNumber(entry.value?.degreeId)).filter((value) => Number.isFinite(value));
-};
-
-const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
-    const profileSituation = user.userProfileSituation;
-    const strained = profileSituation?.illust === "after_training" ? 1 : 0;
-
-    return {
-        uid: toNumber(user.userId),
-        name: user.name ?? "",
-        introduction: user.introduction ?? "",
-        rank: toNumber(user.rankLevel),
-        sid: toNumber(profileSituation?.situationId),
-        strained,
-        degrees: buildDegrees(user),
-        tier: toNumber(user.rank),
-        point: toNumber(user.point),
-    };
-};
-
-const buildUsers = (container?: { entries?: GarupaRankingUser[] }): RankingUserRaw[] => {
-    const rows = container?.entries ?? [];
-    return rows.map((user) => parseUser(user));
-};
-
+/**
+ * Parses Garupa monthly ranking protobuf responses.
+ *
+ * Decodes the `UserMonthlyRankingRankingResponse` protobuf message and extracts
+ * the top-rank and border-rank user lists. Each user is normalized into a
+ * {@link RankingUserRaw} record with fields such as UID, name, rank, tier, points,
+ * and card degrees.
+ */
 export class GarupaMonthlyRankingParser {
+    /**
+     * Parses a decrypted monthly ranking response buffer.
+     * @param payload - Decrypted protobuf response from the Garupa API
+     * @returns Parsed monthly ranking data with top and border user arrays
+     */
     public parse(payload: Buffer): MonthlyRankingBandoriRaw {
         const parsed = garupaParser.decode<GarupaMonthlyRankingRankingResponse>(payload, userMonthlyRankingRankingResponseSchema);
         return this.buildReport(parsed);
@@ -49,4 +30,5 @@ export class GarupaMonthlyRankingParser {
     }
 }
 
+/** Singleton instance of {@link GarupaMonthlyRankingParser} used by the Garupa API client. */
 export const bandoriMonthlyRankingParser = new GarupaMonthlyRankingParser();

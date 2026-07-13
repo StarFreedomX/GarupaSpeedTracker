@@ -58,7 +58,24 @@ const toEventDetail = (entry: GarupaMasterEvent, server: number, serverCount: nu
     };
 };
 
+/**
+ * Parses the Garupa event master list protobuf response.
+ *
+ * The master list contains metadata for all events (past, current, and upcoming) on a
+ * given server. Each event entry is decoded from the `MasterEventListResponse` protobuf
+ * message and converted into an {@link EventDetail} record with per-server nullable arrays
+ * for time fields, flags, rewards, and names.
+ *
+ * The resulting {@link EventDetailList} is keyed by event ID string.
+ */
 export class GarupaEventInfoParser {
+    /**
+     * Parses a decrypted event master list response buffer.
+     * @param payload - Decrypted protobuf response
+     * @param server - Server index (used to slot values into per-server arrays)
+     * @param serverCount - Total number of configured servers (determines array dimensions)
+     * @returns An event detail list keyed by string event ID
+     */
     public parse(payload: Buffer, server: number, serverCount: number): EventDetailList {
         const parsed = garupaParser.decode<GarupaMasterEventListResponse>(payload, masterEventListSchema);
         const out: EventDetailList = {};
@@ -80,4 +97,5 @@ export class GarupaEventInfoParser {
     }
 }
 
+/** Singleton instance of {@link GarupaEventInfoParser}. */
 export const garupaEventInfoParser = new GarupaEventInfoParser();

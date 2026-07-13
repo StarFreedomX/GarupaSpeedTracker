@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { calcEventPT } from "@/features/PT/calcSinglePT";
+import type { FpsOption } from "@/features/songMeta/autoScoreMath";
 import { calcExactScoreInTurns } from "@/features/songMeta/autoScoreMath";
 import { useI18n } from "@/i18n";
 import type { Skill, SongLevelSummary } from "@/types/songMetadata";
-import type { FpsOption } from "@/features/songMeta/autoScoreMath";
 import DraggableSkillList from "./DraggableSkillList.vue";
 
 const { t } = useI18n();

@@ -2,20 +2,43 @@ import Router from "@koa/router";
 import { queryToNumber, queryToOptionalNumber, validationError } from "@/router/utils";
 import { monthlyRankingInfoService } from "@/services/monthlyRankingInfoService";
 import { getCurrentMonthlyId, getMonthlyRankingServerCount, isMonthlyRankingBorderTier, monthlyRankingService } from "@/services/monthlyRankingService";
+
+/**
+ * Router for monthly ranking endpoints — info listings, top snapshots, and border point cutoffs.
+ */
 export const monthlyRankingRouter = new Router();
 
+/**
+ * GET /monthlyRanking/info | /monthlyRanking/info.json
+ *
+ * Returns the full list of monthly ranking metadata entries (IDs, dates, status).
+ */
 monthlyRankingRouter.get(["/monthlyRanking/info", "/monthlyRanking/info.json"], async (ctx) => {
     const result = await monthlyRankingInfoService.getMonthlyRankingInfoList();
     ctx.status = 200;
     ctx.body = result;
 });
 
+/**
+ * GET /monthlyRanking/all | /monthlyRanking/all.json
+ *
+ * Returns the full list of monthly ranking detail entries including server-specific data.
+ */
 monthlyRankingRouter.get(["/monthlyRanking/all", "/monthlyRanking/all.json"], async (ctx) => {
     const result = await monthlyRankingInfoService.getMonthlyRankingDetailList();
     ctx.status = 200;
     ctx.body = result;
 });
 
+/**
+ * GET /monthlyRanking/info.:monthlyRankingId.json
+ *
+ * Returns the detail data for a specific monthly ranking by ID.
+ * Responds with 404 if the monthly ranking detail is not found.
+ *
+ * Path parameters:
+ * - `monthlyRankingId` (required, int >= 1) — Monthly ranking identifier.
+ */
 monthlyRankingRouter.get("/monthlyRanking/info.:monthlyRankingId.json", async (ctx) => {
     const monthlyRankingId = queryToNumber(ctx.params.monthlyRankingId);
 
@@ -40,6 +63,16 @@ monthlyRankingRouter.get("/monthlyRanking/info.:monthlyRankingId.json", async (c
     ctx.body = result;
 });
 
+/**
+ * GET /monthlyRanking/top | /monthlyRanking/top.json
+ *
+ * Returns the top snapshot (points + users) for a monthly ranking.
+ * If `monthlyId` is omitted the current active monthly ranking is resolved automatically.
+ *
+ * Query parameters:
+ * - `server` (required, int >= 0) — Game server index.
+ * - `monthlyId` (optional, int >= 1) — Monthly ranking ID. Defaults to current.
+ */
 monthlyRankingRouter.get(["/monthlyRanking/top", "/monthlyRanking/top.json"], async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const monthlyId = queryToOptionalNumber(ctx.query.monthlyId);
@@ -69,6 +102,18 @@ monthlyRankingRouter.get(["/monthlyRanking/top", "/monthlyRanking/top.json"], as
     ctx.body = result;
 });
 
+/**
+ * GET /monthlyRanking/border | /monthlyRanking/border.json
+ *
+ * Returns border (cutoff) points for a specific monthly ranking tier.
+ * If `monthlyId` is omitted the current active monthly ranking is resolved automatically.
+ *
+ * Query parameters:
+ * - `server` (required, int >= 0) — Game server index.
+ * - `monthlyId` (optional, int >= 1) — Monthly ranking ID. Defaults to current.
+ * - `tier` (required, int >= 1) — Border tier. Must be one of the valid monthly ranking
+ *   tiers: 20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000.
+ */
 monthlyRankingRouter.get(["/monthlyRanking/border", "/monthlyRanking/border.json"], async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const monthlyId = queryToOptionalNumber(ctx.query.monthlyId);

@@ -1,3 +1,4 @@
+// noinspection DuplicatedCode
 /**
  * 技能信息探究脚本（批量版）
  *

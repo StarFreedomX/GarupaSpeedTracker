@@ -50,6 +50,16 @@ const DIFFICULTY_ORDER: ReadonlyArray<{ key: DifficultyKey; name: string }> = [
     { key: "4", name: "special" },
 ];
 
+/**
+ * Normalizes a music item to a stable representation for hash comparison.
+ *
+ * Only the fields relevant to song identity are included (tag, band, jacket,
+ * title, publish dates, difficulty levels). This ensures that minor data
+ * differences (e.g. order of keys) do not cause false hash mismatches.
+ *
+ * @param music - The raw music item from Bestdori.
+ * @returns A plain object with normalized fields.
+ */
 const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
     tag: music.tag,
     bandId: music.bandId,
@@ -66,6 +76,14 @@ const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
     },
 });
 
+/**
+ * Computes a SHA-1 hash of the normalized song data for change detection.
+ *
+ * Songs are sorted by numeric ID before hashing to ensure deterministic output.
+ *
+ * @param payload - The raw music data response from Bestdori.
+ * @returns A hex-encoded SHA-1 digest.
+ */
 const hashSongs = (payload: MusicDataResponse): string => {
     const normalized = Object.fromEntries(
         Object.entries(payload)
@@ -75,6 +93,12 @@ const hashSongs = (payload: MusicDataResponse): string => {
     return createHash("sha1").update(JSON.stringify(normalized)).digest("hex");
 };
 
+/**
+ * Safely reads and parses a JSON file, returning undefined on any error.
+ *
+ * @param filePath - Absolute path to the JSON file.
+ * @returns The parsed value, or undefined if the file does not exist or is malformed.
+ */
 const readJson = async <T>(filePath: string): Promise<T | undefined> => {
     try {
         if (!(await fs.pathExists(filePath))) {
@@ -89,6 +113,16 @@ const readJson = async <T>(filePath: string): Promise<T | undefined> => {
     }
 };
 
+/**
+ * Atomically writes a JSON value to disk via a temp-file + rename strategy.
+ *
+ * Retries on `EBUSY` errors (up to the specified number of retries) with
+ * increasing backoff delays.
+ *
+ * @param filePath - Destination file path.
+ * @param value - The value to serialize as JSON.
+ * @param retries - Maximum retry attempts on `EBUSY` (default 3).
+ */
 const writeJson = async (filePath: string, value: unknown, retries = 3): Promise<void> => {
     await fs.ensureDir(path.dirname(filePath));
     const tempPath = `${filePath}.tmp`;
@@ -108,6 +142,18 @@ const writeJson = async (filePath: string, value: unknown, retries = 3): Promise
     }
 };
 
+/**
+ * Fetches all songs and charts from Bestdori with concurrency control,
+ * computes chart difficulty summaries, and persists results to a disk cache.
+ *
+ * The service performs incremental updates: it compares the SHA-1 hash of the
+ * normalized song data against the last known hash, and only re-fetches charts
+ * for songs that are new or have changed. Raw chart JSON files can optionally
+ * be stored on disk to speed up subsequent runs.
+ *
+ * The check interval controls how often a full re-check is allowed; within the
+ * interval, cached metadata is returned immediately.
+ */
 export class BestdoriSongMetadataService {
     private readonly downloader: DownloaderLike;
     private readonly chartParser: BestdoriChartParser;
@@ -123,6 +169,14 @@ export class BestdoriSongMetadataService {
     private state: State | undefined;
     private syncPromise: Promise<SongChartMeta> | undefined;
 
+    /**
+     * @param options - Configuration overrides.
+     * @param options.dataDir - Base directory for cache data (default: `cwd/data`).
+     * @param options.rawChartStorage - Whether to persist raw chart JSON files (default: from config).
+     * @param options.checkIntervalMs - Minimum interval between full re-checks (default: from config).
+     * @param options.concurrency - Max concurrent chart fetch operations (default: 50).
+     * @param deps - Injectable dependencies for testing.
+     */
     public constructor(
         options: Options = {},
         deps?: Partial<{ downloader: DownloaderLike; chartParser: BestdoriChartParser; levelParser: BestdoriSongLevelParser }>,
@@ -139,12 +193,24 @@ export class BestdoriSongMetadataService {
         this.concurrency = options.concurrency ?? 50;
     }
 
+    /**
+     * Returns the current chart metadata, triggering a refresh if the cached
+     * data is stale (past the check interval) or not yet loaded.
+     *
+     * @returns The full chart metadata map (song ID → difficulty → summary).
+     */
     public async getSongMetadata(): Promise<SongChartMeta> {
         await this.loadState();
         if (!this.state || this.shouldRefresh(this.state.checkedAt)) return this.syncSongMetadata();
         return this.state.chartMeta;
     }
 
+    /**
+     * Loads persisted state from the metadata JSON file.
+     *
+     * If the file is missing, malformed, or contains corrupted data, the state
+     * is reset so the next call triggers a full re-sync.
+     */
     private async loadState(): Promise<void> {
         if (this.state) return;
         const dataset = await readJson<PersistedDataset>(this.metadataPath);
@@ -163,10 +229,24 @@ export class BestdoriSongMetadataService {
         }
     }
 
+    /**
+     * Checks whether the cached data has exceeded the configured check interval.
+     *
+     * A non-positive interval (≤ 0) forces a refresh on every call.
+     *
+     * @param checkedAt - The timestamp of the last successful check.
+     * @returns True if a refresh is due.
+     */
     private shouldRefresh(checkedAt: number): boolean {
         return this.checkIntervalMs <= 0 || Date.now() - checkedAt >= this.checkIntervalMs;
     }
 
+    /**
+     * Ensures only one sync operation runs at a time by reusing an in-flight
+     * promise.
+     *
+     * @returns The chart metadata from the current or pending sync.
+     */
     private async syncSongMetadata(): Promise<SongChartMeta> {
         if (this.syncPromise) return this.syncPromise;
         this.syncPromise = this.performSync().finally(() => {
@@ -175,6 +255,13 @@ export class BestdoriSongMetadataService {
         return this.syncPromise;
     }
 
+    /**
+     * Performs the full sync: fetches the song list, detects changes via hash
+     * comparison, re-fetches charts only for changed/new songs, updates metadata,
+     * and persists everything to disk.
+     *
+     * @returns The updated chart metadata.
+     */
     private async performSync(): Promise<SongChartMeta> {
         await fs.ensureDir(this.dataDir);
         logger("bestdori", "checking Bestdori song summary source...");
@@ -278,6 +365,19 @@ export class BestdoriSongMetadataService {
         return chartMeta;
     }
 
+    /**
+     * Builds a difficulty-level summary for a single song by fetching and
+     * analyzing its chart data for each available difficulty.
+     *
+     * Charts are either read from the local raw cache (if enabled and present)
+     * or fetched from the Bestdori API. Failed chart fetches are logged and
+     * skipped without failing the entire song.
+     *
+     * @param songId - The numeric song ID.
+     * @param music - The song's music item from Bestdori.
+     * @param levels - Pre-computed play levels from the level parser.
+     * @returns The song summary object and the number of charts successfully processed.
+     */
     private async buildSongSummary(songId: number, music: MusicItem, levels: number[]): Promise<{ summary: SongSummary; chartCount: number }> {
         const summary = {} as SongSummary;
         let chartCount = 0;
@@ -290,7 +390,7 @@ export class BestdoriSongMetadataService {
             let chart: Chart;
             const chartPath = path.join(this.rawDir, String(songId), `${definition.name}.json`);
             try {
-                // 本地已有谱面文件则直接读取，避免重复下载
+                // Read local chart file if caching is enabled and the file exists
                 if (this.rawChartStorage && (await fs.pathExists(chartPath))) {
                     chart = await fs.readJson(chartPath);
                 } else {
@@ -314,6 +414,9 @@ export class BestdoriSongMetadataService {
         return { summary, chartCount };
     }
 
+    /**
+     * Persists the current in-memory state to the metadata JSON file atomically.
+     */
     private async persistState(): Promise<void> {
         if (!this.state) {
             return;

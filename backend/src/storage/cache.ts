@@ -25,6 +25,9 @@ export interface CachedPayload<TPayload> {
     payloadBytes: number;
 }
 
+/**
+ * The source from which a cached payload was retrieved.
+ */
 export type CacheSource = "memory" | "disk";
 
 interface CacheOptions {
@@ -39,6 +42,20 @@ interface CacheOptions {
     logScope?: string;
 }
 
+/**
+ * Abstract two-level cache that stores payloads in memory (LRU) and on disk.
+ *
+ * Memory layer uses an LRU eviction policy based on last-access time. Disk layer
+ * persists cache entries as JSON files under a service-specific directory tree.
+ * A periodic cleanup thread prunes the disk cache when total bytes exceed the
+ * configured limit, evicting oldest (by mtime) files first.
+ *
+ * Subclasses implement {@link buildDiskPath}, {@link isPayloadShape}, and
+ * {@link getMaxTimestamp} to customise storage layout and staleness logic.
+ *
+ * @typeParam TParams - Lookup parameters used to derive the disk file path.
+ * @typeParam TPayload - The cached value type.
+ */
 export abstract class AbstractCacheStorage<TParams, TPayload> {
     private readonly cache = new Map<string, MemoryEntry<TPayload>>();
     private readonly logScope: string;
@@ -59,14 +76,29 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         }
     }
 
+    /**
+     * Formats a byte count as a human-readable string (MB and raw bytes).
+     */
     static formatBytes(value: number): string {
         return `${(value / 1024 / 1024).toFixed(2)}MB (${value.toLocaleString()} bytes)`;
     }
 
+    /**
+     * Returns the number of entries currently held in the in-memory LRU cache.
+     */
     getMemoryEntryCount(): number {
         return this.cache.size;
     }
 
+    /**
+     * Retrieves a cached payload by params and key.
+     *
+     * Checks the in-memory LRU cache first (fast path). On a miss, reads from the
+     * disk cache; if found on disk the entry is also promoted to memory. Returns
+     * `undefined` when neither tier has a valid, non-stale entry.
+     *
+     * @returns The cached payload with its source, or `undefined` on a miss.
+     */
     async get(params: TParams, key: string): Promise<{ source: CacheSource; entry: CachedPayload<TPayload> } | undefined> {
         const memoryCached = this.getMemoryEntry(key);
         if (memoryCached) {
@@ -96,6 +128,15 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         };
     }
 
+    /**
+     * Stores a payload in both memory and disk tiers.
+     *
+     * The entry is inserted into the LRU memory cache and persisted to disk.
+     * Disk writes are best-effort — failures are logged but do not reject the
+     * caller. After a successful disk write a cleanup cycle is scheduled.
+     *
+     * @returns The stored payload (same shape as the input).
+     */
     async set(params: TParams, key: string, entry: CachedPayload<TPayload>): Promise<CachedPayload<TPayload>> {
         const stored = this.setMemoryEntry(key, entry);
 
@@ -114,20 +155,45 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         };
     }
 
+    /**
+     * Returns the on-disk file path for the given lookup parameters.
+     *
+     * Implementations should return a deterministic, collision-free path.
+     */
     protected abstract buildDiskPath(params: TParams): string;
 
+    /**
+     * Type guard that validates whether an unknown value matches the expected
+     * payload shape. Used to verify disk-loaded data before returning it.
+     */
     protected abstract isPayloadShape(payload: unknown): payload is TPayload;
 
+    /**
+     * Extracts a comparable timestamp (Unix epoch ms) from a payload.
+     *
+     * Used together with {@link shouldReuse} to determine staleness.
+     */
     protected abstract getMaxTimestamp(payload: TPayload): number;
 
+    /**
+     * Convenience helper to join path segments under the disk root directory.
+     */
     protected buildDiskPathFromSegments(...segments: string[]): string {
         return path.join(this.diskRootDir, ...segments);
     }
 
+    /**
+     * Computes the UTF-8 byte length of a serialised payload. Used for memory
+     * and disk budget accounting.
+     */
     protected payloadBytesOf(payload: TPayload): number {
         return Buffer.byteLength(JSON.stringify(payload), "utf8");
     }
 
+    /**
+     * Returns `true` when a cached entry's max timestamp is still within the
+     * configured {@link CacheOptions.staleAfterSeconds} threshold.
+     */
     protected shouldReuse(maxTimestamp: number): boolean {
         if (!maxTimestamp) {
             return false;

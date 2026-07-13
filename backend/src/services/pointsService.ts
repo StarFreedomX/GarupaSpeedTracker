@@ -8,6 +8,16 @@ import { toMs } from "@/utils";
 
 const parser = new BestdoriPointsParser();
 
+/**
+ * Fetches event top points data from Bestdori and parses it into a track response.
+ *
+ * The raw payload is cached with an expiry time derived from the maximum timestamp
+ * in the returned data, plus a minimum update interval. The cached response is
+ * re-fetched when the expiry time passes.
+ *
+ * @param params - Query parameters including event/server IDs, tier, and time filters.
+ * @returns A structured track response containing point history for the requested tier.
+ */
 export const getPointTrack = async (params: PointsQueryParams): Promise<PointsTrackResponse> => {
     const payload = await fetchBestdoriTopPoints(params, {
         getExpireAt: (body) => {

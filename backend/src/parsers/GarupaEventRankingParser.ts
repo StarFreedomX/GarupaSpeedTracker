@@ -1,4 +1,4 @@
-import { GarupaParser } from "@/parsers/GarupaParser";
+import { buildUsers, garupaParser } from "@/parsers/GarupaRankingParser";
 import type { EventRankingBandoriRaw, MusicRankingBandoriRaw } from "@/types/event";
 import type {
     GarupaChallengeEventRankingResponse,
@@ -6,7 +6,6 @@ import type {
     GarupaLiveTryEventRankingResponse,
     GarupaMedleyEventRankingResponse,
     GarupaMissionLiveEventRankingResponse,
-    GarupaRankingUser,
     GarupaStoryEventRankingResponse,
     GarupaTeamLiveFestivalEventRankingResponse,
     GarupaVersusEventRankingResponse,
@@ -22,42 +21,6 @@ import {
     userVersusEventRankingResponseSchema,
 } from "@/types/garupaSchema";
 import type { SchemaDefinition } from "@/types/garupaSchema/schemaDefinition";
-import type { RankingUserRaw } from "@/types/rankingUser";
-
-const garupaParser = new GarupaParser();
-
-// ============================================================================
-// Shared user parsing (same logic as GarupaMonthlyRankingParser)
-// ============================================================================
-
-const toNumber = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
-
-const buildDegrees = (user: GarupaRankingUser): number[] => {
-    const entries = user.userProfileDegreeMap?.entries ?? [];
-    return entries.map((entry) => toNumber(entry.value?.degreeId)).filter((value) => Number.isFinite(value));
-};
-
-const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
-    const profileSituation = user.userProfileSituation;
-    const strained = profileSituation?.illust === "after_training" ? 1 : 0;
-
-    return {
-        uid: toNumber(user.userId),
-        name: user.name ?? "",
-        introduction: user.introduction ?? "",
-        rank: toNumber(user.rankLevel),
-        sid: toNumber(profileSituation?.situationId),
-        strained,
-        degrees: buildDegrees(user),
-        tier: toNumber(user.rank),
-        point: toNumber(user.point),
-    };
-};
-
-const buildUsers = (container?: { entries?: GarupaRankingUser[] }): RankingUserRaw[] => {
-    const rows = container?.entries ?? [];
-    return rows.map((user) => parseUser(user));
-};
 
 // ============================================================================
 // Event type → Schema mapping
@@ -147,7 +110,26 @@ const REPORT_BUILDERS: Record<string, ReportBuilder> = {
 // Parser class
 // ============================================================================
 
+/**
+ * Parses Garupa event ranking protobuf responses for all 7 supported event types.
+ *
+ * **Supported event types:** medley, challenge, versus, live_try, story, mission_live, team_live_festival.
+ *
+ * The parser selects the appropriate protobuf schema and report builder based on the
+ * `eventType` string. Each event type has a dedicated schema (protobuf message descriptor)
+ * and a `buildReport` function that maps decoded protobuf fields into a unified
+ * {@link EventRankingBandoriRaw} structure.
+ *
+ * The `challenge` and `versus` event types additionally parse per-song music ranking sub-lists.
+ */
 export class GarupaEventRankingParser {
+    /**
+     * Parses a decrypted event ranking response buffer into a unified ranking report.
+     * @param payload - Decrypted protobuf response from the Garupa API
+     * @param eventType - Protobuf event type string (one of the 7 supported types)
+     * @returns Parsed and normalized event ranking data
+     * @throws If the event type is not found in {@link SCHEMA_MAP} or the report builder
+     */
     public parse(payload: Buffer, eventType: string): EventRankingBandoriRaw {
         const schemaEntry = SCHEMA_MAP[eventType];
         if (!schemaEntry) {
@@ -164,4 +146,5 @@ export class GarupaEventRankingParser {
     }
 }
 
+/** Singleton instance of {@link GarupaEventRankingParser} used by the Garupa API client. */
 export const bandoriEventRankingParser = new GarupaEventRankingParser();

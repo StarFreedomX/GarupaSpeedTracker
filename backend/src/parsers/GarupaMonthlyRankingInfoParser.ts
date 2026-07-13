@@ -55,7 +55,24 @@ const toMonthlyRankingDetail = (entry: GarupaMasterMonthlyRanking, server: numbe
     };
 };
 
+/**
+ * Parses the Garupa monthly ranking master list protobuf response.
+ *
+ * The master list contains metadata for all monthly ranking periods on a given server.
+ * Each entry is decoded from the `MasterMonthlyRankingListResponse` protobuf message
+ * and converted into a {@link MonthlyRankingDetail} record with per-server nullable arrays
+ * for time fields, flags, rewards, and grades.
+ *
+ * The resulting {@link MonthlyRankingDetailList} is keyed by monthly ranking ID string.
+ */
 export class GarupaMonthlyRankingInfoParser {
+    /**
+     * Parses a decrypted monthly ranking master list response buffer.
+     * @param payload - Decrypted protobuf response
+     * @param server - Server index (used to slot values into per-server arrays)
+     * @param serverCount - Total number of configured servers (determines array dimensions)
+     * @returns A monthly ranking detail list keyed by string monthly ranking ID
+     */
     public parse(payload: Buffer, server: number, serverCount: number): MonthlyRankingDetailList {
         const parsed = garupaParser.decode<GarupaMasterMonthlyRankingListResponse>(payload, masterMonthlyRankingListSchema);
         const out: MonthlyRankingDetailList = {};
@@ -77,4 +94,5 @@ export class GarupaMonthlyRankingInfoParser {
     }
 }
 
+/** Singleton instance of {@link GarupaMonthlyRankingInfoParser}. */
 export const garupaMonthlyRankingInfoParser = new GarupaMonthlyRankingInfoParser();

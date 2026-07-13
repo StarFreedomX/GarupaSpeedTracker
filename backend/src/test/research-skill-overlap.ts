@@ -1,3 +1,4 @@
+// noinspection DuplicatedCode
 /**
  * 研究：检查所有谱面的技能触发点间隔
  * 输出所有触发点间隔 < 8s 的谱面（可能发生技能窗口重叠）
@@ -5,7 +6,7 @@
  * 用法: npx tsx src/test/research-skill-overlap.ts
  */
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ============ 简易类型定义（避免依赖项目内部模块） ============
@@ -202,7 +203,7 @@ if (results.length === 0) {
         for (let i = 0; i < r.skillEvents.length; i++) {
             const e = r.skillEvents[i];
             const gap = i > 0 ? ` (gap=${(e.seconds - r.skillEvents[i - 1].seconds).toFixed(2)}s)` : "";
-            const marker = i > 0 && (e.seconds - r.skillEvents[i - 1].seconds) < MAX_SKILL_DURATION ? " ← overlap" : "";
+            const marker = i > 0 && e.seconds - r.skillEvents[i - 1].seconds < MAX_SKILL_DURATION ? " ← overlap" : "";
             console.log(`    #${i}: beat=${e.beat.toFixed(2).padStart(8)}  time=${e.seconds.toFixed(2).padStart(7)}s${gap}${marker}`);
         }
     }

@@ -2,8 +2,21 @@ import Router from "@koa/router";
 import { queryToNumber, queryToOptionalNumber } from "@/router/utils";
 import { playerDeckService } from "@/services/playerDeckService";
 
+/**
+ * Router for player deck status endpoint.
+ */
 export const playerDeckRouter = new Router();
 
+/**
+ * GET /playerDeckStatus
+ *
+ * Returns the deck status for a specific player, optionally filtered by event.
+ *
+ * Query parameters:
+ * - `server` (required, int 0-4) — Game server index.
+ * - `playerId` (required, int >= 1) — Player identifier.
+ * - `eventId` (optional, int) — Event ID to filter by. 0 or empty is treated as unset.
+ */
 playerDeckRouter.get("/playerDeckStatus", async (ctx) => {
     const server = queryToNumber(ctx.query.server);
     const playerId = queryToNumber(ctx.query.playerId);
