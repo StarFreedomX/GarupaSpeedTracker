@@ -8,6 +8,7 @@
 import { createApp } from "@/app";
 import { HOST, PORT } from "@/config";
 import { logger } from "@/logger";
+import { migrateTimestampToTime } from "@/migrations/timestamp-to-time";
 import { eventInfoService, eventRankingService, monthlyRankingInfoService, monthlyRankingService, songMetadataService } from "@/services";
 
 logger("mainAPI", "initializing...");
@@ -19,11 +20,19 @@ void songMetadataService.getSongMetadata().catch((error: unknown) => {
     logger("mainAPI", `song summary warmup failed: ${nodeError.message ?? "unknown error"}`);
 });
 
-monthlyRankingInfoService.start();
-monthlyRankingService.start();
-eventInfoService.start();
-eventRankingService.start();
+(async () => {
+    // Run startup migrations before starting services
+    await migrateTimestampToTime().catch((error: unknown) => {
+        const nodeError = error as { message?: string };
+        logger("migration", `timestamp-to-time failed: ${nodeError.message ?? "unknown error"}`);
+    });
 
-app.listen(PORT, HOST, () => {
-    logger("mainAPI", `listening on ${HOST}:${PORT}`);
-});
+    monthlyRankingInfoService.start();
+    monthlyRankingService.start();
+    eventInfoService.start();
+    eventRankingService.start();
+
+    app.listen(PORT, HOST, () => {
+        logger("mainAPI", `listening on ${HOST}:${PORT}`);
+    });
+})();

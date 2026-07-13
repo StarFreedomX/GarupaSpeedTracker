@@ -163,7 +163,7 @@ class EventRankingService {
                 }
 
                 // Store top data
-                const timestamp = topData.points[0]?.timestamp ?? Date.now();
+                const timestamp = topData.points[0]?.time ?? Date.now();
                 const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
                 await eventTopCollection.updateOne(
@@ -416,7 +416,7 @@ class EventRankingService {
      */
     private async persistEventTopSnapshot(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
         const users = raw.eventPointTopUsers ?? [];
-        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = users.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
         await eventTopCollection.updateOne(
@@ -516,7 +516,7 @@ class EventRankingService {
         musicRaw: MusicRankingBandoriRaw,
     ): Promise<void> {
         const users = musicRaw.scoreTopUsers ?? [];
-        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = users.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
         await musicTopCollection.updateOne(
@@ -603,7 +603,7 @@ class EventRankingService {
      */
     private async persistEventTopSnapshotReplace(server: number, eventId: number, timestamp: number, raw: EventRankingBandoriRaw): Promise<void> {
         const users = raw.eventPointTopUsers ?? [];
-        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = users.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
         await replacePointsInBucket(eventTopCollection, { server, eventId, bucket }, timestamp, newPoints);
     }
@@ -640,7 +640,7 @@ class EventRankingService {
         musicRaw: MusicRankingBandoriRaw,
     ): Promise<void> {
         const users = musicRaw.scoreTopUsers ?? [];
-        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = users.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
         await replacePointsInBucket(musicTopCollection, { server, eventId, musicId, bucket }, timestamp, newPoints);
     }

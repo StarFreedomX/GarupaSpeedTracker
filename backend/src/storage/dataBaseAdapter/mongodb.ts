@@ -63,6 +63,15 @@ class MongoCollection<TDocument> implements DatabaseCollection<TDocument> {
         await this.collection().updateOne(filter as Filter<Document>, update as Document, { upsert: options?.upsert ?? false });
     }
 
+    async updateMany(filter: DatabaseFilter, update: DatabaseUpdate): Promise<{ matchedCount: number; modifiedCount: number }> {
+        const result = await this.collection().updateMany(filter as Filter<Document>, update as Document);
+        return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount };
+    }
+
+    async insertOne(document: TDocument): Promise<void> {
+        await this.collection().insertOne(document as Document);
+    }
+
     async find(filter: DatabaseFilter): Promise<DatabaseFindQuery<TDocument>> {
         return new MongoFindQuery<TDocument>(this.collection().find(filter as Filter<Document>));
     }

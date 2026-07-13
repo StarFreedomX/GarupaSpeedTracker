@@ -21,7 +21,7 @@ export type MonthlyRankingInfo = {
 ///===============服务器对外API=====================
 // Top 接口
 export interface MonthlyRankingTopPoint {
-    timestamp: number;
+    time: number;
     uid: number;
     value: number;
 }

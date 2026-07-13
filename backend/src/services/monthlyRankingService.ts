@@ -380,7 +380,7 @@ class MonthlyRankingService {
      * @param raw       The raw ranking data from the Garupa API
      */
     private async persistTopSnapshot(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
-        const newPoints = raw.monthlyRankingPointTopUsers.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = raw.monthlyRankingPointTopUsers.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const currentTopUsers: RankingUser[] = raw.monthlyRankingPointTopUsers.map(({ point: _p, tier: _t, ...user }) => user);
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
 
@@ -472,7 +472,7 @@ class MonthlyRankingService {
      */
     private async persistTopSnapshotReplace(server: number, monthlyId: number, timestamp: number, raw: MonthlyRankingBandoriRaw): Promise<void> {
         const users = raw.monthlyRankingPointTopUsers;
-        const newPoints = users.map((u) => ({ timestamp, uid: u.uid, value: u.point }));
+        const newPoints = users.map((u) => ({ time: timestamp, uid: u.uid, value: u.point }));
         const bucket = Math.floor(new Date(timestamp).getUTCDate() / 8);
         await replacePointsInBucket(topCollection, { server, monthlyId, bucket }, timestamp, newPoints);
     }

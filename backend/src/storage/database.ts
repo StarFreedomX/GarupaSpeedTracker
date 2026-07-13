@@ -40,6 +40,8 @@ export interface DatabaseCollection<TDocument> {
     findOne(filter: DatabaseFilter, options?: { projection?: DatabaseProjection<TDocument> }): Promise<TDocument | undefined>;
     replaceOne(filter: DatabaseFilter, document: TDocument, options?: { upsert?: boolean }): Promise<void>;
     updateOne(filter: DatabaseFilter, update: DatabaseUpdate, options?: { upsert?: boolean }): Promise<void>;
+    updateMany(filter: DatabaseFilter, update: DatabaseUpdate): Promise<{ matchedCount: number; modifiedCount: number }>;
+    insertOne(document: TDocument): Promise<void>;
     find(filter: DatabaseFilter): Promise<DatabaseFindQuery<TDocument>>;
 }
 

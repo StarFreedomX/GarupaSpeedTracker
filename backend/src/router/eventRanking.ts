@@ -41,7 +41,7 @@ eventRankingRouter.get("/eventtop/data", async (ctx) => {
     };
     const params: Record<string, number | undefined> = { server, event };
 
-    if (mid !== undefined) {
+    if (mid !== undefined && mid !== 0) {
         rules.mid = { type: "int", required: true, min: 1 };
         params.mid = mid;
     }
@@ -55,7 +55,7 @@ eventRankingRouter.get("/eventtop/data", async (ctx) => {
 
     let result: { points: unknown[]; users: unknown[] };
 
-    if (mid !== undefined) {
+    if (mid !== undefined && mid !== 0) {
         result = await eventRankingService.getMusicTopSnapshot(server, event, mid);
     } else {
         result = await eventRankingService.getEventTopSnapshot(server, event);
@@ -105,7 +105,7 @@ eventRankingRouter.get("/tracker/data", async (ctx) => {
     };
     const params: Record<string, number | undefined> = { server, event, tier };
 
-    if (mid !== undefined) {
+    if (mid !== undefined && mid !== 0) {
         rules.mid = { type: "int", required: true, min: 1 };
         params.mid = mid;
     }
@@ -119,7 +119,7 @@ eventRankingRouter.get("/tracker/data", async (ctx) => {
 
     let result: { result: boolean; cutoffs: unknown[] };
 
-    if (mid !== undefined) {
+    if (mid !== undefined && mid !== 0) {
         if (!isMusicRankingBorderTier(tier)) {
             throw validationError("tier", "tier must be one of: 20,30,40,50,100,200,300,500,1000,2000,5000,10000,20000,50000,100000");
         }

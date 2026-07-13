@@ -102,7 +102,7 @@ export interface EventRankingTopResponse {
     users: RankingUser[];
 }
 export interface EventRankingTopPoint {
-    timestamp: number;
+    time: number;
     uid: number;
     value: number;
 }
@@ -123,7 +123,7 @@ export interface MusicRankingTopResponse {
     users: RankingUser[];
 }
 export interface MusicRankingTopPoint {
-    timestamp: number;
+    time: number;
     uid: number;
     value: number;
 }

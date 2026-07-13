@@ -128,19 +128,19 @@ async function replaceEntriesInBucket<T extends Record<string, unknown>>(
  * @param collection   MongoDB collection that holds the bucket documents.
  * @param filter       Query filter identifying the target document.
  * @param timestamp    Timestamp whose existing entries should be replaced.
- * @param newPoints    Replacement point entries (timestamp, uid, value).
+ * @param newPoints    Replacement point entries (time, uid, value).
  */
 export async function replacePointsInBucket(
     collection: ReturnType<typeof database.collection>,
     filter: Record<string, unknown>,
     timestamp: number,
-    newPoints: Array<{ timestamp: number; uid: number; value: number }>,
+    newPoints: Array<{ time: number; uid: number; value: number }>,
 ): Promise<void> {
     return replaceEntriesInBucket(
         collection,
         filter,
         "points",
-        "timestamp",
+        "time",
         timestamp,
         newPoints,
         (old, entry) => old.uid === entry.uid && old.value === entry.value,
@@ -189,15 +189,20 @@ export async function buildTopSnapshot(
     playerCollection: ReturnType<typeof database.collection>,
     filter: Record<string, unknown>,
     server: number,
-): Promise<{ points: Array<{ timestamp: number; uid: number; value: number }>; users: RankingUser[] }> {
+): Promise<{ points: Array<{ time: number; uid: number; value: number }>; users: RankingUser[] }> {
     const query = await bucketCollection.find(filter);
     const records = await query.sort({ bucket: 1 }).toArray();
     if (records.length === 0) {
         return { points: [], users: [] };
     }
 
-    const points = records.flatMap((record) => ((record as Record<string, unknown>).points as Array<{ timestamp: number; uid: number; value: number }>) ?? []);
-    points.sort((a, b) => a.timestamp - b.timestamp);
+    const rawRows = records.flatMap((record) => ((record as Record<string, unknown>).points as Array<Record<string, unknown>>) ?? []);
+    const points: Array<{ time: number; uid: number; value: number }> = rawRows.map((p) => ({
+        time: (p.time ?? p.timestamp ?? 0) as number,
+        uid: p.uid as number,
+        value: p.value as number,
+    }));
+    points.sort((a, b) => a.time - b.time);
 
     const uidSet = new Set(points.map((p) => p.uid));
     const uids = Array.from(uidSet);
