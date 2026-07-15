@@ -26,7 +26,29 @@ const messages: Record<Locale, I18nMessages> = {
 
 const DEFAULT_LOCALE: Locale = "zh-CN";
 
-const locale = ref<Locale>(DEFAULT_LOCALE);
+const supportedLocales: Locale[] = LOCALE_OPTIONS.map((o) => o.locale);
+
+const detectBrowserLocale = (): Locale => {
+    if (typeof navigator === "undefined") return DEFAULT_LOCALE;
+
+    const languages = navigator.languages?.length ? navigator.languages : [navigator.language ?? ""];
+
+    for (const lang of languages) {
+        const normalized = lang.toLowerCase();
+        // 精确匹配 "zh-CN"
+        const exact = supportedLocales.find((l) => l.toLowerCase() === normalized);
+        if (exact) return exact;
+
+        // 主语言匹配 (ja → ja-JP, zh → zh-CN, en → en-US)
+        const primary = normalized.split("-")[0];
+        const match = supportedLocales.find((l) => l.toLowerCase().startsWith(primary));
+        if (match) return match;
+    }
+
+    return DEFAULT_LOCALE;
+};
+
+const locale = ref<Locale>(detectBrowserLocale());
 
 const pick = <T extends object>(tree: T, path: string): string => {
     const node = path.split(".").reduce<unknown>((acc, key) => {
@@ -62,6 +84,7 @@ export const useI18n = () => ({
     t: translate,
     setLocale: (next: Locale) => {
         locale.value = next;
+        document.documentElement.lang = next;
     },
     availableLocales: LOCALE_OPTIONS,
 });
