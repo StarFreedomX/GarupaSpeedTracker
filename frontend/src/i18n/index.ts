@@ -5,6 +5,17 @@ import zhCN from "@/i18n/messages/zh-CN";
 
 export type Locale = "zh-CN" | "en-US";
 
+export interface LocaleOption {
+    locale: Locale;
+    /** 语言自身的名称，如 "English"、"中文" */
+    label: string;
+}
+
+export const LOCALE_OPTIONS: LocaleOption[] = [
+    { locale: "zh-CN", label: "简体中文" },
+    { locale: "en-US", label: "English" },
+] as const;
+
 const messages: Record<Locale, I18nMessages> = {
     "zh-CN": zhCN,
     "en-US": enUS,
@@ -38,4 +49,5 @@ export const useI18n = () => ({
     setLocale: (next: Locale) => {
         locale.value = next;
     },
+    availableLocales: LOCALE_OPTIONS,
 });
