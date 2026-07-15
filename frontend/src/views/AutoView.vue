@@ -15,16 +15,16 @@ import { MusicDataResponse } from "@/types/songs";
 
 const { t } = useI18n();
 // 活动类型选项
-const ACTIVITY_TYPES = [
-    { value: "mission", label: t("eventType.mission") },
-    { value: "try", label: t("eventType.try") },
-    { value: "challenge", label: t("eventType.challenge") },
-    { value: "versus", label: t("eventType.versus") },
-    { value: "5v5", label: t("eventType.5v5") },
-    { value: "medley1", label: t("eventType.medley1") },
-] as const;
+const ACTIVITY_TYPES = computed(() => [
+    { value: "mission" as const, label: t("eventType.mission") },
+    { value: "try" as const, label: t("eventType.try") },
+    { value: "challenge" as const, label: t("eventType.challenge") },
+    { value: "versus" as const, label: t("eventType.versus") },
+    { value: "5v5" as const, label: t("eventType.5v5") },
+    { value: "medley1" as const, label: t("eventType.medley1") },
+]);
 
-type ActivityType = (typeof ACTIVITY_TYPES)[number]["value"];
+type ActivityType = "mission" | "try" | "challenge" | "versus" | "5v5" | "medley1";
 
 // 技能时长选项：使用 SkillDurationPicker 组件（双栏下拉）
 

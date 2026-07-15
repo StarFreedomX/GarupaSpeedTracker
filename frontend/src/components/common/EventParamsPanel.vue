@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { sanitizeDecimalInput, sanitizeIntInput } from "@/composables/inputFilters";
 import type { ActivityType } from "@/features/scoreControl/types";
 import { useI18n } from "@/i18n";
@@ -35,16 +36,16 @@ const emit = defineEmits<{
     (e: "update:fps", value: 60 | 120): void;
 }>();
 
-const AUTO_PRESETS = [
-    { id: "nonJp", label: t("auto.server.nonJp"), value: 0.5 },
-    { id: "jp", label: t("auto.server.jp"), value: 0.75 },
-    { id: "custom", label: t("auto.server.custom"), value: null },
-] as const;
+const AUTO_PRESETS = computed(() => [
+    { id: "nonJp" as const, label: t("auto.server.nonJp"), value: 0.5 },
+    { id: "jp" as const, label: t("auto.server.jp"), value: 0.75 },
+    { id: "custom" as const, label: t("auto.server.custom"), value: null },
+]);
 
 const onAutoPresetChange = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value as "nonJp" | "jp" | "custom";
     emit("update:autoPreset", value);
-    const preset = AUTO_PRESETS.find((p) => p.id === value);
+    const preset = AUTO_PRESETS.value.find((p) => p.id === value);
     if (preset?.value !== null && preset?.value !== undefined) {
         emit("update:autoPara", preset.value);
     }

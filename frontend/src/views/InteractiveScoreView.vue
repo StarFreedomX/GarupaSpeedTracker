@@ -32,21 +32,21 @@ const STORAGE_KEYS = {
 } as const;
 
 // ─── activity type options ───
-const ACTIVITY_TYPES = [
-    { value: "mission", label: t("eventType.mission"), icon: "📋" },
-    { value: "try", label: t("eventType.try"), icon: "✅" },
-    { value: "challenge", label: t("eventType.challenge"), icon: "🟣" },
-    { value: "versus", label: t("eventType.versus"), icon: "⚔️" },
-    { value: "5v5", label: t("eventType.5v5"), icon: "🏟️" },
-    { value: "medley1", label: t("eventType.medley1"), icon: "🎵" },
-] as const;
+const ACTIVITY_TYPES = computed(() => [
+    { value: "mission" as const, label: t("eventType.mission"), icon: "📋" },
+    { value: "try" as const, label: t("eventType.try"), icon: "✅" },
+    { value: "challenge" as const, label: t("eventType.challenge"), icon: "🟣" },
+    { value: "versus" as const, label: t("eventType.versus"), icon: "⚔️" },
+    { value: "5v5" as const, label: t("eventType.5v5"), icon: "🏟️" },
+    { value: "medley1" as const, label: t("eventType.medley1"), icon: "🎵" },
+]);
 
 // ─── auto presets ───
-const AUTO_PRESETS = [
-    { id: "nonJp", label: t("auto.server.nonJp"), value: 0.5 },
-    { id: "jp", label: t("auto.server.jp"), value: 0.75 },
-    { id: "custom", label: t("auto.server.custom"), value: null },
-] as const;
+const AUTO_PRESETS = computed(() => [
+    { id: "nonJp" as const, label: t("auto.server.nonJp"), value: 0.5 },
+    { id: "jp" as const, label: t("auto.server.jp"), value: 0.75 },
+    { id: "custom" as const, label: t("auto.server.custom"), value: null },
+]);
 
 // ─── defaults ───
 const defaultFormData = {
@@ -185,9 +185,9 @@ const goToStep = (step: number) => {
 watch(
     () => formData.value.autoPara,
     () => {
-        if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "nonJp")?.value) {
+        if (formData.value.autoPara === AUTO_PRESETS.value.find((p) => p.id === "nonJp")?.value) {
             autoPreset.value = "nonJp";
-        } else if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "jp")?.value) {
+        } else if (formData.value.autoPara === AUTO_PRESETS.value.find((p) => p.id === "jp")?.value) {
             autoPreset.value = "jp";
         } else {
             autoPreset.value = "custom";
