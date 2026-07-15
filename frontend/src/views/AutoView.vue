@@ -59,13 +59,13 @@ const defaultCenterIndex = 2; // 默认第3个技能为队长
 
 // 添加 auto 倍率预设选项
 const AUTO_PRESETS = [
-    { id: "cn", label: t("auto.server.cn"), value: 0.5 },
+    { id: "nonJp", label: t("auto.server.nonJp"), value: 0.5 },
     { id: "jp", label: t("auto.server.jp"), value: 0.75 },
-    { id: "others", label: t("auto.server.others"), value: 1 }, // null 表示使用自定义输入
+    { id: "custom", label: t("auto.server.custom"), value: 1 }, // null 表示使用自定义输入
 ] as const;
 const defaultAutoPreset = "jp";
 // 添加当前选择的预设
-const autoPreset = ref<"jp" | "cn" | "others">(defaultAutoPreset);
+const autoPreset = ref<"jp" | "nonJp" | "custom">(defaultAutoPreset);
 
 const defaultFilterOptions = {
     showOnlyFixedPT: false,
@@ -331,12 +331,12 @@ const onDeckFetched = (data: {
 // 监听预设变化，自动填充 autoPara —— 由 EventParamsPanel 内部处理
 // 监听 autoPara 变化，如果是预设值则自动切换到对应的预设
 const updateAutoPreset = () => {
-    if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "cn")?.value) {
-        autoPreset.value = "cn";
+    if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "nonJp")?.value) {
+        autoPreset.value = "nonJp";
     } else if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "jp")?.value) {
         autoPreset.value = "jp";
     } else {
-        autoPreset.value = "others";
+        autoPreset.value = "custom";
     }
 };
 

@@ -43,9 +43,9 @@ const ACTIVITY_TYPES = [
 
 // ─── auto presets ───
 const AUTO_PRESETS = [
-    { id: "cn", label: t("auto.server.cn"), value: 0.5 },
+    { id: "nonJp", label: t("auto.server.nonJp"), value: 0.5 },
     { id: "jp", label: t("auto.server.jp"), value: 0.75 },
-    { id: "others", label: t("auto.server.others"), value: null },
+    { id: "custom", label: t("auto.server.custom"), value: null },
 ] as const;
 
 // ─── defaults ───
@@ -84,7 +84,7 @@ const formData = ref({ ...defaultFormData });
 const filterData = ref<SolutionFilter>({ ...defaultFilter });
 const skills = ref<Skill[]>([...defaultSkills]);
 const centerIndex = ref(defaultCenterIndex);
-const autoPreset = ref<"jp" | "cn" | "others">("jp");
+const autoPreset = ref<"jp" | "nonJp" | "custom">("jp");
 const showAdvancedFilter = ref(false);
 
 // metadata
@@ -185,12 +185,12 @@ const goToStep = (step: number) => {
 watch(
     () => formData.value.autoPara,
     () => {
-        if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "cn")?.value) {
-            autoPreset.value = "cn";
+        if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "nonJp")?.value) {
+            autoPreset.value = "nonJp";
         } else if (formData.value.autoPara === AUTO_PRESETS.find((p) => p.id === "jp")?.value) {
             autoPreset.value = "jp";
         } else {
-            autoPreset.value = "others";
+            autoPreset.value = "custom";
         }
     },
 );
@@ -432,9 +432,9 @@ watch(filterData, saveFilter, { deep: true });
 onMounted(() => {
     loadFromStorage();
     loadMetadata();
-    if (formData.value.autoPara === 0.5) autoPreset.value = "cn";
+    if (formData.value.autoPara === 0.5) autoPreset.value = "nonJp";
     else if (formData.value.autoPara === 0.75) autoPreset.value = "jp";
-    else autoPreset.value = "others";
+    else autoPreset.value = "custom";
     window.addEventListener("keydown", handleKeydown);
 });
 
@@ -854,7 +854,7 @@ const bonusRows = computed(() => {
                         <div class="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="text-sm font-medium text-text">
                                 {{ t('interactive.step4.playsCount', { count: i + 1 }) }} —
-                                {{ t('interactive.step4.flameCount', { flames: step.flames }) }}
+                                {{ t('interactive.step4.liveBoostCount', { count: step.boosts }) }}
                             </span>
                             <span class="text-xs text-muted">
                                 {{ t('interactive.step4.basePT') }} = <span class="font-mono text-text">{{ step.basePT.toLocaleString() }}</span>

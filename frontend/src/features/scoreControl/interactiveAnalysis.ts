@@ -157,7 +157,7 @@ export function computeFixedBasePTs(
  */
 export function computeBoostLevelPTs(achievableBasePTs: number[]): BoostLevelPT[] {
     return FLAME_MULTIPLIERS.map((multiplier, f) => ({
-        flames: f,
+        boosts: f,
         multiplier,
         achievableBasePTs,
     }));
@@ -561,7 +561,7 @@ export function analyze(
                     return aFull - bFull;
                 });
                 return {
-                    flames: fi,
+                    boosts: fi,
                     multiplier: m,
                     basePT: bp,
                     boostedPT: bp * m,

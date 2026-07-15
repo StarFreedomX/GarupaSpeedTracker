@@ -108,8 +108,8 @@ const enUS = {
     auto: {
         server: {
             jp: "JP",
-            cn: "CN",
-            others: "Custom",
+            nonJp: "Other",
+            custom: "Custom",
         },
         config: {
             eventParams: "Event Parameters",
@@ -213,7 +213,7 @@ const enUS = {
             computing: "Analyzing...",
             solution: "Solution: {plays} auto live(s)",
             playsCount: "Song {count}",
-            flameCount: "{flames} flame(s)",
+            liveBoostCount: "{count} live boost(s)",
             ptRange: "PT Range",
             recommendSongs: "Recommended Songs",
             songColName: "Song",
@@ -281,7 +281,7 @@ const enUS = {
         success: "Data fetched! Event: {eventName}",
         warnPowerNotPublic: "Total power not public, please configure actual total power manually",
         warnMissionSupport: "Mission live event, please configure support band power manually",
-        warnMedleyCheck: "Medley event, please verify group song 1 formation matches profile display formation",
+        warnMedleyCheck: "Medley event, please verify medley song 1 formation matches profile display formation",
         error: "Fetch failed: {message}",
     },
     error: {

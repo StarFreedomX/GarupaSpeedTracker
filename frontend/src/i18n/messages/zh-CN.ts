@@ -87,8 +87,8 @@ const zhCN = {
     auto: {
         server: {
             jp: "日服",
-            cn: "国服",
-            others: "自定义",
+            nonJp: "非日服",
+            custom: "自定义",
         },
         config: {
             eventParams: "活动参数",
@@ -213,7 +213,7 @@ const zhCN = {
             computing: "正在分析...",
             solution: "推荐方案：{plays} 次auto",
             playsCount: "曲{count}",
-            flameCount: "{flames} 火",
+            liveBoostCount: "{count} 火",
             ptRange: "PT 范围",
             recommendSongs: "推荐歌曲",
             songColName: "歌曲",

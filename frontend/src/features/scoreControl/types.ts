@@ -19,7 +19,7 @@ export interface TeamConfig {
 
 /** 单个火焰等级的信息 */
 export interface BoostLevelPT {
-    flames: number;
+    boosts: number;
     multiplier: number;
     /** 该火焰等级下所有固定PT歌曲的可达成 basePT 值集合（去重排序） */
     achievableBasePTs: number[];
@@ -27,7 +27,7 @@ export interface BoostLevelPT {
 
 /** 精确解中的一步：一次游玩 */
 export interface PlayStep {
-    flames: number;
+    boosts: number;
     multiplier: number;
     /** 本次需要达到的基础 PT（未乘火） */
     basePT: number;

@@ -12,7 +12,7 @@ const props = withDefaults(
         supportBandPower: number;
         eventBonus: number;
         autoPara: number;
-        autoPreset: "cn" | "jp" | "others";
+        autoPreset: "nonJp" | "jp" | "custom";
         fps: 60 | 120;
         showSupportBand: boolean;
         showEventBonus: boolean;
@@ -31,18 +31,18 @@ const emit = defineEmits<{
     (e: "update:supportBandPower", value: number): void;
     (e: "update:eventBonus", value: number): void;
     (e: "update:autoPara", value: number): void;
-    (e: "update:autoPreset", value: "cn" | "jp" | "others"): void;
+    (e: "update:autoPreset", value: "nonJp" | "jp" | "custom"): void;
     (e: "update:fps", value: 60 | 120): void;
 }>();
 
 const AUTO_PRESETS = [
-    { id: "cn", label: t("auto.server.cn"), value: 0.5 },
+    { id: "nonJp", label: t("auto.server.nonJp"), value: 0.5 },
     { id: "jp", label: t("auto.server.jp"), value: 0.75 },
-    { id: "others", label: t("auto.server.others"), value: null },
+    { id: "custom", label: t("auto.server.custom"), value: null },
 ] as const;
 
 const onAutoPresetChange = (e: Event) => {
-    const value = (e.target as HTMLSelectElement).value as "cn" | "jp" | "others";
+    const value = (e.target as HTMLSelectElement).value as "nonJp" | "jp" | "custom";
     emit("update:autoPreset", value);
     const preset = AUTO_PRESETS.find((p) => p.id === value);
     if (preset?.value !== null && preset?.value !== undefined) {
@@ -138,12 +138,12 @@ const onAutoPresetChange = (e: Event) => {
                         class="w-24 sm:w-28 rounded border border-border/80 bg-surface/90 px-1.5 sm:px-2 py-1.5 text-sm text-text"
                         @change="onAutoPresetChange"
                     >
-                        <option value="cn">{{ t('auto.server.cn') }}</option>
+                        <option value="nonJp">{{ t('auto.server.nonJp') }}</option>
                         <option value="jp">{{ t('auto.server.jp') }}</option>
-                        <option value="others">{{ t('auto.server.others') }}</option>
+                        <option value="custom">{{ t('auto.server.custom') }}</option>
                     </select>
                     <input
-                        v-if="autoPreset === 'others'"
+                        v-if="autoPreset === 'custom'"
                         :value="autoPara"
                         type="text"
                         inputmode="decimal"

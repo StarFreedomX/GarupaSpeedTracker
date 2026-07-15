@@ -86,8 +86,8 @@ export interface I18nMessages {
     auto: {
         server: {
             jp: string;
-            cn: string;
-            others: string;
+            nonJp: string;
+            custom: string;
         };
         config: {
             eventParams: string;
@@ -212,7 +212,7 @@ export interface I18nMessages {
             computing: string;
             solution: string;
             playsCount: string;
-            flameCount: string;
+            liveBoostCount: string;
             ptRange: string;
             recommendSongs: string;
             songColName: string;
