@@ -92,7 +92,7 @@ const jaJP = {
         },
         config: {
             eventParams: "イベントパラメータ",
-            eventType: "イベント種別",
+            eventType: "イベントタイプ",
             totalPower: "総合力*",
             totalPowerNote: "5v5・対バンモードでは、イベント総合力を入力してください。",
             supportPower: "サポート総合力",
@@ -143,7 +143,7 @@ const jaJP = {
     home: {
         manualRefresh: "手動更新",
         eventTitle: "イベント名",
-        eventType: "イベント種別",
+        eventType: "イベントタイプ",
         eventStart: "開始時間",
         eventEnd: "終了時間",
         eventLoading: "イベント情報を読み込み中…",
@@ -156,7 +156,7 @@ const jaJP = {
             liveTry: "ライブトライ",
             challenge: "チャレンジライブ",
             missionLive: "ミッションライブ",
-            versus: "VSライブ",
+            versus: "対バンライブ",
             medley: "メドレー",
             festival: "5 v 5",
         },
