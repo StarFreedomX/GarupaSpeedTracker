@@ -24,7 +24,9 @@ const messages: Record<Locale, I18nMessages> = {
     "ja-JP": jaJP,
 };
 
-const locale = ref<Locale>("zh-CN");
+const DEFAULT_LOCALE: Locale = "zh-CN";
+
+const locale = ref<Locale>(DEFAULT_LOCALE);
 
 const pick = <T extends object>(tree: T, path: string): string => {
     const node = path.split(".").reduce<unknown>((acc, key) => {
@@ -38,7 +40,16 @@ const pick = <T extends object>(tree: T, path: string): string => {
 };
 
 export const translate = (path: string, params?: Record<string, string | number>): string => {
-    const raw = pick(messages[locale.value], path);
+    let raw = pick(messages[locale.value], path);
+
+    // 当前语言缺失或为空时，回退到默认语言
+    if (raw === "" || raw === path) {
+        const fallback = pick(messages[DEFAULT_LOCALE], path);
+        if (fallback !== path) {
+            raw = fallback;
+        }
+    }
+
     if (!params) {
         return raw;
     }

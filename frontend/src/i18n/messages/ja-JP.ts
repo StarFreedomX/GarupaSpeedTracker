@@ -106,8 +106,7 @@ const jaJP = {
             skillOrderHint: "編成スキル",
             skillRateLabel: "倍率",
             skillCenterHint: "ラジオボタンでセンタースキルを選択（6枠目が固定発動）",
-            skillNote:
-                "注意：スキル倍率1.55は+155%（合計2.55倍）を意味します。5つの編成スキルの発動順序を自動最適化し、最高/最低スコアを算出します。",
+            skillNote: "注意：スキル倍率1.55は+155%（合計2.55倍）を意味します。5つの編成スキルの発動順序を自動最適化し、最高/最低スコアを算出します。",
             progressiveToggle: "プログレ",
             progressiveStepRate: "+毎回",
             progressiveMaxCap: "上限",
@@ -236,8 +235,7 @@ const jaJP = {
             mainPlan: "メイン案",
             altPlan: "代替案{index}",
             noSongsForStep: "このステップに固定PT楽曲がありません",
-            adjustConfigHint:
-                "ステップ3に戻って編成パラメータを調整し再分析するか、下のボーナス調整案を参照してください。",
+            adjustConfigHint: "ステップ3に戻って編成パラメータを調整し再分析するか、下のボーナス調整案を参照してください。",
             recommendPT: "≤{plays} 回オートの最大連続到達区間：",
             windowPreview: "💡 最大連続到達区間プレビュー（区間内すべての値が正確に到達可能）：",
             segmentLen: "中心 {center}、長さ {len}",
@@ -261,8 +259,7 @@ const jaJP = {
         },
         status: {
             noFixedSongs: "現在の編成では固定PT楽曲が見つかりません。",
-            noFixedSongsHint:
-                "編成パラメータ（総合力、ボーナス、スキルなど）を調整して固定PT楽曲を生成するか、オート倍率を下げてください。",
+            noFixedSongsHint: "編成パラメータ（総合力、ボーナス、スキルなど）を調整して固定PT楽曲を生成するか、オート倍率を下げてください。",
             targetTooLow: "目標PTが現在の編成の最低固定PT楽曲を下回っています。",
             targetTooLowHint:
                 "現在の編成での最低PTは{min}です。これより低い目標は達成できません。総合力を下げる、ボーナスを減らす、またはイベント種別を変更してください。",
@@ -287,8 +284,7 @@ const jaJP = {
         success: "データ取得成功！イベント：{eventName}",
         warnPowerNotPublic: "総合力が非公開です。実際の総合力を手動で設定してください",
         warnMissionSupport: "ミッションライブイベントです。サポート総合力を手動で設定してください",
-        warnMedleyCheck:
-            "メドレーイベントです。メドレー1曲目の編成がプロフィール表示と一致しているか確認してください",
+        warnMedleyCheck: "メドレーイベントです。メドレー1曲目の編成がプロフィール表示と一致しているか確認してください",
         error: "取得失敗：{message}",
     },
     error: {
