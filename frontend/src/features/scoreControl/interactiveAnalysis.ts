@@ -80,7 +80,7 @@ function* generateNonDecreasingCombos(n: number, k: number): Generator<number[]>
  * 同时构建 basePT → 歌曲列表的映射
  */
 /** 排除的非正式常驻曲目标识 */
-const EXCLUDE_TITLE_TOKENS = ["超高難易度", "新SPECIAL"];
+const EXCLUDE_TITLE_TOKENS = ["超高難易度", "新SPECIAL", "超高难易度", "期间限定 SPECIAL", "期間限定 SPECIAL"];
 
 export function computeFixedBasePTs(
     config: TeamConfig,
