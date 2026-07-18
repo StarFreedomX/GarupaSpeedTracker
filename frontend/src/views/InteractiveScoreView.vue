@@ -900,7 +900,8 @@ const bonusRows = computed(() => {
                                     :class="song.difficultyKey === '4' ? 'bg-purple-500/20 text-purple-400' :
                                             song.difficultyKey === '3' ? 'bg-red-500/20 text-red-400' :
                                             song.difficultyKey === '2' ? 'bg-yellow-500/20 text-yellow-400' :
-                                            'bg-green-500/20 text-green-400'"
+                                            song.difficultyKey === '1' ? 'bg-green-500/20 text-green-400' :
+                                            'bg-blue-500/20 text-blue-400'"
                                 >
                                     {{ song.difficultyLabel }}
                                 </span>

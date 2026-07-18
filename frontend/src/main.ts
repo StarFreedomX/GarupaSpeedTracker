@@ -1,8 +1,8 @@
 import { createApp } from "vue";
 import App from "@/App.vue";
 import "./style/main.css";
-import router from "./router";
 import { useI18n } from "@/i18n";
+import router from "./router";
 
 const { locale } = useI18n();
 document.documentElement.lang = locale.value;
