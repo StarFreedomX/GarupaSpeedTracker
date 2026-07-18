@@ -16,25 +16,25 @@ logger("mainAPI", "initializing...");
 const app = createApp();
 
 (async () => {
-    // 1. Startup migrations (blocks until complete)
-    await migrateTimestampToTime().catch((error: unknown) => {
+    // 1. Accept traffic immediately — independent endpoints (e.g. SongMetadata) work right away
+    app.listen(PORT, HOST, () => {
+        logger("mainAPI", `listening on ${HOST}:${PORT}`);
+    });
+
+    // 2. Run startup migrations in background (may block if DB unavailable; non-fatal)
+    migrateTimestampToTime().catch((error: unknown) => {
         const nodeError = error as { message?: string };
         logger("migration", `timestamp-to-time failed: ${nodeError.message ?? "unknown error"}`);
     });
 
-    // 2. Bootstrap historical data in parallel (no pollers running yet, no races)
+    // 3. Bootstrap historical data in parallel (may block if DB unavailable; non-fatal)
     await Promise.allSettled([eventRankingService.bootstrap(), monthlyRankingService.bootstrap(), songMetadataService.getSongMetadata()]);
 
-    // 3. Start background pollers (now that bootstraps are complete)
+    // 4. Start background pollers
     monthlyRankingInfoService.start();
     eventInfoService.start();
     eventRankingService.start();
     monthlyRankingService.start();
-
-    // 4. Accept traffic
-    app.listen(PORT, HOST, () => {
-        logger("mainAPI", `listening on ${HOST}:${PORT}`);
-    });
 })().catch((error: unknown) => {
     const nodeError = error as { message?: string };
     logger("mainAPI", `startup failed: ${nodeError.message ?? "unknown error"}`);

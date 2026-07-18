@@ -126,7 +126,10 @@ eventRankingRouter.get("/tracker/data", async (ctx) => {
         result = await eventRankingService.getMusicBorderPoints(server, event, mid, tier);
     } else {
         if (!isEventRankingBorderTier(tier)) {
-            throw validationError("tier", "tier must be one of: 20,30,40,50,100,200,300,500,1000,1500,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000");
+            throw validationError(
+                "tier",
+                "tier must be one of: 20,30,40,50,100,200,300,500,1000,1500,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000",
+            );
         }
         result = await eventRankingService.getEventBorderPoints(server, event, tier);
     }
