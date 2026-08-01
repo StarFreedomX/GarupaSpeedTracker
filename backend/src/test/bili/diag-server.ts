@@ -72,8 +72,9 @@ async function main() {
     const evBorder = ev.eventPointBorderUsers?.entries ?? [];
     console.log(`=== 活动榜 border users (共 ${evBorder.length} 人) ===`);
     for (const u of evBorder) {
-        if (u.rank >= 1480 && u.rank <= 1520) {
-            console.log(`  命中 rank=${u.rank}, name="${u.name}", point=${u.point}`);
+        const rank = u.rank ?? 0;
+        if (rank >= 1480 && rank <= 1520) {
+            console.log(`  命中 rank=${rank}, name="${u.name}", point=${u.point}`);
         }
     }
     console.log(`  rank 范围: ${evBorder[0]?.rank ?? "?"} ~ ${evBorder[evBorder.length - 1]?.rank ?? "?"}`);
@@ -93,8 +94,9 @@ async function main() {
     console.log(`\n=== 月榜 border users (共 ${mBorder.length} 人) ===`);
     let found1500 = false;
     for (const u of mBorder) {
-        if (u.rank >= 1480 && u.rank <= 1520) {
-            console.log(`  rank=${u.rank}, name="${u.name}"`);
+        const rank = u.rank ?? 0;
+        if (rank >= 1480 && rank <= 1520) {
+            console.log(`  rank=${rank}, name="${u.name}"`);
             found1500 = true;
         }
     }
