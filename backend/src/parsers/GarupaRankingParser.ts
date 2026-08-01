@@ -40,20 +40,51 @@ export const buildDegrees = (user: GarupaRankingUser): number[] => {
  * @param user - The protobuf-decoded ranking user to normalize.
  * @returns A normalized user record with coerced numeric fields, string defaults, and extracted degrees.
  */
-export const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
-    const profileSituation = user.userProfileSituation;
-    let sid = toNumber(profileSituation?.situationId);
-    let strained = profileSituation?.illust === "after_training" ? 1 : 0;
+/**
+ * Resolves the player's displayed card ID and training status from ranking data.
+ *
+ * The game has two profile-display modes controlled by
+ * {@code UserProfileSituation.viewProfileSituationStatus}:
+ * - {@code "profile_situation"} → show the user-selected profile card
+ * - {@code "deck_leader"} (or empty/missing) → show the main deck's leader card
+ *
+ * This mirrors the game client's {@code UserProfileSituationModel.ViewProfileSituationType}
+ * / {@code IllustThumbnailUtility.LoadProfileIllustCardThumbnail} logic.
+ *
+ * @param profileSituation - The player's profile situation (may be empty or missing)
+ * @param deckLeaderId     - The deck leader card ID from {@code UserDeck.leader}
+ * @param situationEntries - All cards in the player's deck
+ * @returns Resolved {@code [sid, strained]} tuple
+ */
+const resolveDisplayCard = (
+    profileSituation: GarupaRankingUser["userProfileSituation"],
+    deckLeaderId: number | undefined,
+    situationEntries: Array<{ situationId?: number; illust?: string }> | undefined,
+): [sid: number, strained: number] => {
+    const viewStatus = profileSituation?.viewProfileSituationStatus;
 
-    // Fallback: when profile card is not set, use deck leader card
-    if (sid === 0) {
-        const leaderId = user.userDeck?.leader;
-        if (typeof leaderId === "number" && Number.isFinite(leaderId) && leaderId > 0) {
-            sid = leaderId;
-            const leaderCard = user.userSituationList?.entries?.find((entry) => entry.situationId === leaderId);
-            strained = leaderCard?.illust === "after_training" ? 1 : 0;
-        }
+    // Profile-situation mode: use the explicitly selected card
+    if (viewStatus === "profile_situation") {
+        return [toNumber(profileSituation?.situationId), profileSituation?.illust === "after_training" ? 1 : 0];
     }
+
+    // Deck-leader mode (or empty/missing profile situation): use deck leader
+    if (typeof deckLeaderId === "number" && Number.isFinite(deckLeaderId) && deckLeaderId > 0) {
+        const leaderCard = situationEntries?.find((entry) => entry.situationId === deckLeaderId);
+        return [deckLeaderId, leaderCard?.illust === "after_training" ? 1 : 0];
+    }
+
+    return [1, 0];
+};
+
+/**
+ * Converts a raw Garupa ranking user into a normalized {@link RankingUserRaw} record.
+ *
+ * @param user - The protobuf-decoded ranking user to normalize.
+ * @returns A normalized user record with coerced numeric fields, string defaults, and extracted degrees.
+ */
+export const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
+    const [sid, strained] = resolveDisplayCard(user.userProfileSituation, user.userDeck?.leader, user.userSituationList?.entries);
 
     return {
         uid: toNumber(user.userId),

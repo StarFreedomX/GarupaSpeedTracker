@@ -1,8 +1,12 @@
 /**
  * 验证 parseUser 的 profile card → deck leader fallback 逻辑
  *
- * 修复背景：部分玩家未设置 userProfileSituation（资料展示卡），
- * 导致 sid=0。fallback 到 userDeck.leader（领队卡）。
+ * 游戏有两种资料展示卡模式（viewProfileSituationStatus）：
+ *   "profile_situation" → 显示玩家选定的资料展示卡
+ *   "deck_leader" / 空 → 显示主乐队领队卡
+ *
+ * 修复：parseUser 现在与游戏客户端行为一致，通过 viewProfileSituationStatus 决定
+ * 使用 userProfileSituation 还是 userDeck.leader。
  *
  * 用法：npx tsx src/test/debug-sid-zero-verify.ts
  */
@@ -10,45 +14,83 @@
 import { parseUser } from "@/parsers/GarupaRankingParser";
 import type { GarupaRankingUser } from "@/types/garupaSchema";
 
-// 场景1：有 profile card，不应触发 fallback
-const withProfile: GarupaRankingUser = {
+// 场景1：profile_situation 模式 — 使用 profile 卡
+const profileMode: GarupaRankingUser = {
     userId: 38100567,
     name: "いちごだん",
     rankLevel: 300,
     rank: 1,
     point: 5665050,
-    userProfileSituation: { userId: 38100567, situationId: 1511, illust: "after_training" },
-    userDeck: { deckId: 33, leader: 2492, member1: 2495, deckType: "normal" },
+    userProfileSituation: {
+        userId: 38100567,
+        situationId: 1511,
+        illust: "after_training",
+        viewProfileSituationStatus: "profile_situation",
+    },
+    userDeck: { deckId: 33, leader: 2492, deckType: "normal" },
     userSituationList: {
-        entries: [{ situationId: 2492, illust: "after_training", level: 60, skillLevel: 5 }],
+        entries: [{ situationId: 2492, illust: "normal" }],
     },
 };
 
-// 场景2：无 profile card，有 deck leader，应 fallback
-const noProfile: GarupaRankingUser = {
+// 场景2：profile 卡为空（0字节空消息） — 应 fallback 到领队卡
+const emptyProfile: GarupaRankingUser = {
     userId: 92161183,
     name: "せなたゃん",
     introduction: "次の対バンまでのんびり",
     rankLevel: 191,
     rank: 9,
     point: 2999475,
-    userProfileSituation: {}, // 空消息 — 即 Garupa 返回的 0 字节 message
-    userDeck: { deckId: 3, deckName: "Roselia", leader: 2017, member1: 2146, deckType: "normal" },
+    userProfileSituation: {}, // 空消息
+    userDeck: { deckId: 3, deckName: "Roselia", leader: 2017, deckType: "normal" },
     userSituationList: {
-        entries: [{ situationId: 2017, illust: "after_training", level: 60, skillLevel: 5 }],
+        entries: [{ situationId: 2017, illust: "after_training" }],
     },
 };
 
-// 场景3：无 profile 无 deck — sid 和 strained 应保持 0
-const noDeck: GarupaRankingUser = {
+// 场景3：deck_leader 模式 — 即使 profile situationId 有值，也应显示领队卡
+const deckLeaderMode: GarupaRankingUser = {
+    userId: 100,
+    name: "deckLeaderPlayer",
+    rankLevel: 100,
+    rank: 50,
+    point: 1000000,
+    userProfileSituation: {
+        userId: 100,
+        situationId: 9999, // 之前选过的卡，但现在已切换到领队模式
+        illust: "normal",
+        viewProfileSituationStatus: "deck_leader",
+    },
+    userDeck: { deckId: 1, leader: 5555, deckType: "normal" },
+    userSituationList: {
+        entries: [{ situationId: 5555, illust: "after_training" }],
+    },
+};
+
+// 场景4：userProfileSituation 完全不存在 — fallback 到领队卡
+const noProfileField: GarupaRankingUser = {
     userId: 99999999,
     name: "test",
     rankLevel: 1,
     rank: 999,
     point: 100,
+    // no userProfileSituation at all
+    userDeck: { deckId: 5, leader: 3000, deckType: "normal" },
+    userSituationList: {
+        entries: [{ situationId: 3000, illust: "normal" }],
+    },
 };
 
-// 场景4：leader 卡不在 situationList 中 — sid 应 fallback 但 strained=0
+// 场景5：无 profile 无 deck — sid 和 strained 为 0
+const noDeck: GarupaRankingUser = {
+    userId: 222,
+    name: "noDeck",
+    rankLevel: 1,
+    rank: 999,
+    point: 100,
+};
+
+// 场景6：领队卡不在 situationList 中 — sid fallback 但 strained=0
 const noMatch: GarupaRankingUser = {
     userId: 111,
     name: "nomatch",
@@ -59,23 +101,13 @@ const noMatch: GarupaRankingUser = {
     userSituationList: { entries: [{ situationId: 1111, illust: "after_training" }] },
 };
 
-// 场景5：leader=0（无效值）— 不应触发 fallback
-const leaderZero: GarupaRankingUser = {
-    userId: 222,
-    name: "zeroLeader",
-    rankLevel: 1,
-    rank: 500,
-    point: 1000,
-    userDeck: { leader: 0, deckType: "normal" },
-    userSituationList: { entries: [] },
-};
-
 const cases: Array<{ label: string; user: GarupaRankingUser; expectedSid: number; expectedStrained: number }> = [
-    { label: "With profile card", user: withProfile, expectedSid: 1511, expectedStrained: 1 },
-    { label: "No profile, fallback to leader", user: noProfile, expectedSid: 2017, expectedStrained: 1 },
-    { label: "No profile, no deck", user: noDeck, expectedSid: 0, expectedStrained: 0 },
-    { label: "Leader not in situationList", user: noMatch, expectedSid: 9999, expectedStrained: 0 },
-    { label: "Leader=0 (invalid)", user: leaderZero, expectedSid: 0, expectedStrained: 0 },
+    { label: "profile_situation mode → use profile card", user: profileMode, expectedSid: 1511, expectedStrained: 1 },
+    { label: "Empty profile → fallback to leader", user: emptyProfile, expectedSid: 2017, expectedStrained: 1 },
+    { label: "deck_leader mode → ignore profile, use leader", user: deckLeaderMode, expectedSid: 5555, expectedStrained: 1 },
+    { label: "No profile field → fallback to leader", user: noProfileField, expectedSid: 3000, expectedStrained: 0 },
+    { label: "No profile, no deck → sid=1 (safe default)", user: noDeck, expectedSid: 1, expectedStrained: 0 },
+    { label: "Leader not in situationList → sid fallback, strained=0", user: noMatch, expectedSid: 9999, expectedStrained: 0 },
 ];
 
 let passed = 0;
@@ -88,8 +120,8 @@ for (const tc of cases) {
     const ok = sidOk && strainedOk;
 
     console.log(`${ok ? "✅" : "❌"} ${tc.label}`);
-    console.log(`   sid: ${result.sid} (expected ${tc.expectedSid})${sidOk ? "" : " ❌"}`);
-    console.log(`   strained: ${result.strained} (expected ${tc.expectedStrained})${strainedOk ? "" : " ❌"}`);
+    if (!sidOk) console.log(`   sid: got ${result.sid}, expected ${tc.expectedSid}`);
+    if (!strainedOk) console.log(`   strained: got ${result.strained}, expected ${tc.expectedStrained}`);
 
     if (ok) passed++;
     else failed++;
