@@ -42,14 +42,25 @@ export const buildDegrees = (user: GarupaRankingUser): number[] => {
  */
 export const parseUser = (user: GarupaRankingUser): RankingUserRaw => {
     const profileSituation = user.userProfileSituation;
-    const strained = profileSituation?.illust === "after_training" ? 1 : 0;
+    let sid = toNumber(profileSituation?.situationId);
+    let strained = profileSituation?.illust === "after_training" ? 1 : 0;
+
+    // Fallback: when profile card is not set, use deck leader card
+    if (sid === 0) {
+        const leaderId = user.userDeck?.leader;
+        if (typeof leaderId === "number" && Number.isFinite(leaderId) && leaderId > 0) {
+            sid = leaderId;
+            const leaderCard = user.userSituationList?.entries?.find((entry) => entry.situationId === leaderId);
+            strained = leaderCard?.illust === "after_training" ? 1 : 0;
+        }
+    }
 
     return {
         uid: toNumber(user.userId),
         name: user.name ?? "",
         introduction: user.introduction ?? "",
         rank: toNumber(user.rankLevel),
-        sid: toNumber(profileSituation?.situationId),
+        sid,
         strained,
         degrees: buildDegrees(user),
         tier: toNumber(user.rank),
