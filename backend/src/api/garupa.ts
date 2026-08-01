@@ -22,6 +22,7 @@ import {
 import { logger } from "@/logger";
 import { bandoriEventRankingParser } from "@/parsers/GarupaEventRankingParser";
 import { bandoriMonthlyRankingParser as garupaMonthlyRankingParser } from "@/parsers/GarupaMonthlyRankingParser";
+import { validateEventRanking, validateMonthlyRanking } from "@/parsers/GarupaResponseValidator";
 import { downloader } from "@/storage/downloader";
 import type { EventRankingBandoriRaw } from "@/types/event";
 import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
@@ -407,7 +408,24 @@ export const fetchMonthlyRanking = async (server: number, monthlyId: number, cli
     }
 
     try {
-        return garupaMonthlyRankingParser.parse(decrypted);
+        const report = garupaMonthlyRankingParser.parse(decrypted);
+
+        const validation = validateMonthlyRanking(report, server);
+        if (!validation.valid) {
+            logger("garupaApi", `monthlyId=${monthlyId} validation failed: ${validation.reason}, retrying once`);
+            const { decrypted: dec2, status: st2 } = await fetchMonthlyRankingBuffer(server, monthlyId, clientVersion);
+            if (st2 < 200 || st2 >= 300) {
+                throw new Error(`Monthly ranking HTTP ${st2}`);
+            }
+            const report2 = garupaMonthlyRankingParser.parse(dec2);
+            const validation2 = validateMonthlyRanking(report2, server);
+            if (!validation2.valid) {
+                throw new Error(`Monthly ranking validation still failing after retry: ${validation2.reason}`);
+            }
+            return report2;
+        }
+
+        return report;
     } catch (parseErr) {
         const diagDir = path.join("cache", "diag");
         await fs.mkdir(diagDir, { recursive: true });
@@ -591,7 +609,24 @@ export const fetchEventRanking = async (
     }
 
     try {
-        return bandoriEventRankingParser.parse(decrypted, eventType);
+        const report = bandoriEventRankingParser.parse(decrypted, eventType);
+
+        const validation = validateEventRanking(report, server);
+        if (!validation.valid) {
+            logger("garupaApi", `eventId=${eventId} validation failed: ${validation.reason}, retrying once`);
+            const { decrypted: dec2, status: st2 } = await fetchEventRankingBuffer(server, eventId, eventType, clientVersion, mid);
+            if (st2 < 200 || st2 >= 300) {
+                throw new Error(`Event ranking HTTP ${st2}`);
+            }
+            const report2 = bandoriEventRankingParser.parse(dec2, eventType);
+            const validation2 = validateEventRanking(report2, server);
+            if (!validation2.valid) {
+                throw new Error(`Event ranking validation still failing after retry: ${validation2.reason}`);
+            }
+            return report2;
+        }
+
+        return report;
     } catch (parseErr) {
         // Save the exact buffer that caused parse failure
         const diagDir = path.join("cache", "diag");
