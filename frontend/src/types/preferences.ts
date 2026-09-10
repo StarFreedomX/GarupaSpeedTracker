@@ -1,6 +1,8 @@
 import type { ServerKey } from "@/types/points";
 
 export type RequestMode = "fixed-interval" | "fixed-minute" | "smart-refresh";
+export type DisplayTimeZone = "local" | "Asia/Shanghai" | "Asia/Tokyo";
+
 export type ApiMode = "frontend" | "backend";
 
 export interface ApiPreferences {
@@ -34,6 +36,7 @@ export interface CalculatorPreferences {
 }
 
 export interface UserPreferences {
+    timeZone: DisplayTimeZone;
     api: ApiPreferences;
     query: QueryPreferences;
     table: TablePreferences;

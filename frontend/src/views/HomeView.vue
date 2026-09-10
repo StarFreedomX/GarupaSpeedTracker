@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import EventSummaryPanel from "@/components/event/EventSummaryPanel.vue";
 import PointsFilters from "@/components/filters/PointsFilters.vue";
+import HourlyTables from "@/components/table/HourlyTables.vue";
 import PointsTable from "@/components/table/PointsTable.vue";
 import { toTableModel } from "@/features/points/pointsMath";
 import { useI18n } from "@/i18n";
@@ -10,6 +11,7 @@ import type { PlayerTrack } from "@/types/points";
 import type { QueryPreferences } from "@/types/preferences";
 
 const props = defineProps<{
+    hourly?: boolean;
     filters: QueryPreferences;
     tracks: PlayerTrack[];
     rowsPerPage: number;
@@ -75,7 +77,8 @@ const selectedEvent = computed(() => props.eventOptions.find((option) => option.
             {{ props.error }}
         </p>
 
-        <PointsTable :model="tableModel" :loading="props.loading" :rows-per-page="props.rowsPerPage"/>
+        <HourlyTables v-if="props.hourly" :tracks="props.tracks" :event="selectedEvent" :loading="props.loading" />
+        <PointsTable v-else :model="tableModel" :loading="props.loading" :rows-per-page="props.rowsPerPage"/>
         <!-- 页脚 -->
         <footer class="mt-10 text-center text-xs text-gray-400">
             <div class="text-center text-xs text-gray-400 mb-2 mt-4">

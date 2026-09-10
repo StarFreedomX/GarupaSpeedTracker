@@ -31,6 +31,7 @@ const draft = reactive(clonePreferences(model.value));
 
 const syncDraft = (next: UserPreferences) => {
     const copy = clonePreferences(next);
+    draft.timeZone = copy.timeZone;
     Object.assign(draft.api, copy.api);
     Object.assign(draft.query, copy.query);
     Object.assign(draft.table, copy.table);
@@ -137,6 +138,7 @@ const save = () => {
     const next = clonePreferences(draft);
     next.api.backendBaseUrl = normalizeApiBase(next.api.backendBaseUrl);
 
+    model.value.timeZone = next.timeZone;
     Object.assign(model.value.api, next.api);
     Object.assign(model.value.query, next.query);
     Object.assign(model.value.table, next.table);
@@ -308,6 +310,15 @@ const onHueChange = (event: Event) => {
 
         <section class="app-panel grid grid-cols-1 gap-4 p-4">
             <h2 class="text-base font-semibold">{{ t('settings.tableTitle') }}</h2>
+
+            <label class="grid gap-1 text-sm text-muted max-w-xs">
+                {{ t('settings.timeZone') }}
+                <select v-model="draft.timeZone" class="rounded-app border-border bg-surface text-sm text-text">
+                    <option value="local">{{ t('settings.timeZoneLocal') }}</option>
+                    <option value="Asia/Shanghai">{{ t('settings.timeZoneBeijing') }}</option>
+                    <option value="Asia/Tokyo">{{ t('settings.timeZoneJapan') }}</option>
+                </select>
+            </label>
 
             <label class="grid gap-1 text-sm text-muted max-w-xs">
                 {{ t('settings.rowsPerPage') }}

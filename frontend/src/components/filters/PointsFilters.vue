@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from "@/utils/time";
 import { useI18n } from "@/i18n";
 import type { EventOption } from "@/types/event";
 import type { QueryPreferences } from "@/types/preferences";
@@ -26,7 +27,7 @@ const { t } = useI18n();
                     }}
                 </option>
                 <option v-for="option in props.eventOptions" :key="option.eventId" :value="option.eventId">
-                    {{ option.label }}
+                    {{ option.eventId }} - {{ option.eventName }} ({{ formatDateTime(option.startAt) }})
                 </option>
             </select>
         </label>

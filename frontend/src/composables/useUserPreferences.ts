@@ -47,6 +47,7 @@ const toRequestMode = (value: unknown): RequestMode => {
 };
 
 export const createDefaultPreferences = (): UserPreferences => ({
+    timeZone: "local",
     api: {
         ...DEFAULT_API_PREFERENCES,
     },
@@ -73,6 +74,7 @@ export const createDefaultPreferences = (): UserPreferences => ({
 });
 
 export const clonePreferences = (preferences: UserPreferences): UserPreferences => ({
+    timeZone: preferences.timeZone,
     api: {
         ...preferences.api,
     },
@@ -136,6 +138,7 @@ const loadPreferences = (): UserPreferences => {
 
         const parsed = JSON.parse(raw) as Partial<UserPreferences>;
         return {
+            timeZone: parsed.timeZone === "Asia/Shanghai" || parsed.timeZone === "Asia/Tokyo" ? parsed.timeZone : "local",
             api: normalizeApiPreferences(parsed.api as Record<string, unknown> | undefined),
             query: normalizeQueryPreferences(parsed.query as Record<string, unknown> | undefined),
             table: normalizeTablePreferences(parsed.table as Record<string, unknown> | undefined),

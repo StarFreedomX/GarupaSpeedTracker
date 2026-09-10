@@ -1,6 +1,24 @@
 import type { I18nMessages } from "@/i18n/messages/schema";
 
 const zhCN = {
+    hourly: {
+        title: "时速表",
+        subtitle: "最近 24 个整点 · 最新在上",
+        note: "取整点前最近快照，与约 60 分钟前的快照相减。* 为新进前十玩家，以上次第十名积分作为基准；变动次数不等于实际游玩次数。",
+        empty: "暂无可用的整点记录。",
+        rank: "排名",
+        player: "玩家",
+        points: "分数",
+        gap: "与上位分差",
+        speed: "60min 分数变化",
+        speedRank: "速度排名",
+        changes: "分数变动次数",
+        firstBlank: "前空白/min",
+        lastBlank: "尾空白/min",
+        average: "把均 PT",
+        samples: "实际采样",
+        partial: "不足一小时",
+    },
     menu: {
         home: "首页",
         auto: "自动控分表",
@@ -162,6 +180,11 @@ const zhCN = {
         },
     },
     settings: {
+        timeZone: "显示时区",
+        timeZoneLocal: "本地时区",
+        timeZoneBeijing: "北京时间",
+        timeZoneJapan: "日本时间",
+
         title: "主题设置",
         queryTitle: "默认查询设置",
         tableTitle: "表格设置",

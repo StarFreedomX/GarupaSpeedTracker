@@ -1,4 +1,22 @@
 export interface I18nMessages {
+    hourly: {
+        title: string;
+        subtitle: string;
+        note: string;
+        empty: string;
+        rank: string;
+        player: string;
+        points: string;
+        gap: string;
+        speed: string;
+        speedRank: string;
+        changes: string;
+        firstBlank: string;
+        lastBlank: string;
+        average: string;
+        samples: string;
+        partial: string;
+    };
     menu: {
         home: string;
         auto: string;
@@ -161,6 +179,10 @@ export interface I18nMessages {
         };
     };
     settings: {
+        timeZone: string;
+        timeZoneLocal: string;
+        timeZoneBeijing: string;
+        timeZoneJapan: string;
         title: string;
         queryTitle: string;
         tableTitle: string;

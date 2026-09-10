@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatTime } from "@/utils/time";
 import { computed, ref } from "vue";
 import type { Locale } from "@/i18n";
 import { useI18n } from "@/i18n";
@@ -15,7 +16,7 @@ const updatedLabel = computed(() => {
         return t("topbar.notSynced");
     }
 
-    return new Date(props.lastUpdated).toLocaleTimeString();
+    return formatTime(props.lastUpdated);
 });
 
 const open = ref(false);

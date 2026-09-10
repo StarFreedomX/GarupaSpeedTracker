@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Lenis from "lenis";
+import { displayTimeZone } from "@/utils/time";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router"; // 引入路由钩子
 import TopStatusBar from "@/components/layout/TopStatusBar.vue";
@@ -18,6 +19,7 @@ const route = useRoute();
 
 const menuItems = computed(() => [
     { key: "home", label: t("menu.home") },
+    { key: "hourly", label: t("hourly.title") },
     { key: "interactive", label: t("menu.interactive") },
     { key: "auto", label: t("menu.auto") },
     { key: "bonus", label: t("menu.bonus") },
@@ -27,6 +29,7 @@ const menuItems = computed(() => [
 
 const { preferences, applyTheme, persist } = useUserPreferences();
 applyTheme(preferences.theme);
+watch(() => preferences.timeZone, (value) => { displayTimeZone.value = value; }, { immediate: true });
 setApiBase(preferences.api);
 
 // 使用当前路由名称作为激活状态
@@ -136,9 +139,8 @@ watch(
 );*/
 
 const { tracks, statusText, isPaused, countdownSeconds, isLoading, error, lastUpdated, refreshFull } = usePointsPolling(
-    () => filters,
-    // 只有在首页时才激活轮询逻辑
-    () => route.name === "home" && eventReady.value,
+    () => route.name === "hourly" ? { ...filters, time: 26 * 60, sampleIntervalSeconds: 1 } : filters,
+    () => (route.name === "home" || route.name === "hourly") && eventReady.value,
 );
 
 const togglePause = () => {
@@ -227,8 +229,9 @@ watch(
                                     <component
                                         :is="Component"
                                         v-bind="
-                                            (route.name === 'home' || route.name === 'auto')
+                                            (route.name === 'home' || route.name === 'hourly' || route.name === 'auto')
                                             ? {
+                                                hourly: route.name === 'hourly',
                                                 filters: filters,
                                                 tracks: tracks,
                                                 rowsPerPage: preferences.table.rowsPerPage,
