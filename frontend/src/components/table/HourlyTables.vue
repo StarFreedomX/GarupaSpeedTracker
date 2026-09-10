@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { displayTimeZone, formatShortDateTime } from "@/utils/time";
+import { formatShortDateTime } from "@/utils/time";
 import { computed } from "vue";
 import { toHourlySnapshots } from "@/features/points/hourlyMath";
 import { useI18n } from "@/i18n";
@@ -15,11 +15,7 @@ const number = (value: number | null) => value === null ? "—" : value.toLocale
 
 <template>
     <section class="min-w-0" :aria-busy="loading">
-        <div class="mb-5 space-y-2">
-            <h1 class="text-lg font-semibold">{{ t('hourly.title') }}</h1>
-            <p class="text-sm text-muted">{{ t('hourly.subtitle') }} · {{ t(displayTimeZone === 'local' ? 'settings.timeZoneLocal' : displayTimeZone === 'Asia/Tokyo' ? 'settings.timeZoneJapan' : 'settings.timeZoneBeijing') }}</p>
-            <p class="text-xs leading-relaxed text-muted">{{ t('hourly.note') }}</p>
-        </div>
+        <h1 class="mb-3 text-lg font-semibold">{{ t('hourly.title') }}</h1>
         <p v-if="!snapshots.length" class="app-panel p-6 text-center text-sm text-muted">
             {{ loading ? t('common.loading') : t('hourly.empty') }}
         </p>
@@ -28,7 +24,7 @@ const number = (value: number | null) => value === null ? "—" : value.toLocale
                 <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-primary/10 px-4 py-3">
                     <h2 class="font-semibold tabular-nums">{{ formatShortDateTime(snapshot.hour, false) }}</h2>
                     <span v-if="snapshot.partial" class="text-xs text-muted">{{ t('hourly.partial') }}</span>
-                    <p class="text-xs tabular-nums text-muted">{{ t('hourly.samples') }}: {{ formatShortDateTime(snapshot.start) }} → {{ formatShortDateTime(snapshot.end) }}</p>
+                    <p class="text-xs tabular-nums text-muted">{{ formatShortDateTime(snapshot.start) }} → {{ formatShortDateTime(snapshot.end) }}</p>
                 </header>
                 <div class="overflow-x-auto" tabindex="0" :aria-label="t('hourly.title')">
                     <table class="w-full whitespace-nowrap text-right text-sm tabular-nums">
@@ -44,7 +40,7 @@ const number = (value: number | null) => value === null ? "—" : value.toLocale
                                 </th>
                                 <td class="px-4 py-3">{{ number(row.points) }}</td>
                                 <td class="px-4 py-3 text-muted">{{ number(row.gap) }}</td>
-                                <td class="px-4 py-3 font-semibold text-primary">{{ number(row.speed) }}{{ row.usesTenthPlaceBaseline ? '*' : '' }}</td>
+                                <td class="px-4 py-3 font-semibold text-primary">{{ number(row.speed) }}</td>
                                 <td class="px-4 py-3">{{ number(row.speedRank) }}</td>
                                 <td class="px-4 py-3">{{ number(row.changes) }}</td>
                                 <td class="px-4 py-3 text-muted">{{ number(row.firstBlank) }}</td>

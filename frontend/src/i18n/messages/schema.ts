@@ -1,8 +1,6 @@
 export interface I18nMessages {
     hourly: {
         title: string;
-        subtitle: string;
-        note: string;
         empty: string;
         rank: string;
         player: string;
@@ -14,7 +12,6 @@ export interface I18nMessages {
         firstBlank: string;
         lastBlank: string;
         average: string;
-        samples: string;
         partial: string;
     };
     menu: {

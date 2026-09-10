@@ -3,8 +3,6 @@ import type { I18nMessages } from "@/i18n/messages/schema";
 const jaJP = {
     hourly: {
         title: "時速表",
-        subtitle: "直近24時間 · 新しい順",
-        note: "毎正時以前の最新データと約60分前の差分。* は新規トップ10入り（前回10位のポイントを基準に計算）。変動回数は実際のプレイ回数とは異なります。",
         empty: "毎正時の記録はまだありません。",
         rank: "順位",
         player: "プレイヤー",
@@ -16,7 +14,6 @@ const jaJP = {
         firstBlank: "前空白/分",
         lastBlank: "後空白/分",
         average: "平均PT",
-        samples: "取得時刻",
         partial: "1時間未満",
     },
     menu: {

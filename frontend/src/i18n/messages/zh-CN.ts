@@ -3,8 +3,6 @@ import type { I18nMessages } from "@/i18n/messages/schema";
 const zhCN = {
     hourly: {
         title: "时速表",
-        subtitle: "最近 24 个整点 · 最新在上",
-        note: "取整点前最近快照，与约 60 分钟前的快照相减。* 为新进前十玩家，以上次第十名积分作为基准；变动次数不等于实际游玩次数。",
         empty: "暂无可用的整点记录。",
         rank: "排名",
         player: "玩家",
@@ -16,7 +14,6 @@ const zhCN = {
         firstBlank: "前空白/min",
         lastBlank: "尾空白/min",
         average: "把均 PT",
-        samples: "实际采样",
         partial: "不足一小时",
     },
     menu: {

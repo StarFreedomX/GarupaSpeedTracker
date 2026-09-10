@@ -3,8 +3,6 @@ import type { I18nMessages } from "@/i18n/messages/schema";
 const enUS = {
     hourly: {
         title: "Hourly speed",
-        subtitle: "Latest 24 hours · Newest first",
-        note: "Uses the last snapshot before each hour and a snapshot about 60 minutes earlier. * New entrants use the previous tenth-place score as their baseline; changes are not actual play counts.",
         empty: "No hourly records available.",
         rank: "Rank",
         player: "Player",
@@ -16,7 +14,6 @@ const enUS = {
         firstBlank: "Initial idle/min",
         lastBlank: "Final idle/min",
         average: "PT/change",
-        samples: "Sample times",
         partial: "Less than one hour",
     },
     menu: {
