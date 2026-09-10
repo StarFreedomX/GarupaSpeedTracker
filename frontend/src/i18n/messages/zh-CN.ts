@@ -196,7 +196,7 @@ const zhCN = {
     about: {
         title: "关于",
         desc: "该页面用于展示活动分速，支持增量同步与按时间对齐的表格视图。",
-        source: "数据来源：Bestdori 榜线接口（经后端转发）。",
+        source: "数据来源：优先使用项目数据库，无可用积分数据时回退 Bestdori；活动列表合并双方数据。",
     },
     interactive: {
         title: "交互式控分",

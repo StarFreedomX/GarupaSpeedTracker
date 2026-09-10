@@ -2,7 +2,7 @@ import Router from "@koa/router";
 import { getEventList } from "@/services";
 
 /**
- * Router group for Bestdori event list endpoints.
+ * Router group for merged event list endpoints.
  *
  * The route keeps the response shape lightweight by forwarding only the
  * normalized event list projection produced by the service layer.
@@ -12,7 +12,7 @@ export const eventRouter = new Router();
 /**
  * GET /api/events
  *
- * Fetches the Bestdori event list through the service layer and returns the
+ * Merges project and Bestdori event lists through the service layer and returns the
  * normalized event object keyed by event ID.
  *
  * Failure semantics:

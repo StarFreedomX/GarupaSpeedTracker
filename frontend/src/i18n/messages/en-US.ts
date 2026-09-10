@@ -196,7 +196,7 @@ const enUS = {
     about: {
         title: "About",
         desc: "This page tracks points velocity with incremental syncing and time-aligned table rendering.",
-        source: "Data source: Bestdori ranking API through backend proxy.",
+        source: "Data source: project database first, with Bestdori fallback when points are unavailable. Events combine both sources.",
     },
     interactive: {
         title: "Score Calculator",

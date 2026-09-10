@@ -5,7 +5,7 @@ import { getPointTrack } from "@/services/pointsService";
 import type { PointsQueryParams } from "@/types/bestdori";
 
 /**
- * Router group for Bestdori points tracking endpoints.
+ * Router group for database-first points tracking endpoints.
  *
  * This router validates points polling parameters, enforces the local server
  * index contract, and delegates the upstream fetch/caching work to the service
