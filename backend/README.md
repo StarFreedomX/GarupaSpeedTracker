@@ -73,6 +73,7 @@ pnpm start
 | `GARUPA_ENCRYPTION_KEY`                           | 同上                                     | 单值回退配置                                |
 | `GARUPA_ENCRYPTION_IVS`                           | `-,-,-,-`                              | AES IV 列表（16 字节）                      |
 | `GARUPA_ENCRYPTION_IV`                            | 同上                                     | 单值回退配置                                |
+| `GARUPA_RIDS`                                    | `-,-,-,-`                              | 各服初始 nonce；国服填第 4 项，初始签名为 `MD5(rkey + rid)`，后续优先使用响应 nonce；空项或 `-` 表示未配置 |
 | `GARUPA_REFRESH_INTERVAL_SECONDS`                 | `60`                                   | Garupa 轮询基础间隔（秒）                      |
 | `GARUPA_REFRESH_AT_SECOND`                        | `0`                                    | Garupa 轮询触发秒（0-59）                    |
 | `GARUPA_PACKAGE_URLS`                             | `itunes...`                            | 自动获取客户端版本的包查询地址列表                     |

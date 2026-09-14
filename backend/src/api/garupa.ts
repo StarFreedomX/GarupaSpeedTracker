@@ -10,6 +10,7 @@ import {
     GARUPA_PACKAGE_URLS,
     GARUPA_PIDS,
     GARUPA_RKEYS,
+    GARUPA_RIDS,
     GARUPA_SERVER_BASES,
     GARUPA_STATUS_POLL_INTERVAL_MS,
     GARUPA_STATUS_UNAVAILABILITY_THRESHOLD,
@@ -297,7 +298,7 @@ const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => M
  * where `requestID` is a server-provided nonce. This function serializes all CN requests per server
  * via a promise-based lock (`ridLock`) to ensure sequential nonce state:
  *
- * 1. On the first request, no stored nonce exists so a random fallback is sent.
+ * 1. On the first request, sign GARUPA_RIDS[server] if configured; otherwise send a random fallback.
  * 2. The server responds with the current nonce in the `X-Requestid` response header.
  * 3. If the server returns HTTP 405, the stored nonce is stale. The function extracts a fresh nonce
  *    from the decrypted error body (or response header) and retries the request immediately.
@@ -340,9 +341,11 @@ const fetchRankingBuffer = async (url: string, server: number, clientVersion: st
     await prev;
 
     try {
-        const storedRequestId = ridStore.get(server);
+        const configuredRid = GARUPA_RIDS[server];
+        const initialRid = configuredRid && configuredRid !== "-" ? configuredRid : undefined;
+        const storedRequestId = ridStore.get(server) ?? initialRid;
 
-        // 如果有 requestKey 和已存储的 requestID，本地计算 RID
+        // 优先使用服务端返回的 nonce；尚未获取时使用环境变量中的初始 nonce。
         const computedRid = requestKey && storedRequestId ? computeRequestId(requestKey, storedRequestId) : null;
 
         const headers = createGarupaHeaders(server, clientVersion);

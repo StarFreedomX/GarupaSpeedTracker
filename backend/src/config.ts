@@ -119,6 +119,8 @@ export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ??
 
 /** Per-server rkeys (CN-specific). */
 export const GARUPA_RKEYS = toList(process.env.GARUPA_RKEYS, ["-", "-", "-", "-"]);
+/** Per-server initial nonce, used for MD5(requestKey + nonce) before a response nonce is available. */
+export const GARUPA_RIDS = (process.env.GARUPA_RIDS ?? "-,-,-,-").split(",").map((entry) => entry.trim());
 /** Per-server cids (CN-specific). */
 export const GARUPA_CIDS = toList(process.env.GARUPA_CIDS, ["-", "-", "-", "-"]);
 /** Per-server pids (CN-specific). */
