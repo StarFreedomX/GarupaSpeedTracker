@@ -187,3 +187,13 @@ GET /api/playerDeckStatus?server=0&playerId=28012549
   ]
 }
 ```
+
+### 歌曲主数据与计分等级
+
+歌曲信息直接读取日服 `/suite/master`（AES 解密、BZip2 解压、protobuf 解析）。日服已有字段优先，Bestdori 只补充缺失字段及其他区服名称/时间，谱面 Note 数据仍使用 Bestdori。歌曲和难度列表以日服为准。
+
+需配置 `GARUPA_ENCRYPTION_KEYS`、`GARUPA_ENCRYPTION_IVS` 的第 0 项（日服）；沿用现有配置的编码格式。此接口不需要 UID/UUID。日服地址在未配置 `GARUPA_SERVER_BASES[0]` 时默认使用 `https://api.garupa.jp/api/`，客户端版本从 App Store 查询，失败时使用 `GARUPA_CLIENT_VERSIONS` 的第 0 项。歌曲接口不依赖 MongoDB 初始化。
+
+`playLevel`/谱面 `level` 用于显示，`scoreLevel` 用于分数计算；游戏未设置 `scoreLevel`（缺失或 0）时使用 `playLevel`。例如 Game Changer Expert 显示 Lv29，计分使用 Lv28。
+
+刷新周期沿用 `BESTDORI_SONGS_CHECK_INTERVAL_MS`。旧谱面缓存首次访问会自动迁移，并复用 Note 统计。日服暂时不可用时保留上次日服快照；无日服快照的首次运行会返回错误，不会改用 Bestdori 的显示等级计分。

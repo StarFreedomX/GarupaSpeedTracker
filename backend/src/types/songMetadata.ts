@@ -27,6 +27,8 @@ export type SkillDuration =
  */
 export interface SongLevelSummary {
     level: number;
+    /** Game scoring level; falls back to level for older datasets. */
+    scoreLevel?: number;
     /**
      * 谱面总note数
      */

@@ -1,5 +1,5 @@
 import Router from "@koa/router";
-import { getSongsList } from "@/services";
+import { getSongsList } from "@/services/songsService";
 
 /**
  * 歌曲路由
@@ -13,7 +13,7 @@ export const songsRouter = new Router();
  *
  * 获取歌曲列表
  *
- * 通过服务层获取 Bestdori 的歌曲数据，返回歌曲对象。
+ * 通过服务层获取日服游戏歌曲主数据，使用 Bestdori 补充缺失字段。
  *
  * 错误处理：
  * - 上游请求失败或超时由全局错误中间件统一处理

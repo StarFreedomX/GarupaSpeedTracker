@@ -339,3 +339,18 @@ describe("Overlap Delta Correction", () => {
         expect(result).toEqual(660000);
     });
 });
+
+describe("Game Changer scoring level regression", () => {
+    const skills: Skill[] = Array.from({ length: 6 }, () => ({ duration: "7.0", scoreUp: 1.55 }));
+    const oldChart: SongLevelSummary = { ...mockSongLevelSummary, level: 28 };
+    const reratedChart: SongLevelSummary = { ...oldChart, level: 29, scoreLevel: 28 };
+
+    test.each([60, 120] as const)("rerating preserves scores at %s fps", (fps) => {
+        const oldScore = calcExactScoreInTurns(300000, skills, oldChart, 0.75, fps);
+        expect(calcExactScoreInTurns(300000, skills, reratedChart, 0.75, fps)).toBe(oldScore);
+        expect(calcExactScoreInTurns(300000, skills, { ...oldChart, level: 29 }, 0.75, fps)).toBeGreaterThan(oldScore);
+        expect(calcScore(300000, skills.slice(0, 5), skills[5], reratedChart, 0.75, fps)).toEqual(
+            calcScore(300000, skills.slice(0, 5), skills[5], oldChart, 0.75, fps),
+        );
+    });
+});

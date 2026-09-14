@@ -146,7 +146,8 @@ export function calcScore(
  * @param autoPara auto倍率参数
  */
 export function calcExactScoreInTurns(totalPower: number, skills: Skill[], songLevelSummary: SongLevelSummary, autoPara: number, fps: FpsOption = 120): number {
-    const songLevel = songLevelSummary.level;
+    // 使用歌曲的分数等级
+    const songLevel = songLevelSummary.scoreLevel ?? songLevelSummary.level;
     // 1. 计算基础自动分数 (整数)
     const baseAutoScore = Math.floor((3 * autoPara * totalPower * (1 + (songLevel - 5) / 100)) / songLevelSummary.total);
 

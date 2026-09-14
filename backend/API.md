@@ -219,7 +219,7 @@ https://bestdori.com/api/events/all.5.json
 
 ## GET `/api/songs`
 
-Query Bestdori song list and return the full music database keyed by song ID.
+Return the JP game song catalog keyed by song ID. JP values take priority; Bestdori only fills missing metadata and region slots. Songs/difficulties absent from the JP catalog are not added by Bestdori.
 
 ### Query Parameters
 
@@ -234,7 +234,8 @@ GET /api/songs
 Upstream mapping:
 
 ```text
-https://bestdori.com/api/songs/all.5.json
+https://api.garupa.jp/api/suite/master (primary)
+https://bestdori.com/api/songs/all.5.json (supplement only)
 ```
 
 ### Success Response `200`
@@ -262,6 +263,7 @@ https://bestdori.com/api/songs/all.5.json
 ### Response Contract
 
 - Response is an object keyed by Bestdori song ID (string).
+- `difficulty[*].playLevel` is the displayed level; `scoreLevel` is the game scoring level (defaults to `playLevel` when unset/zero in the game protocol).
 - Each song includes `tag` (anime / normal / tie_up), `bandId`, `jacketImage`, `musicTitle`, `publishedAt`, `closedAt`, and `difficulty`.
 - `musicTitle`, `publishedAt`, `closedAt`, and `jacketImage` are arrays of 5 elements indexed by server (0=jp, 1=en, 2=tw, 3=cn, 4=kr). Elements may be `null`.
 - `difficulty` keys: `"0"` (easy), `"1"` (normal), `"2"` (hard), `"3"` (expert), `"4"` (special). The `"4"` key may be absent if the song has no special difficulty.
@@ -300,7 +302,7 @@ https://bestdori.com/api/songs/all.5.json
 
 ## GET `/api/songMetadata.json`
 
-Return the cached Bestdori chart distribution dataset (`SongChartMeta`) keyed by `song_id` then `level`.
+Return cached chart metadata (`SongChartMeta`) keyed by song ID and difficulty key. Levels come from the JP game; note distributions come from Bestdori charts.
 
 ### Query Parameters
 
@@ -319,7 +321,9 @@ Response is JSON and may be gzipped when the client sends `Accept-Encoding: gzip
 ```json
 {
   "1": {
-    "22": {
+    "3": {
+      "level": 22,
+      "scoreLevel": 22,
       "total": 459,
       "counts": {
         "3.0": [11, 15, 16, 8, 9, 10]
@@ -332,8 +336,10 @@ Response is JSON and may be gzipped when the client sends `Accept-Encoding: gzip
 ### Response Contract
 
 - The dataset is stored under `backend/data/songMetadata.json` and reused until the configured check interval expires.
+- Old metadata caches are automatically migrated on first access. Existing note counts are reused while display/scoring levels are refreshed.
+- JP song snapshots are cached in `backend/data/jpSongs.json`. If JP refresh fails, the last JP snapshot is retained; on a cold start a JP error is surfaced instead of using Bestdori scoring levels.
 - Raw chart storage is disabled by default and can be enabled via `BESTDORI_STORE_RAW_CHARTS`.
-- All available difficulties are fetched in upstream order (`easy`, `normal`, `hard`, `expert`, `special`) and stored as `{ [song_id]: { [level]: { total, counts } } }`.
+- All available difficulties are fetched in upstream order (`easy`, `normal`, `hard`, `expert`, `special`) and stored as `{ [song_id]: { [difficulty]: { level, scoreLevel, total, counts } } }`. `level` remains the displayed difficulty; calculations use `scoreLevel`.
 
 ## GET `/api/eventtop/data`
 

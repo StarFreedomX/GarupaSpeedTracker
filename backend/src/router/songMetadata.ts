@@ -1,7 +1,7 @@
 import { promisify } from "node:util";
 import { gzip as gzipCallback } from "node:zlib";
 import Router from "@koa/router";
-import { getSongMetadata } from "@/services";
+import { getSongMetadata } from "@/services/songMetadataService";
 import type { SongChartMeta } from "@/types/songMetadata";
 
 const gzip = promisify(gzipCallback);

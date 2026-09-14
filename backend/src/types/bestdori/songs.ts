@@ -37,6 +37,8 @@ export interface MusicItem {
 
 export interface Difficulty {
     playLevel: number;
+    /** Game scoring level; independent of the displayed playLevel. */
+    scoreLevel?: number;
     // 只有部分难度（如难度 4）会包含该字段，故设为可选
     publishedAt?: (string | null)[];
 }

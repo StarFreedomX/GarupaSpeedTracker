@@ -182,8 +182,7 @@ export const getGarupaServerIds = (): number[] =>
  * @param server - Server index
  * @param clientVersion - Client version string (from live version check or fallback)
  */
-export const createGarupaHeaders = (server: number, clientVersion: string) => {
-    const uuid = getGarupaUuid(server);
+export const createGarupaHeaders = (server: number, clientVersion: string, anonymous = false) => {
     const channelId = getGarupaChannelId(server);
     const platformId = getGarupaPlatformId(server);
 
@@ -192,11 +191,12 @@ export const createGarupaHeaders = (server: number, clientVersion: string) => {
         "X-Unity-Version": getGarupaUnityVersion(server),
         "X-ClientPlatform": getGarupaClientPlatform(server),
         "X-ClientVersion": clientVersion,
-        "X-Signature": uuid,
         "Accept-Encoding": "deflate, gzip",
         "Content-Type": "application/octet-stream",
         Accept: "application/octet-stream",
     };
+
+    if (!anonymous) headers["X-Signature"] = getGarupaUuid(server);
 
     if (channelId) headers["X-ChannelID"] = channelId;
     if (platformId) headers["X-PlatformID"] = platformId;
@@ -262,6 +262,15 @@ const decryptPayload = (server: number, payload: Buffer): Buffer => {
     const decipher = crypto.createDecipheriv("aes-128-cbc", getCipherKey(server), getCipherIv(server));
     decipher.setAutoPadding(false);
     return Buffer.concat([decipher.update(payload), decipher.final()]);
+};
+
+/** JP song masters are public: no player UID or UUID is needed. */
+export const fetchJpSuiteMasterBuffer = async (clientVersion: string): Promise<Buffer> => {
+    const configuredBase = GARUPA_SERVER_BASES[0]?.trim();
+    const base = configuredBase && configuredBase !== "-" ? getGarupaBaseUrl(0) : "https://api.garupa.jp/api/";
+    const { status, body } = await downloader.downloadRaw(new URL("suite/master", base).toString(), createGarupaHeaders(0, clientVersion, true));
+    if (status < 200 || status >= 300) throw new Error(`JP suite master HTTP ${status}`);
+    return decryptPayload(0, body);
 };
 
 /**

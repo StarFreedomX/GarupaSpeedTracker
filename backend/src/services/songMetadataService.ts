@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import fs from "fs-extra";
 import pLimit from "p-limit";
-import { fetchBestdoriChart, fetchBestdoriSongs } from "@/api/bestdori";
+import { fetchBestdoriChart } from "@/api/bestdori";
 import { BESTDORI_SONGS_CHECK_INTERVAL_MS, BESTDORI_STORE_RAW_CHARTS } from "@/config";
 import { logger } from "@/logger";
 import { BestdoriChartParser } from "@/parsers/BestdoriChartParser";
 import { BestdoriSongLevelParser } from "@/parsers/BestdoriSongLevelParser";
+import { getSongsList } from "@/services/songsService";
 import { type DownloadCacheOptions, downloader } from "@/storage/downloader";
 import type { Chart } from "@/types/bestdori/chart";
 import type { DifficultyKey, MusicDataResponse, MusicItem } from "@/types/bestdori/songs";
@@ -32,6 +33,7 @@ interface State {
 }
 
 interface PersistedDataset {
+    version?: number;
     sourceHash: string;
     checkedAt: number;
     chartCount: number;
@@ -54,10 +56,10 @@ const DIFFICULTY_ORDER: ReadonlyArray<{ key: DifficultyKey; name: string }> = [
  * Normalizes a music item to a stable representation for hash comparison.
  *
  * Only the fields relevant to song identity are included (tag, band, jacket,
- * title, publish dates, difficulty levels). This ensures that minor data
+ * title, publish dates, display and scoring levels). This ensures that minor data
  * differences (e.g. order of keys) do not cause false hash mismatches.
  *
- * @param music - The raw music item from Bestdori.
+ * @param music - The merged JP music item.
  * @returns A plain object with normalized fields.
  */
 const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
@@ -67,13 +69,7 @@ const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
     musicTitle: [...music.musicTitle],
     publishedAt: [...music.publishedAt],
     closedAt: [...music.closedAt],
-    difficulty: {
-        0: music.difficulty["0"]?.playLevel ?? null,
-        1: music.difficulty["1"]?.playLevel ?? null,
-        2: music.difficulty["2"]?.playLevel ?? null,
-        3: music.difficulty["3"]?.playLevel ?? null,
-        4: music.difficulty["4"]?.playLevel ?? null,
-    },
+    difficulty: Object.fromEntries(DIFFICULTY_ORDER.map(({ key }) => [key, music.difficulty[key] ?? null])),
 });
 
 /**
@@ -81,7 +77,7 @@ const normalizeMusicItem = (music: MusicItem): Record<string, unknown> => ({
  *
  * Songs are sorted by numeric ID before hashing to ensure deterministic output.
  *
- * @param payload - The raw music data response from Bestdori.
+ * @param payload - The merged JP music data response.
  * @returns A hex-encoded SHA-1 digest.
  */
 const hashSongs = (payload: MusicDataResponse): string => {
@@ -147,8 +143,8 @@ const writeJson = async (filePath: string, value: unknown, retries = 3): Promise
  * computes chart difficulty summaries, and persists results to a disk cache.
  *
  * The service performs incremental updates: it compares the SHA-1 hash of the
- * normalized song data against the last known hash, and only re-fetches charts
- * for songs that are new or have changed. Raw chart JSON files can optionally
+ * normalized song data against the last known hash, updates display/scoring levels,
+ * and fetches charts only when their note statistics are missing. Raw chart JSON files can optionally
  * be stored on disk to speed up subsequent runs.
  *
  * The check interval controls how often a full re-check is allowed; within the
@@ -158,6 +154,7 @@ export class BestdoriSongMetadataService {
     private readonly downloader: DownloaderLike;
     private readonly chartParser: BestdoriChartParser;
     private readonly levelParser: BestdoriSongLevelParser;
+    private readonly fetchSongs: () => Promise<MusicDataResponse>;
     private readonly dataDir: string;
     private readonly metadataPath: string;
     private readonly songsPath: string;
@@ -179,11 +176,17 @@ export class BestdoriSongMetadataService {
      */
     public constructor(
         options: Options = {},
-        deps?: Partial<{ downloader: DownloaderLike; chartParser: BestdoriChartParser; levelParser: BestdoriSongLevelParser }>,
+        deps?: Partial<{
+            downloader: DownloaderLike;
+            chartParser: BestdoriChartParser;
+            levelParser: BestdoriSongLevelParser;
+            fetchSongs: () => Promise<MusicDataResponse>;
+        }>,
     ) {
         this.downloader = deps?.downloader ?? downloader;
         this.chartParser = deps?.chartParser ?? new BestdoriChartParser();
         this.levelParser = deps?.levelParser ?? new BestdoriSongLevelParser();
+        this.fetchSongs = deps?.fetchSongs ?? getSongsList;
         this.dataDir = options.dataDir ?? DATA_DIR;
         this.metadataPath = path.join(this.dataDir, METADATA_FILENAME);
         this.songsPath = path.join(this.dataDir, SONGS_FILENAME);
@@ -217,8 +220,8 @@ export class BestdoriSongMetadataService {
         if (dataset?.chartMeta && dataset.checkedAt) {
             this.state = {
                 chartMeta: dataset.chartMeta,
-                sourceHash: dataset.sourceHash,
-                checkedAt: dataset.checkedAt,
+                sourceHash: dataset.version === 2 ? dataset.sourceHash : "",
+                checkedAt: dataset.version === 2 ? dataset.checkedAt : 0,
                 chartCount: dataset.chartCount,
             };
         } else {
@@ -264,18 +267,12 @@ export class BestdoriSongMetadataService {
      */
     private async performSync(): Promise<SongChartMeta> {
         await fs.ensureDir(this.dataDir);
-        logger("bestdori", "checking Bestdori song summary source...");
+        logger("bestdori", "checking JP song summary source...");
 
         // Load old songs data before overwriting, so we can detect changed songs
         const oldMusicData = await readJson<MusicDataResponse>(this.songsPath);
 
-        const musicData = await fetchBestdoriSongs(
-            {
-                getExpireAt: () => Date.now() + Math.max(this.checkIntervalMs, 0),
-                fallbackTtlMs: Math.max(this.checkIntervalMs, 0),
-            },
-            this.downloader,
-        );
+        const musicData = await this.fetchSongs();
         const sourceHash = hashSongs(musicData);
         const now = Date.now();
 
@@ -290,7 +287,7 @@ export class BestdoriSongMetadataService {
         // Detect which songs changed (new or modified) vs the old snapshot
         const changedSongIds: string[] = [];
         for (const songId of Object.keys(musicData)) {
-            if (!oldMusicData?.[songId]) {
+            if (!oldMusicData?.[songId] || !this.state?.chartMeta[Number(songId)] || !this.state.sourceHash) {
                 changedSongIds.push(songId); // New song
             } else {
                 const oldNorm = JSON.stringify(normalizeMusicItem(oldMusicData[songId]));
@@ -338,7 +335,7 @@ export class BestdoriSongMetadataService {
                         music.difficulty["2"]?.playLevel ?? 0,
                         music.difficulty["3"]?.playLevel ?? 0,
                     ];
-                    const { summary, chartCount } = await this.buildSongSummary(songNumericId, music, levels);
+                    const { summary, chartCount } = await this.buildSongSummary(songNumericId, music, levels, this.state?.chartMeta[songNumericId]);
                     return { songId: songNumericId, summary, chartCount };
                 }),
             ),
@@ -378,7 +375,12 @@ export class BestdoriSongMetadataService {
      * @param levels - Pre-computed play levels from the level parser.
      * @returns The song summary object and the number of charts successfully processed.
      */
-    private async buildSongSummary(songId: number, music: MusicItem, levels: number[]): Promise<{ summary: SongSummary; chartCount: number }> {
+    private async buildSongSummary(
+        songId: number,
+        music: MusicItem,
+        levels: number[],
+        previous?: SongSummary,
+    ): Promise<{ summary: SongSummary; chartCount: number }> {
         const summary = {} as SongSummary;
         let chartCount = 0;
 
@@ -386,6 +388,15 @@ export class BestdoriSongMetadataService {
             const definition = DIFFICULTY_ORDER[index];
             const difficulty = music.difficulty[definition.key];
             if (!difficulty) continue;
+
+            const level = levels[index] ?? difficulty.playLevel;
+            const scoreLevel = difficulty.scoreLevel ?? level;
+            const cached = previous?.[definition.key];
+            if (cached) {
+                summary[definition.key] = { ...cached, level, scoreLevel };
+                chartCount += 1;
+                continue;
+            }
 
             let chart: Chart;
             const chartPath = path.join(this.rawDir, String(songId), `${definition.name}.json`);
@@ -407,8 +418,7 @@ export class BestdoriSongMetadataService {
 
             chartCount += 1;
 
-            const level = levels[index] ?? difficulty.playLevel;
-            summary[definition.key] = this.chartParser.buildLevelSummary(chart, level);
+            summary[definition.key] = { ...this.chartParser.buildLevelSummary(chart, level), scoreLevel };
         }
 
         return { summary, chartCount };
@@ -423,6 +433,7 @@ export class BestdoriSongMetadataService {
         }
 
         const payload: PersistedDataset = {
+            version: 2,
             sourceHash: this.state.sourceHash,
             checkedAt: this.state.checkedAt,
             chartCount: this.state.chartCount,
