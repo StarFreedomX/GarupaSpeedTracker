@@ -15,7 +15,8 @@
         "start": "node dist/index.js",
         "check": "biome check --write .",
         "format": "biome format --write .",
-        "lint": "biome lint ./src"
+        "lint": "biome lint ./src",
+        "rid:set": "node dist/scripts/setGarupaRid.js"
     },
     "keywords": [],
     "author": "",

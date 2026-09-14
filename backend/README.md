@@ -73,7 +73,7 @@ pnpm start
 | `GARUPA_ENCRYPTION_KEY`                           | 同上                                     | 单值回退配置                                |
 | `GARUPA_ENCRYPTION_IVS`                           | `-,-,-,-`                              | AES IV 列表（16 字节）                      |
 | `GARUPA_ENCRYPTION_IV`                            | 同上                                     | 单值回退配置                                |
-| `GARUPA_RIDS`                                    | `-,-,-,-`                              | 各服初始 nonce；国服填第 4 项，初始签名为 `MD5(rkey + rid)`，后续优先使用响应 nonce；空项或 `-` 表示未配置 |
+| `GARUPA_RIDS`                                    | `-,-,-,-`                              | 各服初始 nonce；国服填第 4 项，仅数据库无记录时初始化；后续自动持久化响应 nonce |
 | `GARUPA_REFRESH_INTERVAL_SECONDS`                 | `60`                                   | Garupa 轮询基础间隔（秒）                      |
 | `GARUPA_REFRESH_AT_SECOND`                        | `0`                                    | Garupa 轮询触发秒（0-59）                    |
 | `GARUPA_PACKAGE_URLS`                             | `itunes...`                            | 自动获取客户端版本的包查询地址列表                     |
@@ -198,3 +198,15 @@ GET /api/playerDeckStatus?server=0&playerId=28012549
 `playLevel`/谱面 `level` 用于显示，`scoreLevel` 用于分数计算；游戏未设置 `scoreLevel`（缺失或 0）时使用 `playLevel`。例如 Game Changer Expert 显示 Lv29，计分使用 Lv28。
 
 刷新周期沿用 `BESTDORI_SONGS_CHECK_INTERVAL_MS`。旧谱面缓存首次访问会自动迁移，并复用 Note 统计。日服暂时不可用时保留上次日服快照；无日服快照的首次运行会返回错误，不会改用 Bestdori 的显示等级计分。
+
+### 国服 RID 持久化与手动更新
+
+MongoDB 的 `garupa_request_ids` 集合每服保存一个 nonce（`_id` 为服务器编号）。请求前读取数据库，无记录时使用 `GARUPA_RIDS`；成功收到新 nonce 后覆盖保存，重启后继续使用。405 响应不写入数据库。
+
+首次部署需重新构建。仓库根目录或 backend 目录均可运行：
+
+```bash
+pnpm rid:set 3 <服务端响应头中的32位nonce>
+```
+
+命令直接覆盖数据库值，下一次排名请求生效，无须重启。传入原始 nonce，不要传 MD5 后的请求签名。更换账号后也用此命令更新 nonce。

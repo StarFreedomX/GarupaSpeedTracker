@@ -25,6 +25,7 @@ import { bandoriEventRankingParser } from "@/parsers/GarupaEventRankingParser";
 import { bandoriMonthlyRankingParser as garupaMonthlyRankingParser } from "@/parsers/GarupaMonthlyRankingParser";
 import { validateEventRanking, validateMonthlyRanking } from "@/parsers/GarupaResponseValidator";
 import { downloader } from "@/storage/downloader";
+import { GARUPA_RID_COLLECTION, loadRidState, saveRidState, type RidState } from "@/storage/garupaRidStore";
 import type { EventRankingBandoriRaw } from "@/types/event";
 import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
 
@@ -208,9 +209,8 @@ export const createGarupaHeaders = (server: number, clientVersion: string, anony
 const cipherKeyCache = new Map<number, Buffer>();
 const cipherIvCache = new Map<number, Buffer>();
 
-// CN RID state: per-server serialization lock + stored nonce (requestID from server)
+// CN RID state: per-server serialization lock; nonce state is persisted in MongoDB
 const ridLock = new Map<number, Promise<void>>();
-const ridStore = new Map<number, string>();
 
 /**
  * Computes the X-Requestid header value for CN servers: MD5(requestKey + requestID).
@@ -298,7 +298,7 @@ const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => M
  * where `requestID` is a server-provided nonce. This function serializes all CN requests per server
  * via a promise-based lock (`ridLock`) to ensure sequential nonce state:
  *
- * 1. On the first request, sign GARUPA_RIDS[server] if configured; otherwise send a random fallback.
+ * 1. Read the persisted server nonce, falling back to GARUPA_RIDS[server] when no record exists.
  * 2. The server responds with the current nonce in the `X-Requestid` response header.
  * 3. If the server returns HTTP 405, the stored nonce is stale. The function extracts a fresh nonce
  *    from the decrypted error body (or response header) and retries the request immediately.
@@ -343,10 +343,13 @@ const fetchRankingBuffer = async (url: string, server: number, clientVersion: st
     try {
         const configuredRid = GARUPA_RIDS[server];
         const initialRid = configuredRid && configuredRid !== "-" ? configuredRid : undefined;
-        const storedRequestId = ridStore.get(server) ?? initialRid;
+        const { database } = await import("@/storage/dataBaseAdapter/mongodb");
+        await database.ready();
+        const collection = database.collection<RidState>(GARUPA_RID_COLLECTION);
+        const storedRequestId = await loadRidState(collection, server, initialRid);
 
         // 优先使用服务端返回的 nonce；尚未获取时使用环境变量中的初始 nonce。
-        const computedRid = requestKey && storedRequestId ? computeRequestId(requestKey, storedRequestId) : null;
+        const computedRid = storedRequestId ? computeRequestId(requestKey, storedRequestId) : null;
 
         const headers = createGarupaHeaders(server, clientVersion);
         headers["X-Requestid"] = computedRid ?? generateRandomRequestId();
@@ -357,15 +360,15 @@ const fetchRankingBuffer = async (url: string, server: number, clientVersion: st
         // 从响应头提取服务端下发的新 nonce（无论 200 还是 405 都可能有）
         // axios lowercases all response header keys
         const responseHeaderRid = responseHeaders["x-requestid"];
-        if (responseHeaderRid) {
-            ridStore.set(server, responseHeaderRid);
+        if (status >= 200 && status < 300 && responseHeaderRid) {
+            await saveRidState(collection, server, responseHeaderRid);
         }
 
         if (status === 405) {
             // RID 失效：从 body 提取新 nonce 并重试
-            const serverRid = extractNewRequestId(decrypted) ?? responseHeaderRid;
+            const recoverySignature = extractNewRequestId(decrypted);
+            const serverRid = recoverySignature ?? (responseHeaderRid ? computeRequestId(requestKey, responseHeaderRid) : null);
             if (serverRid) {
-                ridStore.set(server, serverRid);
                 logger("garupaApi", `server ${server}: X-Requestid refreshed via 405 fallback`);
                 const retryHeaders = createGarupaHeaders(server, clientVersion);
                 retryHeaders["X-Requestid"] = serverRid;
@@ -373,8 +376,8 @@ const fetchRankingBuffer = async (url: string, server: number, clientVersion: st
                 const retryLength = retryBody.length;
                 // 重试成功后也存储响应头中的 nonce（可能更新）
                 const retryHeaderRid = retryResponseHeaders["x-requestid"];
-                if (retryHeaderRid) {
-                    ridStore.set(server, retryHeaderRid);
+                if (retryStatus >= 200 && retryStatus < 300 && retryHeaderRid) {
+                    await saveRidState(collection, server, retryHeaderRid);
                 }
                 logger("garupaApi", `fetch ${url} → status=${retryStatus} len=${retryLength} (retry)`);
                 return {

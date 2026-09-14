@@ -28,7 +28,8 @@
         "check:backend": "pnpm --filter ./backend check",
         "check:frontend": "pnpm --filter ./frontend check",
         "docker-build": "docker-compose up -d --build --force-recreate --remove-orphans",
-        "docker-build-proxy": "cross-env HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 docker-compose up -d --build --force-recreate --remove-orphans"
+        "docker-build-proxy": "cross-env HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 docker-compose up -d --build --force-recreate --remove-orphans",
+        "rid:set": "pnpm --filter ./backend rid:set"
     },
     "devDependencies": {
         "cross-env": "^10.1.0"
