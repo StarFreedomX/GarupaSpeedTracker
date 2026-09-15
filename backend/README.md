@@ -202,8 +202,6 @@ GET /api/playerDeckStatus?server=0&playerId=28012549
 
 国服（server=3）首次排名请求通过 B 站 SDK 使用帐号密码登录，再建立游戏会话。月榜和活动榜共享串行的 token/nonce 链，URL 使用登录返回的游戏 UID。榜单 HTTP 请求统一由 `downloader.downloadRaw` 发送，会话层负责登录、串行控制及 token/nonce 更新。HAR 和旧会话凭据不参与登录。
 
-在服务端 `.env` 配置 `GARUPA_CN_ACCOUNT`、`GARUPA_CN_PASSWORD`，不要提交真实凭据。`GARUPA_SERVER_BASES` 第四项填写国服游戏 API 基础地址，`GARUPA_CLIENT_VERSIONS` 第四项设为 `9.4.4`。其他服的已有配置保持原值。
-
 | 配置 | 默认值 | 用途 |
 | --- | --- | --- |
 | `GARUPA_CN_ACCOUNT` / `GARUPA_CN_PASSWORD` | 空 | B 站 SDK 帐号和密码，启用国服排名时必填 |
@@ -214,14 +212,14 @@ GET /api/playerDeckStatus?server=0&playerId=28012549
 
 `GARUPA_CN_LOGIN_TIMEOUT_MS` 从每个登录相关 HTTP 请求发起时开始计时，覆盖连接、等待响应和读取响应体；超时会中止请求并丢弃当前会话。它不限制整套登录／爬取流程的总时长，也不包含排队时间。国服榜单请求沿用通用的 `DOWNLOADER_TIMEOUT_MS`（默认 10000 毫秒），不受此登录超时配置影响。iTunes 版本查询及其他通用下载器请求也不使用此配置。
 
-此前实测通过的版本组合为客户端 9.4.4 / versionCode 105 / Unity 2022.3.62f3c1。Unity 版本沿用 `GARUPA_UNITY_VERSIONS` 第四项。登录前从 application 获取 data/master 版本，并检查客户端版本是否匹配。版本号查询不会自动更新 Android versionCode。
+登录前从 application 获取 data/master 版本，并检查客户端版本是否匹配。版本号查询不会自动更新 Android versionCode。
 
-会话仅保存在内存中，重启后重新登录。405 和其他失败响应均不提取修复 RID；请求失败或超时时丢弃会话；成功响应有非空 token/nonce 才更新对应状态，缺失或空值保留旧值，冷却后由下次排名请求重新登录。SDK 返回需要验证码时明确报错并停止本次登录，暂不支持验证码提交或续登。
+会话仅每次启动时保存在内存中，重启后重新登录。请求失败或超时时丢弃会话；成功响应有非空 token/nonce 才更新对应状态，缺失或空值保留旧值，冷却后由下次排名请求重新登录。SDK 返回需要验证码时明确报错并停止本次登录，暂不支持验证码提交或续登（TODO）。
 
-旧 `GARUPA_RIDS` 和 `rid:set` 已移除，旧 MongoDB `garupa_request_ids` 集合不再使用。国服无需手填 UID、UUID。AES key、IV 和 RequestKey 沿用 `GARUPA_ENCRYPTION_KEYS`、`GARUPA_ENCRYPTION_IVS`、`GARUPA_RKEYS` 的第四项；SDK 签名密钥使用 `GARUPA_CN_SDK_APP_KEY`。这些密钥必须通过服务端环境配置，无内置真实密钥或默认回退。同一帐号建议只运行一个采集进程，避免不同会话互相影响。
+国服无需手填 UID、UUID。同一帐号建议只运行一个采集进程，避免不同会话互相影响。
 
-SDK 地址从 `GARUPA_CN_SDK_BASE` 读取，默认官方地址。设备档案由 `GARUPA_CN_DEVICE_ID`、`GARUPA_CN_BUVID`、`GARUPA_CN_SDK_UDID`、`GARUPA_CN_BD_ID`、`GARUPA_CN_DEVICE_MODEL`、`GARUPA_CN_DEVICE_OS`、`GARUPA_CN_AD_ID` 配置；APK 签名指纹由 `GARUPA_CN_APK_SIGN` 配置，SDK 版本由 `GARUPA_CN_SDK_VERSION` 配置。设备档案和 APK 指纹没有内置真实值；留空时的标识生成与回退规则见下文。User-Agent 沿用 `GARUPA_USER_AGENTS` 第四项。设备档案不应提交到 Git。
+设备参数的填写说明见 `.env.example`。可留空的设备标识按以下规则处理：
 
-`GARUPA_CN_AD_ID` 对应游戏 `UserUdid.adId`（替代旧名 `GARUPA_CN_DEVICE_SEED`）。`GARUPA_CN_BUVID` 非空时直接使用；留空时要求 `GARUPA_CN_DEVICE_ID` 为同一 Android ID 的 32 位十六进制 MD5，并生成 `uppercase("XX" + H[2] + H[12] + H[22] + H)`（H 为 DEVICE_ID，下标从 0 开始）。`GARUPA_CN_SDK_UDID` 非空时优先使用，留空时复用最终 BUVID。这是采集器选用的回退规则，不是完整复现 SDK 的硬件及缓存选择流程。首次游戏登录不发送随机 RID，登录成功后采用响应中的会话状态；这不是对官方冷启动 RID 来源的结论。
-
-`GARUPA_CN_BD_ID` 留空时生成两个随机 UUID，以连字符拼接后截取前 64 字符并转小写。结果仅保存在当前登录客户端实例的内存中，该实例重新登录时复用；新实例或进程重启后重新生成。显式配置优先，自动生成不依赖数据库或文件存储。（该项建议手动抓包配置，新生成容易触发风控弹验证码）
+- `GARUPA_CN_BUVID`：根据 `GARUPA_CN_DEVICE_ID` 生成，要求设备 ID 为 32 位十六进制字符串。
+- `GARUPA_CN_SDK_UDID`：复用 BUVID。
+- `GARUPA_CN_BD_ID`：随机生成，当前进程内复用，重启后重新生成。建议填写官方客户端成功登录请求中的 `bd_id`；随机值可能触发验证码。
