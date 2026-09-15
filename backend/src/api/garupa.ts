@@ -5,12 +5,27 @@ import {
     GARUPA_CIDS,
     GARUPA_CLIENT_PLATFORMS,
     GARUPA_CLIENT_VERSIONS,
+    GARUPA_CN_ACCOUNT,
+    GARUPA_CN_AD_ID,
+    GARUPA_CN_APK_SIGN,
+    GARUPA_CN_BD_ID,
+    GARUPA_CN_BUVID,
+    GARUPA_CN_DEVICE_ID,
+    GARUPA_CN_DEVICE_MODEL,
+    GARUPA_CN_DEVICE_OS,
+    GARUPA_CN_LOGIN_RETRY_MS,
+    GARUPA_CN_PASSWORD,
+    GARUPA_CN_SDK_APP_KEY,
+    GARUPA_CN_SDK_BASE,
+    GARUPA_CN_SDK_UDID,
+    GARUPA_CN_SDK_VERSION,
+    GARUPA_CN_LOGIN_TIMEOUT_MS,
+    GARUPA_CN_VERSION_CODE,
     GARUPA_ENCRYPTION_IVS,
     GARUPA_ENCRYPTION_KEYS,
     GARUPA_PACKAGE_URLS,
     GARUPA_PIDS,
     GARUPA_RKEYS,
-    GARUPA_RIDS,
     GARUPA_SERVER_BASES,
     GARUPA_STATUS_POLL_INTERVAL_MS,
     GARUPA_STATUS_UNAVAILABILITY_THRESHOLD,
@@ -25,9 +40,9 @@ import { bandoriEventRankingParser } from "@/parsers/GarupaEventRankingParser";
 import { bandoriMonthlyRankingParser as garupaMonthlyRankingParser } from "@/parsers/GarupaMonthlyRankingParser";
 import { validateEventRanking, validateMonthlyRanking } from "@/parsers/GarupaResponseValidator";
 import { downloader } from "@/storage/downloader";
-import { GARUPA_RID_COLLECTION, loadRidState, saveRidState, type RidState } from "@/storage/garupaRidStore";
 import type { EventRankingBandoriRaw } from "@/types/event";
 import type { MonthlyRankingBandoriRaw } from "@/types/monthlyRanking";
+import { type CnConfig, CnSessionClient, cnHeaders } from "./cnSession";
 
 /**
  * Converts a raw server base URL into the canonical Garupa API base URL.
@@ -113,8 +128,6 @@ const getGarupaEncryptionIv = (server: number): string => resolveServerValue(GAR
 const getGarupaChannelId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_CIDS, server);
 /** Returns the optional platform ID for the given server index, or `undefined` if not configured. */
 const getGarupaPlatformId = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_PIDS, server);
-/** Returns the optional request key (RKEY) for CN request-ID signing, or `undefined` for non-CN servers. */
-const getGarupaRequestKey = (server: number): string | undefined => resolveOptionalServerValue(GARUPA_RKEYS, server);
 /**
  * Returns the optional fallback client version for the given server index.
  * This value is used when the client version cannot be queried from the live API.
@@ -138,10 +151,11 @@ export const getGarupaVersionCheckTimeoutMs = (): number => GARUPA_VERSION_CHECK
  * Builds the full URL for a monthly ranking request.
  * @param server - Server index
  * @param monthlyId - Monthly ranking period ID
+ * @param userId - Authenticated game UID; falls back to configuration when omitted
  */
-const buildMonthlyRankingUrl = (server: number, monthlyId: number): string => {
+const buildMonthlyRankingUrl = (server: number, monthlyId: number, userId?: string): string => {
     const base = getGarupaBaseUrl(server);
-    const uid = getGarupaUid(server);
+    const uid = userId ?? getGarupaUid(server);
     const url = new URL(`user/${uid}/monthlyranking/${monthlyId}/ranking`, base);
     return url.toString();
 };
@@ -178,6 +192,37 @@ export const getGarupaServerIds = (): number[] =>
         .filter((entry) => entry.value && entry.value !== "-")
         .map((entry) => entry.index);
 
+/** Resolves CN login settings and the fourth entries of the shared per-server configuration. */
+const cnConfig = (): CnConfig => {
+    return {
+        encryptionKey: getCipherKey(3),
+        encryptionIv: getCipherIv(3),
+        requestKey: resolveServerValue(GARUPA_RKEYS, 3, "GARUPA_RKEYS"),
+        sdkAppKey: GARUPA_CN_SDK_APP_KEY,
+        account: GARUPA_CN_ACCOUNT,
+        password: GARUPA_CN_PASSWORD,
+        sdkBase: GARUPA_CN_SDK_BASE,
+        deviceId: GARUPA_CN_DEVICE_ID,
+        buvid: GARUPA_CN_BUVID,
+        sdkUdid: GARUPA_CN_SDK_UDID,
+        bdId: GARUPA_CN_BD_ID,
+        deviceModel: GARUPA_CN_DEVICE_MODEL,
+        deviceOs: GARUPA_CN_DEVICE_OS,
+        adId: GARUPA_CN_AD_ID,
+        apkSign: GARUPA_CN_APK_SIGN,
+        sdkVersion: GARUPA_CN_SDK_VERSION,
+        channelId: resolveServerValue(GARUPA_CIDS, 3, "GARUPA_CIDS"),
+        platformId: resolveServerValue(GARUPA_PIDS, 3, "GARUPA_PIDS"),
+        clientPlatform: getGarupaClientPlatform(3),
+        userAgent: getGarupaUserAgent(3),
+        versionCode: GARUPA_CN_VERSION_CODE,
+        unityVersion: getGarupaUnityVersion(3),
+        loginTimeoutMs: GARUPA_CN_LOGIN_TIMEOUT_MS,
+        retryDelayMs: GARUPA_CN_LOGIN_RETRY_MS,
+    };
+};
+/** Lazily created session shared by CN monthly and event ranking requests. */
+let cnClient: CnSessionClient | undefined;
 /**
  * Builds the HTTP request headers required by the Garupa API for a given server.
  * Includes User-Agent, Unity version, client platform/version, and optional channel/platform IDs.
@@ -185,6 +230,7 @@ export const getGarupaServerIds = (): number[] =>
  * @param clientVersion - Client version string (from live version check or fallback)
  */
 export const createGarupaHeaders = (server: number, clientVersion: string, anonymous = false) => {
+    if (server === 3) return cnHeaders(cnConfig(), clientVersion);
     const channelId = getGarupaChannelId(server);
     const platformId = getGarupaPlatformId(server);
 
@@ -208,22 +254,6 @@ export const createGarupaHeaders = (server: number, clientVersion: string, anony
 
 const cipherKeyCache = new Map<number, Buffer>();
 const cipherIvCache = new Map<number, Buffer>();
-
-// CN RID state: per-server serialization lock; nonce state is persisted in MongoDB
-const ridLock = new Map<number, Promise<void>>();
-
-/**
- * Computes the X-Requestid header value for CN servers: MD5(requestKey + requestID).
- * This is a compile-time hardcoded static key combined with the server-provided nonce.
- * @param requestKey - Static request key from config
- * @param requestId - Server-provided nonce (request ID)
- */
-const computeRequestId = (requestKey: string, requestId: string): string => {
-    return crypto
-        .createHash("md5")
-        .update(requestKey + requestId)
-        .digest("hex");
-};
 
 /**
  * Returns the AES-128-CBC encryption key Buffer for the given server (cached).
@@ -275,129 +305,32 @@ export const fetchJpSuiteMasterBuffer = async (clientVersion: string): Promise<B
 };
 
 /**
- * Extracts the server-provided newRequestId nonce from a decrypted 405 error response body.
- * The body is a protobuf message with a text field containing the pattern `[newRequestId:<hex>]`.
- * @param decrypted - Decrypted response body
- * @returns The hex request ID string, or `null` if not found
- */
-const extractNewRequestId = (decrypted: Buffer): string | null => {
-    const match = decrypted.toString("utf8").match(/\[newRequestId:([a-f0-9]+)\]/i);
-    return match?.[1] ?? null;
-};
-
-/**
- * Generates a random 32-character hex string used as a fallback request ID.
- */
-const generateRandomRequestId = (): string => Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-
-/**
- * Core ranking fetch function: sends a request to a Garupa ranking endpoint and returns the decrypted response.
- *
- * **CN server RID lock/retry logic:**
- * The CN version requires a signed `X-Requestid` header computed as `MD5(requestKey + requestID)`
- * where `requestID` is a server-provided nonce. This function serializes all CN requests per server
- * via a promise-based lock (`ridLock`) to ensure sequential nonce state:
- *
- * 1. Read the persisted server nonce, falling back to GARUPA_RIDS[server] when no record exists.
- * 2. The server responds with the current nonce in the `X-Requestid` response header.
- * 3. If the server returns HTTP 405, the stored nonce is stale. The function extracts a fresh nonce
- *    from the decrypted error body (or response header) and retries the request immediately.
- * 4. On success (HTTP 2xx), the response header nonce is stored for subsequent requests.
- *
- * Non-CN servers (JP, EN, TW, KR) skip this logic and perform a simple fetch + decrypt.
- *
- * @param url - Full API URL for the ranking endpoint
+ * Fetches and decrypts ranking data using the appropriate server authentication path.
+ * CN delegates login and token/nonce updates to the shared session; all ranking HTTP requests
+ * use the common downloader. Other regions use their configured UID and request headers.
+ * @param urlForUser - Builds the ranking URL, accepting the authenticated game UID for CN
  * @param server - Server index
- * @param clientVersion - Client version string
- * @returns An object with the decrypted Buffer, HTTP status code, and raw body length
+ * @param clientVersion - Game client version string
+ * @returns Decrypted response, HTTP status, and encrypted response size in bytes
  */
-const fetchRankingBuffer = async (url: string, server: number, clientVersion: string): Promise<{ decrypted: Buffer; status: number; length: number }> => {
-    const needsRid = getGarupaRequestKey(server) !== undefined;
-
-    // Non-CN: simple fetch
-    if (!needsRid) {
-        const headers = createGarupaHeaders(server, clientVersion);
-        const { status, body: bodyBuffer } = await downloader.downloadRaw(url, headers);
-        const length = bodyBuffer.length;
-        logger("garupaApi", `fetch ${url} → status=${status} len=${length}`);
-        return {
-            decrypted: decryptPayload(server, bodyBuffer),
-            status,
-            length,
-        };
+const fetchRankingBuffer = async (
+    urlForUser: (uid?: string) => string,
+    server: number,
+    clientVersion: string,
+): Promise<{ decrypted: Buffer; status: number; length: number }> => {
+    if (server === 3) {
+        cnClient ??= new CnSessionClient(cnConfig());
+        return cnClient.fetch(getGarupaBaseUrl(server), clientVersion, urlForUser);
     }
-
-    // CN: lock + compute RID locally → send → on 200 store response header nonce, on 405 fallback
-    const requestKey = getGarupaRequestKey(server) as string;
-    const prev = ridLock.get(server) ?? Promise.resolve().then();
-    let release: () => void = () => {};
-    const next = new Promise<void>((resolve) => {
-        release = resolve;
-    });
-    ridLock.set(
-        server,
-        Promise.all([prev, next]).then(() => {}),
-    );
-    await prev;
-
-    try {
-        const configuredRid = GARUPA_RIDS[server];
-        const initialRid = configuredRid && configuredRid !== "-" ? configuredRid : undefined;
-        const { database } = await import("@/storage/dataBaseAdapter/mongodb");
-        await database.ready();
-        const collection = database.collection<RidState>(GARUPA_RID_COLLECTION);
-        const storedRequestId = await loadRidState(collection, server, initialRid);
-
-        // 优先使用服务端返回的 nonce；尚未获取时使用环境变量中的初始 nonce。
-        const computedRid = storedRequestId ? computeRequestId(requestKey, storedRequestId) : null;
-
-        const headers = createGarupaHeaders(server, clientVersion);
-        headers["X-Requestid"] = computedRid ?? generateRandomRequestId();
-
-        const { status, body: bodyBuffer, headers: responseHeaders } = await downloader.downloadRaw(url, headers);
-        const decrypted = decryptPayload(server, bodyBuffer);
-
-        // 从响应头提取服务端下发的新 nonce（无论 200 还是 405 都可能有）
-        // axios lowercases all response header keys
-        const responseHeaderRid = responseHeaders["x-requestid"];
-        if (status >= 200 && status < 300 && responseHeaderRid) {
-            await saveRidState(collection, server, responseHeaderRid);
-        }
-
-        if (status === 405) {
-            // RID 失效：从 body 提取新 nonce 并重试
-            const recoverySignature = extractNewRequestId(decrypted);
-            const serverRid = recoverySignature ?? (responseHeaderRid ? computeRequestId(requestKey, responseHeaderRid) : null);
-            if (serverRid) {
-                logger("garupaApi", `server ${server}: X-Requestid refreshed via 405 fallback`);
-                const retryHeaders = createGarupaHeaders(server, clientVersion);
-                retryHeaders["X-Requestid"] = serverRid;
-                const { status: retryStatus, body: retryBody, headers: retryResponseHeaders } = await downloader.downloadRaw(url, retryHeaders);
-                const retryLength = retryBody.length;
-                // 重试成功后也存储响应头中的 nonce（可能更新）
-                const retryHeaderRid = retryResponseHeaders["x-requestid"];
-                if (retryStatus >= 200 && retryStatus < 300 && retryHeaderRid) {
-                    await saveRidState(collection, server, retryHeaderRid);
-                }
-                logger("garupaApi", `fetch ${url} → status=${retryStatus} len=${retryLength} (retry)`);
-                return {
-                    decrypted: decryptPayload(server, retryBody),
-                    status: retryStatus,
-                    length: retryLength,
-                };
-            }
-        }
-
-        logger("garupaApi", `fetch ${url} → status=${status} len=${bodyBuffer.length}`);
-        return { decrypted, status, length: bodyBuffer.length };
-    } finally {
-        release();
-    }
+    const url = urlForUser();
+    const { status, body } = await downloader.downloadRaw(url, createGarupaHeaders(server, clientVersion));
+    logger("garupaApi", `fetch ${url} → status=${status} len=${body.length}`);
+    return { decrypted: decryptPayload(server, body), status, length: body.length };
 };
 
 /**
  * Fetches a monthly ranking response as a raw decrypted Buffer and HTTP status.
- * Delegates to {@link fetchRankingBuffer} which handles CN RID signing and retry.
+ * Delegates to {@link fetchRankingBuffer} which handles the serialized CN login session.
  * @param server - Server index
  * @param monthlyId - Monthly ranking period ID
  * @param clientVersion - Client version string
@@ -407,8 +340,7 @@ export const fetchMonthlyRankingBuffer = async (
     monthlyId: number,
     clientVersion: string,
 ): Promise<{ decrypted: Buffer; status: number; length: number }> => {
-    const url = buildMonthlyRankingUrl(server, monthlyId);
-    return fetchRankingBuffer(url, server, clientVersion);
+    return fetchRankingBuffer((uid) => buildMonthlyRankingUrl(server, monthlyId, uid), server, clientVersion);
 };
 
 /**
@@ -543,10 +475,11 @@ const eventTypeToUrlSegment = (protobufEventType: string): string => EVENT_TYPE_
  * @param eventId - Event ID
  * @param eventType - Protobuf event type string (e.g. "medley", "challenge", "versus")
  * @param mid - Optional music ID for sub-rankings within the event
+ * @param userId - Authenticated game UID; falls back to configuration when omitted
  */
-export const buildEventRankingUrl = (server: number, eventId: number, eventType: string, mid?: number): string => {
+export const buildEventRankingUrl = (server: number, eventId: number, eventType: string, mid?: number, userId?: string): string => {
     const base = getGarupaBaseUrl(server);
-    const uid = getGarupaUid(server);
+    const uid = userId ?? getGarupaUid(server);
     const urlSegment = eventTypeToUrlSegment(eventType);
     const url = new URL(`user/${uid}/event/${eventId}/${urlSegment}/ranking`, base);
     if (mid !== undefined) {
@@ -567,7 +500,7 @@ export const buildEventMasterListUrl = (server: number): string => {
 
 /**
  * Fetches an event ranking response as a raw decrypted Buffer and HTTP status.
- * Delegates to {@link fetchRankingBuffer} which handles CN RID signing and retry.
+ * Delegates to {@link fetchRankingBuffer} which handles the serialized CN login session.
  * @param server - Server index
  * @param eventId - Event ID
  * @param eventType - Protobuf event type string
@@ -581,8 +514,7 @@ export const fetchEventRankingBuffer = async (
     clientVersion: string,
     mid?: number,
 ): Promise<{ decrypted: Buffer; status: number; length: number }> => {
-    const url = buildEventRankingUrl(server, eventId, eventType, mid);
-    return fetchRankingBuffer(url, server, clientVersion);
+    return fetchRankingBuffer((uid) => buildEventRankingUrl(server, eventId, eventType, mid, uid), server, clientVersion);
 };
 
 /**

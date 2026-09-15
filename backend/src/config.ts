@@ -115,16 +115,51 @@ export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS 
 /** Per-server encryption IVs. */
 export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ?? process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
 
-// --- CN-specific headers (only required for CN server; other servers can leave "-") ---
-
-/** Per-server rkeys (CN-specific). */
+/** Per-server request-ID signing keys. */
 export const GARUPA_RKEYS = toList(process.env.GARUPA_RKEYS, ["-", "-", "-", "-"]);
-/** Per-server initial nonce, used for MD5(requestKey + nonce) before a response nonce is available. */
-export const GARUPA_RIDS = (process.env.GARUPA_RIDS ?? "-,-,-,-").split(",").map((entry) => entry.trim());
-/** Per-server cids (CN-specific). */
+/** Per-server channel IDs. */
 export const GARUPA_CIDS = toList(process.env.GARUPA_CIDS, ["-", "-", "-", "-"]);
-/** Per-server pids (CN-specific). */
+/** Per-server platform IDs. */
 export const GARUPA_PIDS = toList(process.env.GARUPA_PIDS, ["-", "-", "-", "-"]);
+
+// --- CN account/password login ---
+
+/** Signing key for SDK form requests. */
+export const GARUPA_CN_SDK_APP_KEY = process.env.GARUPA_CN_SDK_APP_KEY ?? "";
+/** CN password login (server index 3). Tokens and nonces remain in process memory. */
+export const GARUPA_CN_ACCOUNT = process.env.GARUPA_CN_ACCOUNT ?? "";
+/** Account password encrypted with the SDK-provided RSA public key before submission. */
+export const GARUPA_CN_PASSWORD = process.env.GARUPA_CN_PASSWORD ?? "";
+/** Android package version code sent as the SDK version_code form field. */
+export const GARUPA_CN_VERSION_CODE = process.env.GARUPA_CN_VERSION_CODE ?? "105";
+/** Cooldown in milliseconds after login or authenticated-request failure; checked by the next request. */
+export const GARUPA_CN_LOGIN_RETRY_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_RETRY_MS, 30_000));
+/** Per-login-request timeout in milliseconds; ranking requests use the shared downloader timeout. */
+export const GARUPA_CN_LOGIN_TIMEOUT_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_TIMEOUT_MS, 30_000));
+
+// CN SDK endpoint and device profile. Device identifiers have no shared defaults.
+/** Base URL for SDK account authentication requests. */
+export const GARUPA_CN_SDK_BASE = process.env.GARUPA_CN_SDK_BASE ?? "https://line1-sdk-center-login-sh.biligame.net";
+/** Game device identifier; also used to derive BUVID when BUVID is empty. */
+export const GARUPA_CN_DEVICE_ID = process.env.GARUPA_CN_DEVICE_ID ?? "";
+/** SDK udid form field; empty values reuse the resolved BUVID. */
+export const GARUPA_CN_SDK_UDID = process.env.GARUPA_CN_SDK_UDID ?? "";
+/** SDK BUVID override; empty values are derived from the device identifier. */
+export const GARUPA_CN_BUVID = process.env.GARUPA_CN_BUVID ?? "";
+/** SDK bd_id override; empty values are generated and reused within one client instance. */
+export const GARUPA_CN_BD_ID = process.env.GARUPA_CN_BD_ID ?? "";
+/** Device model included in the game login message. */
+export const GARUPA_CN_DEVICE_MODEL = process.env.GARUPA_CN_DEVICE_MODEL ?? "";
+/** Device operating-system description included in the game login message. */
+export const GARUPA_CN_DEVICE_OS = process.env.GARUPA_CN_DEVICE_OS ?? "";
+/** Advertising identifier included in the nested game login device message. */
+export const GARUPA_CN_AD_ID = process.env.GARUPA_CN_AD_ID ?? "";
+/** Android package signing fingerprint sent as the SDK apk_sign form field. */
+export const GARUPA_CN_APK_SIGN = process.env.GARUPA_CN_APK_SIGN ?? "";
+/** SDK version sent as the sdk_ver form field. */
+export const GARUPA_CN_SDK_VERSION = process.env.GARUPA_CN_SDK_VERSION ?? "6.19.5";
+
+// --- Garupa refresh scheduling ---
 
 /** Interval in seconds between Garupa data refreshes. */
 export const GARUPA_REFRESH_INTERVAL_SECONDS = toNumber(process.env.GARUPA_REFRESH_INTERVAL_SECONDS, 60);
