@@ -1,3 +1,5 @@
+> 历史研究记录：405 提取及恢复 RID 的结论已失效，相关诊断脚本不用于生产登录。当前实现见 `src/api/cnSession.ts` 和 backend README。
+
 # 国服 (Bili/CN) API 爬取研究结论
 
 ## 一、端点总结
