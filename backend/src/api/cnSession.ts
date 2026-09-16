@@ -1,4 +1,6 @@
 import * as crypto from "node:crypto";
+import { GarupaParser } from "@/parsers/GarupaParser";
+import { applicationResponseSchema, loginResponseSchema, type GarupaApplicationResponse, type GarupaLoginResponse } from "@/types/garupaSchema";
 import { downloader } from "@/storage/downloader";
 
 /** SDK credentials, device profile, and game session settings resolved by the caller. */
@@ -28,6 +30,8 @@ export interface CnConfig {
     loginTimeoutMs: number;
     retryDelayMs: number;
 }
+const garupaParser = new GarupaParser();
+
 const md5 = (value: string) => crypto.createHash("md5").update(value).digest("hex");
 /**
  * Computes the SDK form signature from sorted parameter values and the configured app key.
@@ -76,44 +80,6 @@ export function decryptCn(body: Buffer, key: Buffer, iv: Buffer): Buffer {
     return plain.subarray(0, plain.length - count);
 }
 
-/**
- * Reads protobuf wire fields without applying a message schema.
- * Varints remain bigint values to preserve uint64 UIDs; other supported wire types remain Buffers.
- * @param data - Complete protobuf message with encryption padding already removed
- * @returns Field-number map preserving repeated occurrences in encounter order
- * @throws On truncated data, invalid tags, or unsupported wire types
- */
-export function readCnFields(data: Buffer): Map<number, Array<Buffer | bigint>> {
-    let offset = 0;
-    const read = (): bigint => {
-        let n = 0n;
-        for (let i = 0; i < 10; i++) {
-            if (offset >= data.length) throw new Error("Truncated CN protobuf");
-            const b = data[offset++];
-            if (i === 9 && b > 1) throw new Error("Invalid CN uint64");
-            n |= BigInt(b & 127) << BigInt(i * 7);
-            if (b < 128) return n;
-        }
-        throw new Error("Invalid CN varint");
-    };
-    const result = new Map<number, Array<Buffer | bigint>>();
-    while (offset < data.length) {
-        const tag = read();
-        const number = Number(tag >> 3n),
-            wire = Number(tag & 7n);
-        if (number < 1 || number >= 2 ** 29) throw new Error("Invalid CN field");
-        let value: Buffer | bigint;
-        if (wire === 0) value = read();
-        else {
-            const size = wire === 2 ? Number(read()) : wire === 1 ? 8 : wire === 5 ? 4 : -1;
-            if (size < 0 || !Number.isSafeInteger(size) || size > data.length - offset) throw new Error("Invalid CN field length");
-            value = data.subarray(offset, offset + size);
-            offset += size;
-        }
-        result.set(number, [...(result.get(number) ?? []), value]);
-    }
-    return result;
-}
 /** Encodes a non-negative integer for protobuf tags and byte lengths. */
 const varint = (input: number): Buffer => {
     let n = BigInt(input);
@@ -417,14 +383,12 @@ export class CnSessionClient {
         const headers = cnHeaders(this.config, version);
         const application = await this.request(new URL("application", base).toString(), { headers });
         if (application.status !== 200) throw new Error(`CN application HTTP ${application.status}`);
-        const fields = readCnFields(decryptCn(Buffer.from(await application.arrayBuffer()), this.config.encryptionKey, this.config.encryptionIv));
-        const text = (n: number): string => {
-            const v = fields.get(n)?.[0];
-            return Buffer.isBuffer(v) ? v.toString() : "";
-        };
-        const dataVersion = text(2),
-            masterVersion = text(10);
-        if (text(1) !== version || !dataVersion || !masterVersion) throw new Error("CN application/client version mismatch");
+        const metadata = garupaParser.decode<Partial<GarupaApplicationResponse>>(
+            decryptCn(Buffer.from(await application.arrayBuffer()), this.config.encryptionKey, this.config.encryptionIv),
+            applicationResponseSchema,
+        );
+        const { dataVersion, masterDataVersion: masterVersion } = metadata;
+        if (metadata.clientVersion !== version || !dataVersion || !masterVersion) throw new Error("CN application/client version mismatch");
         const cipher = await this.sdk("/api/external/issue/cipher/v3", version, { cipher_type: "bili_login_rsa" });
         const pwd = this.encryptPassword(cipher);
         const sdk = await this.sdk("/api/external/login/v3", version, { user_id: this.config.account, pwd });
@@ -448,10 +412,13 @@ export class CnSessionClient {
             body: new Uint8Array(encryptCn(body, this.config.encryptionKey, this.config.encryptionIv)),
         });
         if (response.status !== 200) throw new Error(`CN game login HTTP ${response.status}`);
-        const uid = readCnFields(decryptCn(Buffer.from(await response.arrayBuffer()), this.config.encryptionKey, this.config.encryptionIv)).get(1)?.[0];
+        const { userId: uid } = garupaParser.decode<Partial<GarupaLoginResponse>>(
+            decryptCn(Buffer.from(await response.arrayBuffer()), this.config.encryptionKey, this.config.encryptionIv),
+            loginResponseSchema,
+        );
         const token = response.headers.get("x-token"),
             nonce = response.headers.get("x-requestid");
-        if (typeof uid !== "bigint" || uid <= 0n || !token || !nonce) throw new Error("Incomplete CN game session");
+        if (typeof uid !== "number" || !Number.isSafeInteger(uid) || uid <= 0 || !token || !nonce) throw new Error("Incomplete CN game session");
         return { uid: String(uid), token, nonce, version, base, headers: { ...headers, "X-DataVersion": dataVersion, "X-MasterDataVersion": masterVersion } };
     }
     /**

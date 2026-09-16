@@ -1,9 +1,10 @@
 import * as crypto from "node:crypto";
+import { GarupaParser } from "@/parsers/GarupaParser";
 import { downloader } from "@/storage/downloader";
 jest.mock("@/storage/downloader", () => ({ downloader: { downloadRaw: jest.fn() } }));
 const downloadRaw = jest.mocked(downloader.downloadRaw);
 
-import { type CnConfig, CnSessionClient, cnField, decryptCn, encryptCn, readCnFields, signCnSdk } from "./cnSession";
+import { type CnConfig, CnSessionClient, cnField, decryptCn, encryptCn, signCnSdk } from "./cnSession";
 
 const config: CnConfig = {
     encryptionKey: Buffer.from("test-key-1234567"),
@@ -88,9 +89,12 @@ test("fresh password login encrypts hash+password, preserves uint64 SDK UID and 
     expect(form.get("apk_sign")).toBe(config.apkSign);
     expect(f.calls[2].url).toBe("https://sdk.example/api/external/login/v3");
     expect(new Headers(f.calls[4].init.headers).get("X-DeviceID")).toBe(config.deviceId);
-    const payload = readCnFields(decryptCn(Buffer.from(f.calls[3].init.body as Uint8Array), config.encryptionKey, config.encryptionIv));
-    expect(payload.get(1)?.[0].toString()).toBe("9007199254740993");
-    expect(payload.get(3)?.[0].toString()).toBe("Android");
+    const payload = new GarupaParser().decode<{ sdkUid: string; platform: string }>(
+        decryptCn(Buffer.from(f.calls[3].init.body as Uint8Array), config.encryptionKey, config.encryptionIv),
+        { 1: { name: "sdkUid", type: "string" }, 3: { name: "platform", type: "string" } },
+    );
+    expect(payload.sdkUid).toBe("9007199254740993");
+    expect(payload.platform).toBe("Android");
     expect(f.calls[4].url).toBe(`${base}suite/user/123`);
     expect(new Headers(f.calls[4].init.headers).get("X-Requestid")).toBe(rid("login-1"));
     expect(new Headers(f.calls[4].init.headers).get("X-PlatformID")).toBe("2");
@@ -161,8 +165,7 @@ test.each([200005, 200006, 200007, 200000, 200001])("SDK verification code %s st
     expect(downloadRaw).not.toHaveBeenCalled();
 });
 
-test("malformed protobuf and ciphertext are rejected", () => {
-    expect(() => readCnFields(Buffer.from([10, 255]))).toThrow();
+test("malformed ciphertext is rejected", () => {
     expect(() => decryptCn(Buffer.from("invalid"), config.encryptionKey, config.encryptionIv)).toThrow();
 });
 
@@ -290,4 +293,15 @@ test("login timeout applies only to login requests; authenticated requests use t
     } finally {
         timeout.mockRestore();
     }
+});
+
+
+test.each(["", "0800", "0a0178"])("incomplete game login is rejected before requesting data: %s", async (hex) => {
+    const f = fixture();
+    const transport: typeof fetch = async (input, init) =>
+        String(input).endsWith("/user/login")
+            ? binary(Buffer.from(hex, "hex"), { "X-Token": "token", "X-Requestid": "nonce" })
+            : f.transport(input, init);
+    await expect(new CnSessionClient(config, transport).fetch(base, "9.4.4", url)).rejects.toThrow("Incomplete CN game session");
+    expect(downloadRaw).not.toHaveBeenCalled();
 });
