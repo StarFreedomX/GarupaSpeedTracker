@@ -9,7 +9,7 @@ dotenv.config({ path: [".env.local", ".env", ".env.example"] });
  * Returns `fallback` when the value is `undefined`, empty, or not a finite number.
  */
 const toNumber = (value: string | undefined, fallback: number): number => {
-    const parsed = Number(value);
+    const parsed = Number(value || fallback);
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -47,14 +47,14 @@ const toList = (value: string | undefined, fallback: string[]): string[] => {
 };
 
 /** Bestdori API base URL. */
-export const BESTDORI_API = process.env.BESTDORI_API ?? "https://bestdori.com/api/";
+export const BESTDORI_API = process.env.BESTDORI_API || "https://bestdori.com/api/";
 
 /** HTTP server host. */
-export const HOST = process.env.HOST ?? "127.0.0.1";
+export const HOST = process.env.HOST || "127.0.0.1";
 /** HTTP server port. */
 export const PORT = toNumber(process.env.PORT, 5519);
 /** Prefix prepended to all API routes. */
-export const API_PREFIX = process.env.API_PREFIX ?? "/api";
+export const API_PREFIX = process.env.API_PREFIX || "/api";
 
 /** Seconds: if the newest Bestdori point is newer than this threshold, reuse cache. */
 export const MIN_POINTS_UPDATE_TIME = toNumber(process.env.MIN_POINTS_UPDATE_TIME, 45);
@@ -98,33 +98,68 @@ export const GARUPA_UIDS = toList(process.env.GARUPA_UIDS, ["-", "-", "-", "-"])
 /** Per-server game UUIDs. */
 export const GARUPA_UUIDS = toList(process.env.GARUPA_UUIDS, ["-", "-", "-", "-"]);
 /** Per-server client version strings. */
-export const GARUPA_CLIENT_VERSIONS = toList(process.env.GARUPA_CLIENT_VERSIONS ?? process.env.GARUPA_CLIENT_VERSION, ["10.1.3", "-", "-", "-"]);
+export const GARUPA_CLIENT_VERSIONS = toList(process.env.GARUPA_CLIENT_VERSIONS || process.env.GARUPA_CLIENT_VERSION, ["10.1.3", "-", "-", "-"]);
 /** Per-server Unity engine versions. */
-export const GARUPA_UNITY_VERSIONS = toList(process.env.GARUPA_UNITY_VERSIONS ?? process.env.GARUPA_UNITY_VERSION, ["2021.3.45f2", "-", "-", "2022.3.62f3c1"]);
+export const GARUPA_UNITY_VERSIONS = toList(process.env.GARUPA_UNITY_VERSIONS || process.env.GARUPA_UNITY_VERSION, ["2021.3.45f2", "-", "-", "2022.3.62f3c1"]);
 /** Per-server User-Agent headers. */
-export const GARUPA_USER_AGENTS = toList(process.env.GARUPA_USER_AGENTS ?? process.env.GARUPA_USER_AGENT, [
+export const GARUPA_USER_AGENTS = toList(process.env.GARUPA_USER_AGENTS || process.env.GARUPA_USER_AGENT, [
     "UnityPlayer/2021.3.45f2 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
     "-",
     "-",
     "UnityPlayer/2022.3.62f3c1 (UnityWebRequest/1.0, libcurl/8.10.1-DEV)",
 ]);
 /** Per-server client platform identifiers. */
-export const GARUPA_CLIENT_PLATFORMS = toList(process.env.GARUPA_CLIENT_PLATFORMS ?? process.env.GARUPA_CLIENT_PLATFORM, ["Android"]);
+export const GARUPA_CLIENT_PLATFORMS = toList(process.env.GARUPA_CLIENT_PLATFORMS || process.env.GARUPA_CLIENT_PLATFORM, ["Android"]);
 /** Per-server encryption keys. */
-export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS ?? process.env.GARUPA_ENCRYPTION_KEY, ["-", "-", "-", "-"]);
+export const GARUPA_ENCRYPTION_KEYS = toList(process.env.GARUPA_ENCRYPTION_KEYS || process.env.GARUPA_ENCRYPTION_KEY, ["-", "-", "-", "-"]);
 /** Per-server encryption IVs. */
-export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS ?? process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
+export const GARUPA_ENCRYPTION_IVS = toList(process.env.GARUPA_ENCRYPTION_IVS || process.env.GARUPA_ENCRYPTION_IV, ["-", "-", "-", "-"]);
 
-// --- CN-specific headers (only required for CN server; other servers can leave "-") ---
-
-/** Per-server rkeys (CN-specific). */
+/** Per-server request-ID signing keys. */
 export const GARUPA_RKEYS = toList(process.env.GARUPA_RKEYS, ["-", "-", "-", "-"]);
-/** Per-server initial nonce, used for MD5(requestKey + nonce) before a response nonce is available. */
-export const GARUPA_RIDS = (process.env.GARUPA_RIDS ?? "-,-,-,-").split(",").map((entry) => entry.trim());
-/** Per-server cids (CN-specific). */
+/** Per-server channel IDs. */
 export const GARUPA_CIDS = toList(process.env.GARUPA_CIDS, ["-", "-", "-", "-"]);
-/** Per-server pids (CN-specific). */
+/** Per-server platform IDs. */
 export const GARUPA_PIDS = toList(process.env.GARUPA_PIDS, ["-", "-", "-", "-"]);
+
+// --- 国服帐号密码登录 --- / --- CN account/password login ---
+
+/** SDK 表单请求的签名密钥。 / Signing key for SDK form requests. */
+export const GARUPA_CN_SDK_APP_KEY = process.env.GARUPA_CN_SDK_APP_KEY ?? "";
+/** 国服（索引 3）的 SDK 登录帐号；Token 和 nonce 仅保存在进程内存中。 / CN password login (server index 3). Tokens and nonces remain in process memory. */
+export const GARUPA_CN_ACCOUNT = process.env.GARUPA_CN_ACCOUNT ?? "";
+/** SDK 登录密码，提交前使用服务端下发的 RSA 公钥加密。 / Account password encrypted with the SDK-provided RSA public key before submission. */
+export const GARUPA_CN_PASSWORD = process.env.GARUPA_CN_PASSWORD ?? "";
+/** Android 安装包版本代码，作为 SDK 表单的 version_code 字段发送。 / Android package version code sent as the SDK version_code form field. */
+export const GARUPA_CN_VERSION_CODE = process.env.GARUPA_CN_VERSION_CODE || "105";
+/** 登录或登录态请求失败后的冷却时间，单位为毫秒，由下一次请求检查。 / Cooldown in milliseconds after login or authenticated-request failure; checked by the next request. */
+export const GARUPA_CN_LOGIN_RETRY_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_RETRY_MS, 30_000));
+/** 每个登录请求的超时上限，单位为毫秒；榜单请求使用统一下载器的超时配置。 / Per-login-request timeout in milliseconds; ranking requests use the shared downloader timeout. */
+export const GARUPA_CN_LOGIN_TIMEOUT_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_TIMEOUT_MS, 30_000));
+
+// 国服 SDK 地址及设备信息，设备标识不设置共用默认值。 / CN SDK endpoint and device profile. Device identifiers have no shared defaults.
+/** SDK 帐号认证请求的基础地址。 / Base URL for SDK account authentication requests. */
+export const GARUPA_CN_SDK_BASE = process.env.GARUPA_CN_SDK_BASE?.trim() || "https://line1-sdk-center-login-sh.biligame.net";
+/** 游戏设备标识，BUVID 留空时也用于生成 BUVID。 / Game device identifier; also used to derive BUVID when BUVID is empty. */
+export const GARUPA_CN_DEVICE_ID = process.env.GARUPA_CN_DEVICE_ID ?? "";
+/** SDK 表单中的 udid；留空时复用解析后的 BUVID。 / SDK udid form field; empty values reuse the resolved BUVID. */
+export const GARUPA_CN_SDK_UDID = process.env.GARUPA_CN_SDK_UDID ?? "";
+/** 显式配置的 SDK BUVID；留空时根据设备标识生成。 / SDK BUVID override; empty values are derived from the device identifier. */
+export const GARUPA_CN_BUVID = process.env.GARUPA_CN_BUVID ?? "";
+/** 显式配置的 SDK bd_id；留空时在当前客户端实例内生成并复用。 / SDK bd_id override; empty values are generated and reused within one client instance. */
+export const GARUPA_CN_BD_ID = process.env.GARUPA_CN_BD_ID ?? "";
+/** 游戏登录消息中的设备型号。 / Device model included in the game login message. */
+export const GARUPA_CN_DEVICE_MODEL = process.env.GARUPA_CN_DEVICE_MODEL ?? "";
+/** 游戏登录消息中的设备操作系统描述。 / Device operating-system description included in the game login message. */
+export const GARUPA_CN_DEVICE_OS = process.env.GARUPA_CN_DEVICE_OS ?? "";
+/** 游戏登录消息中嵌套设备信息的广告标识。 / Advertising identifier included in the nested game login device message. */
+export const GARUPA_CN_AD_ID = process.env.GARUPA_CN_AD_ID ?? "";
+/** Android 安装包签名指纹，作为 SDK 表单的 apk_sign 字段发送。 / Android package signing fingerprint sent as the SDK apk_sign form field. */
+export const GARUPA_CN_APK_SIGN = process.env.GARUPA_CN_APK_SIGN ?? "";
+/** SDK 版本号，作为 sdk_ver 表单字段发送。 / SDK version sent as the sdk_ver form field. */
+export const GARUPA_CN_SDK_VERSION = process.env.GARUPA_CN_SDK_VERSION || "6.19.5";
+
+// --- Garupa refresh scheduling ---
 
 /** Interval in seconds between Garupa data refreshes. */
 export const GARUPA_REFRESH_INTERVAL_SECONDS = toNumber(process.env.GARUPA_REFRESH_INTERVAL_SECONDS, 60);
@@ -159,9 +194,9 @@ export const MONTHLY_RANKING_REFRESH_INTERVAL_MS = toNumber(process.env.MONTHLY_
 // --- MongoDB configuration ---
 
 /** MongoDB connection URI. */
-export const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
+export const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 /** MongoDB database name. */
-export const MONGODB_DB = process.env.MONGODB_DB ?? "garupa";
+export const MONGODB_DB = process.env.MONGODB_DB || "garupa";
 /** MongoDB server selection timeout in ms. */
 export const MONGODB_SERVER_SELECTION_TIMEOUT_MS = toNumber(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS, 60_000);
 /** MongoDB connection probe timeout in ms. */
@@ -173,28 +208,28 @@ export const MONGODB_STARTUP_RETRY_MAX_MS = toNumber(process.env.MONGODB_STARTUP
 /** Interval between MongoDB startup retry attempts. */
 export const MONGODB_STARTUP_RETRY_INTERVAL_MS = toNumber(process.env.MONGODB_STARTUP_RETRY_INTERVAL_MS, 5_000);
 /** Collection name for Garupa metadata. */
-export const MONGODB_GARUPA_META_COLLECTION = process.env.MONGODB_GARUPA_META_COLLECTION ?? "GarupaMeta";
+export const MONGODB_GARUPA_META_COLLECTION = process.env.MONGODB_GARUPA_META_COLLECTION || "GarupaMeta";
 /** Collection name for monthly top points. */
-export const MONGODB_MONTHLY_TOP_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_TOP_POINTS_COLLECTION ?? "monthly_top_points";
+export const MONGODB_MONTHLY_TOP_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_TOP_POINTS_COLLECTION || "monthly_top_points";
 /** Collection name for monthly border points. */
-export const MONGODB_MONTHLY_BORDER_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_BORDER_POINTS_COLLECTION ?? "monthly_border_points";
+export const MONGODB_MONTHLY_BORDER_POINTS_COLLECTION = process.env.MONGODB_MONTHLY_BORDER_POINTS_COLLECTION || "monthly_border_points";
 /** Collection name for ranking player data. */
-export const MONGODB_RANKING_PLAYERS_COLLECTION = process.env.MONGODB_RANKING_PLAYERS_COLLECTION ?? "ranking_players";
+export const MONGODB_RANKING_PLAYERS_COLLECTION = process.env.MONGODB_RANKING_PLAYERS_COLLECTION || "ranking_players";
 /** Collection name for monthly ranking info. */
-export const MONGODB_MONTHLY_INFO_COLLECTION = process.env.MONGODB_MONTHLY_INFO_COLLECTION ?? "monthly_ranking_info";
+export const MONGODB_MONTHLY_INFO_COLLECTION = process.env.MONGODB_MONTHLY_INFO_COLLECTION || "monthly_ranking_info";
 
 // --- Event ranking ---
 
 /** Collection name for event top points. */
-export const MONGODB_EVENT_TOP_POINTS_COLLECTION = process.env.MONGODB_EVENT_TOP_POINTS_COLLECTION ?? "event_top_points";
+export const MONGODB_EVENT_TOP_POINTS_COLLECTION = process.env.MONGODB_EVENT_TOP_POINTS_COLLECTION || "event_top_points";
 /** Collection name for event border points. */
-export const MONGODB_EVENT_BORDER_POINTS_COLLECTION = process.env.MONGODB_EVENT_BORDER_POINTS_COLLECTION ?? "event_border_points";
+export const MONGODB_EVENT_BORDER_POINTS_COLLECTION = process.env.MONGODB_EVENT_BORDER_POINTS_COLLECTION || "event_border_points";
 /** Collection name for music top points. */
-export const MONGODB_MUSIC_TOP_POINTS_COLLECTION = process.env.MONGODB_MUSIC_TOP_POINTS_COLLECTION ?? "music_top_points";
+export const MONGODB_MUSIC_TOP_POINTS_COLLECTION = process.env.MONGODB_MUSIC_TOP_POINTS_COLLECTION || "music_top_points";
 /** Collection name for music border points. */
-export const MONGODB_MUSIC_BORDER_POINTS_COLLECTION = process.env.MONGODB_MUSIC_BORDER_POINTS_COLLECTION ?? "music_border_points";
+export const MONGODB_MUSIC_BORDER_POINTS_COLLECTION = process.env.MONGODB_MUSIC_BORDER_POINTS_COLLECTION || "music_border_points";
 /** Collection name for event info. */
-export const MONGODB_EVENT_INFO_COLLECTION = process.env.MONGODB_EVENT_INFO_COLLECTION ?? "event_info";
+export const MONGODB_EVENT_INFO_COLLECTION = process.env.MONGODB_EVENT_INFO_COLLECTION || "event_info";
 /** Interval in ms between event ranking info metadata polls. */
 export const EVENT_RANKING_INFO_POLL_INTERVAL_MS = toNumber(process.env.EVENT_RANKING_INFO_POLL_INTERVAL_MS, 60 * 60 * 1000);
 /** Interval in ms between event ranking data refreshes. */

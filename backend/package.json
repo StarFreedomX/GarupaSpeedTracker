@@ -7,7 +7,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "dev": "nodemon --ignore cache/** --ignore cache/**/*.tmp --ignore data/** --exec ts-node -r tsconfig-paths/register src/index.ts",
+        "dev": "nodemon --ignore \"cache/**\" --ignore \"cache/**/*.tmp\" --ignore \"data/**\" --exec \"ts-node -r tsconfig-paths/register\" src/index.ts",
         "test": "jest --runInBand",
         "test:bestdori-chart-parser": "jest --runInBand src/parsers/BestdoriChartParser.test.ts",
         "build": "tsc && tsc-alias",
@@ -15,8 +15,7 @@
         "start": "node dist/index.js",
         "check": "biome check --write .",
         "format": "biome format --write .",
-        "lint": "biome lint ./src",
-        "rid:set": "node dist/scripts/setGarupaRid.js"
+        "lint": "biome lint ./src"
     },
     "keywords": [],
     "author": "",

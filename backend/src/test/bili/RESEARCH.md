@@ -1,3 +1,5 @@
+> 下文从 405 响应提取 newRequestId 并恢复请求的旧方案已失效。当前登录及会话处理见 `../../api/cnSession.ts`。
+
 # 国服 (Bili/CN) API 爬取研究结论
 
 ## 一、端点总结

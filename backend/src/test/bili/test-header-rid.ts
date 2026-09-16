@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * 验证：响应头 x-requestid 能不能直接用于下一次请求
  */
 import { Buffer } from "node:buffer";
