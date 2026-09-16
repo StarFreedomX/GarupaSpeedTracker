@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * Smoke test: 验证 GarupaResponseValidator 逻辑
  * - 活动榜数据 → 活动校验通过
  * - 月榜数据 → 月榜校验通过

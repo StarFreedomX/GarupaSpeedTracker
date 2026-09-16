@@ -1,4 +1,4 @@
-> 历史研究记录：405 提取及恢复 RID 的结论已失效，相关诊断脚本不用于生产登录。当前实现见 `src/api/cnSession.ts` 和 backend README。
+> 下文从 405 响应提取 newRequestId 并恢复请求的旧方案已失效。当前登录及会话处理见 `../../api/cnSession.ts`。
 
 # 国服 (Bili/CN) API 爬取研究结论
 

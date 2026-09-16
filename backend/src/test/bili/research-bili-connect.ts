@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * 国服 (CN Server) 连通性 + X-Requestid 探查脚本
  *
  * 验证国服 API 基础连通性、X-Requestid 校验机制、解密正确性。

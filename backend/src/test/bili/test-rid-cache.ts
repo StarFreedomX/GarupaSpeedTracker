@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * 验证：同一 rid 请求不同 monthlyId 是否触发服务端缓存
  */
 import { Buffer } from "node:buffer";

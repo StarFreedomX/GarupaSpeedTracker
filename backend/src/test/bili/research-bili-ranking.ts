@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * CN Server Event Ranking & Monthly Ranking Research Script
  *
  * Key findings (from research-bili-connect.ts):

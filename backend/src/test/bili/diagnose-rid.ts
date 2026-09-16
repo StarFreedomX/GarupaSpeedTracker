@@ -1,4 +1,8 @@
 /**
+ * 本脚本涉及从 405 响应提取 newRequestId 的旧方案，该获取／恢复方式已失效。
+ * 当前登录及会话处理见 ../../api/cnSession.ts。
+ */
+/**
  * 诊断：测试不同 X-Requestid 值对 event ranking 和 monthly ranking 的影响
  * 包括不带 rid 的情况、各种格式的 rid
  */
