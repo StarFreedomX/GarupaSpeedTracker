@@ -1,6 +1,6 @@
 import type { SchemaDefinition } from "./schemaDefinition";
 
-/** Version metadata required before game login. */
+/** 游戏登录前所需的客户端、数据和主数据版本信息。 / Version metadata required before game login. */
 export interface GarupaApplicationResponse {
     clientVersion: string;
     dataVersion: string;
@@ -13,7 +13,7 @@ export const applicationResponseSchema: SchemaDefinition = {
     10: { name: "masterDataVersion", type: "string" },
 };
 
-/** Game user ID returned by login. */
+/** 游戏登录响应返回的用户 ID。 / Game user ID returned by login. */
 export interface GarupaLoginResponse {
     userId: number;
 }

@@ -1,3 +1,7 @@
+/**
+ * 国服登录与会话管理的模拟单元测试；所有网络响应均由 fixture 提供。
+ * Mocked unit tests for CN login and session management; fixtures supply all network responses.
+ */
 import * as crypto from "node:crypto";
 import { GarupaParser } from "@/parsers/GarupaParser";
 import { downloader } from "@/storage/downloader";
@@ -6,6 +10,7 @@ const downloadRaw = jest.mocked(downloader.downloadRaw);
 
 import { type CnConfig, CnSessionClient, cnField, decryptCn, encryptCn, signCnSdk } from "./cnSession";
 
+// 仅用于本地模拟的测试值。 / Synthetic values used only by the mocked tests.
 const config: CnConfig = {
     encryptionKey: Buffer.from("test-key-1234567"),
     encryptionIv: Buffer.from("test-iv--1234567"),
@@ -37,6 +42,14 @@ const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", { modulusLen
 const binary = (body: Buffer, headers = {}) => new Response(new Uint8Array(encryptCn(body, config.encryptionKey, config.encryptionIv)), { headers });
 const md5 = (s: string) => crypto.createHash("md5").update(s).digest("hex");
 const rid = (s: string) => md5(`${config.requestKey}${s}`);
+/**
+ * 记录请求顺序并模拟 SDK、游戏登录及榜单响应；支持注入数据请求失败和推进冷却时钟。
+ * Records requests and mocks SDK, game login, and ranking responses, with injectable failures and clock advancement.
+ * 顺序：application(0)、公钥 POST(1)、SDK 登录 POST(2)、游戏登录(3)、榜单(4)。
+ * Order: application(0), cipher POST(1), SDK login POST(2), game login(3), ranking(4).
+ * 公钥与 SDK 登录请求都携带 bd_id，因此两者的表单均可用于验证设备标识。
+ * Both cipher and SDK login forms carry bd_id and can be used to check the device identifier.
+ */
 function fixture() {
     let time = 10000;
     let count = 0;
@@ -72,11 +85,13 @@ function fixture() {
 }
 const url = (uid: string) => `${base}suite/user/${uid}`;
 
+// 验证密码加密、SDK UID 字符串传递，以及后续请求使用游戏登录返回的 UID。
+// fresh password login encrypts hash+password, preserves uint64 SDK UID and uses returned game UID.
 test("fresh password login encrypts hash+password, preserves uint64 SDK UID and uses returned game UID", async () => {
     const f = fixture();
     expect((await f.client.fetch(base, "9.4.4", url)).decrypted.toString()).toBe("ranking");
     const form = new URLSearchParams(f.calls[2].init.body as string);
-    // Raw RSA decrypt lets the test inspect PKCS#1 v1.5 padding even on Node builds disabling legacy privateDecrypt padding.
+    // 使用原始 RSA 解密检查 PKCS#1 v1.5 填充，兼容禁用旧版 privateDecrypt 填充模式的 Node。 / Raw RSA decrypt lets the test inspect PKCS#1 v1.5 padding even on Node builds disabling legacy privateDecrypt padding.
     const padded = crypto.privateDecrypt({ key: privateKey, padding: crypto.constants.RSA_NO_PADDING }, Buffer.from(form.get("pwd") ?? "", "base64"));
     expect(padded.subarray(0, 2)).toEqual(Buffer.from([0, 2]));
     expect(padded.subarray(padded.indexOf(0, 2) + 1).toString()).toBe("fresh-hashtest-password");
@@ -102,10 +117,14 @@ test("fresh password login encrypts hash+password, preserves uint64 SDK UID and 
     expect(new Headers(f.calls[4].init.headers).has("X-Signature")).toBe(false);
 });
 
+// 验证签名字段按名称排序，并忽略大小写不同的保留字段。
+// SDK sign sorts values and excludes reserved fields case-insensitively.
 test("SDK sign sorts values and excludes reserved fields case-insensitively", () => {
     expect(signCnSdk({ z: "last", a: "first", TOKEN: "ignored", sign: "ignored" }, config.sdkAppKey)).toBe(md5("firstlasttest-sdk-app-key"));
 });
 
+// 验证并发请求串行执行，后一个请求使用前一响应的 nonce。
+// concurrent authenticated calls serialize and use the preceding response nonce.
 test("concurrent authenticated calls serialize and use the preceding response nonce", async () => {
     const f = fixture();
     await Promise.all([f.client.fetch(base, "9.4.4", url), f.client.fetch(base, "9.4.4", url)]);
@@ -113,6 +132,8 @@ test("concurrent authenticated calls serialize and use the preceding response no
     expect(new Headers(f.calls[5].init.headers).get("X-Requestid")).toBe(rid("next-nonce"));
 });
 
+// 验证 405 响应不修复会话，冷却后通过重新登录取得新会话。
+// 405 body and header recovery hints are ignored; after cooldown a fresh login is required.
 test("405 body and header recovery hints are ignored; after cooldown a fresh login is required", async () => {
     const f = fixture();
     f.respond(() => new Response("newRequestId=legacy-hint", { status: 405, headers: { "X-Requestid": "legacy-hint" } }));
@@ -127,6 +148,8 @@ test("405 body and header recovery hints are ignored; after cooldown a fresh log
     expect(new Headers(f.calls[9].init.headers).get("X-Requestid")).toBe(rid("login-2"));
 });
 
+// 验证统一下载器失败后会话失效，冷却后重新登录。
+// downloader failure invalidates the session and forces fresh login after cooldown.
 test("downloader failure invalidates the session and forces fresh login after cooldown", async () => {
     const f = fixture();
     f.respond(() => {
@@ -139,6 +162,8 @@ test("downloader failure invalidates the session and forces fresh login after co
     expect(f.calls.filter((c) => c.url.endsWith("/user/login"))).toHaveLength(2);
 });
 
+// 验证响应缺少 nonce 时保留原值，Token 和 nonce 可以独立更新。
+// success without nonce preserves the chain; token and nonce rotate independently.
 test("success without nonce preserves the chain; token and nonce rotate independently", async () => {
     const f = fixture();
     f.respond(() => binary(Buffer.from("data"), { "X-Token": "rotated-token" }));
@@ -154,6 +179,8 @@ test("success without nonce preserves the chain; token and nonce rotate independ
     expect(f.calls.filter((c) => c.url.endsWith("/user/login"))).toHaveLength(1);
 });
 
+// 验证各类验证码响应立即停止登录，不重试或获取榜单。
+// SDK verification code %s stops login without retry or data request.
 test.each([200005, 200006, 200007, 200000, 200001])("SDK verification code %s stops login without retry or data request", async (code) => {
     const f = fixture();
     const transport: typeof fetch = async (input, init) =>
@@ -165,10 +192,14 @@ test.each([200005, 200006, 200007, 200000, 200001])("SDK verification code %s st
     expect(downloadRaw).not.toHaveBeenCalled();
 });
 
+// 验证非法密文被拒绝。
+// malformed ciphertext is rejected.
 test("malformed ciphertext is rejected", () => {
     expect(() => decryptCn(Buffer.from("invalid"), config.encryptionKey, config.encryptionIv)).toThrow();
 });
 
+// 验证缺少签名密钥时，在发起网络请求前报错。
+// missing %s fails before any network request.
 test.each(["requestKey", "sdkAppKey"] as const)("missing %s fails before any network request", async (key) => {
     const transport = jest.fn();
     const client = new CnSessionClient({ ...config, [key]: "" }, transport);
@@ -176,6 +207,8 @@ test.each(["requestKey", "sdkAppKey"] as const)("missing %s fails before any net
     expect(transport).not.toHaveBeenCalled();
 });
 
+// 验证缺少设备标识时，在发起网络请求前报错。
+// missing device identity fails without network access.
 test("missing device identity fails without network access", async () => {
     const transport = jest.fn();
     const client = new CnSessionClient({ ...config, deviceId: "" }, transport);
@@ -183,6 +216,8 @@ test("missing device identity fails without network access", async () => {
     expect(transport).not.toHaveBeenCalled();
 });
 
+// 验证 SDK UDID 留空时复用显式配置的 BUVID。
+// empty SDK udid reuses the explicitly configured BUVID.
 test("empty SDK udid reuses the explicitly configured BUVID", async () => {
     const f = fixture();
     const client = new CnSessionClient({ ...config, sdkUdid: "" }, f.transport as typeof fetch);
@@ -193,6 +228,8 @@ test("empty SDK udid reuses the explicitly configured BUVID", async () => {
     expect(form.get("sign")).toBe(signCnSdk(Object.fromEntries(form), config.sdkAppKey));
 });
 
+// 验证 BUVID 自动生成及显式 SDK UDID 的优先级。
+// empty BUVID derives from DEVICE_ID, SDK udid override=%s.
 test.each(["", "explicit-sdk-udid"])("empty BUVID derives from DEVICE_ID, SDK udid override=%s", async (sdkUdid) => {
     const f = fixture();
     const client = new CnSessionClient({ ...config, deviceId: "0123456789abcdef0123456789abcdef", buvid: "", sdkUdid }, f.transport as typeof fetch);
@@ -205,6 +242,8 @@ test.each(["", "explicit-sdk-udid"])("empty BUVID derives from DEVICE_ID, SDK ud
     expect(form.get("sign")).toBe(signCnSdk(Object.fromEntries(form), config.sdkAppKey));
 });
 
+// 验证生成 BUVID 所需的设备 ID 格式，不合法时不发送网络请求。
+// invalid DEVICE_ID cannot generate BUVID and fails before network access.
 test("invalid DEVICE_ID cannot generate BUVID and fails before network access", async () => {
     const transport = jest.fn();
     const client = new CnSessionClient({ ...config, buvid: "", deviceId: "invalid" }, transport);
@@ -212,6 +251,8 @@ test("invalid DEVICE_ID cannot generate BUVID and fails before network access", 
     expect(transport).not.toHaveBeenCalled();
 });
 
+// 验证生成的 BD ID 在同一实例重新登录时不变，新实例重新生成。
+// empty BD_ID is generated in memory and reused for re-login within the same client.
 test("empty BD_ID is generated in memory and reused for re-login within the same client", async () => {
     const f = fixture();
     let now = 10000;
@@ -231,6 +272,8 @@ test("empty BD_ID is generated in memory and reused for re-login within the same
     expect(new URLSearchParams(restarted.calls[1].init.body as string).get("bd_id")).not.toBe(generated);
 });
 
+// 验证 -662 响应中的两种公钥字段均可用于重加密，并保持设备信息不变。
+// -662 replaces RSA material from %s and preserves device identity.
 test.each(["cipher_key", "rsa_key"])("-662 replaces RSA material from %s and preserves device identity", async (keyField) => {
     const f = fixture();
     const fresh = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -256,6 +299,8 @@ test.each(["cipher_key", "rsa_key"])("-662 replaces RSA material from %s and pre
     expect(f.calls.filter((call) => call.url.includes("/issue/cipher/")).length).toBe(1);
 });
 
+// 验证 -662 缺少公钥材料或达到重试上限时停止。
+// -662 stops with missing material or after bounded retries: %s.
 test.each([false, true])("-662 stops with missing material or after bounded retries: %s", async (valid) => {
     const f = fixture();
     let logins = 0;
@@ -270,6 +315,8 @@ test.each([false, true])("-662 stops with missing material or after bounded retr
     expect(logins).toBe(valid ? 4 : 1);
 });
 
+// 验证网络诊断只保留允许的错误码，不泄露原始错误中的敏感信息。
+// transport diagnostics retain safe code and redact secrets: %s.
 test.each(["UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "secret-code"])("transport diagnostics retain safe code and redact secrets: %s", async (code) => {
     const f = fixture();
     f.transport.mockRejectedValueOnce(new Error("secret-token", { cause: Object.assign(new Error("test-password"), { code }) }));
@@ -278,6 +325,8 @@ test.each(["UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "secret-code"])("transpo
 });
 
 
+// 验证登录超时只作用于登录请求，数据请求交给统一下载器。
+// login timeout applies only to login requests; authenticated requests use the general timeout.
 test("login timeout applies only to login requests; authenticated requests use the general timeout", async () => {
     const timeout = jest.spyOn(AbortSignal, "timeout");
     try {
@@ -296,6 +345,8 @@ test("login timeout applies only to login requests; authenticated requests use t
 });
 
 
+// 验证登录响应缺少有效游戏 UID 时，不发送数据请求。
+// incomplete game login is rejected before requesting data: %s.
 test.each(["", "0800", "0a0178"])("incomplete game login is rejected before requesting data: %s", async (hex) => {
     const f = fixture();
     const transport: typeof fetch = async (input, init) =>

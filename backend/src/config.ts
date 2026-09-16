@@ -122,41 +122,41 @@ export const GARUPA_CIDS = toList(process.env.GARUPA_CIDS, ["-", "-", "-", "-"])
 /** Per-server platform IDs. */
 export const GARUPA_PIDS = toList(process.env.GARUPA_PIDS, ["-", "-", "-", "-"]);
 
-// --- CN account/password login ---
+// --- 国服帐号密码登录 --- / --- CN account/password login ---
 
-/** Signing key for SDK form requests. */
+/** SDK 表单请求的签名密钥。 / Signing key for SDK form requests. */
 export const GARUPA_CN_SDK_APP_KEY = process.env.GARUPA_CN_SDK_APP_KEY ?? "";
-/** CN password login (server index 3). Tokens and nonces remain in process memory. */
+/** 国服（索引 3）的 SDK 登录帐号；Token 和 nonce 仅保存在进程内存中。 / CN password login (server index 3). Tokens and nonces remain in process memory. */
 export const GARUPA_CN_ACCOUNT = process.env.GARUPA_CN_ACCOUNT ?? "";
-/** Account password encrypted with the SDK-provided RSA public key before submission. */
+/** SDK 登录密码，提交前使用服务端下发的 RSA 公钥加密。 / Account password encrypted with the SDK-provided RSA public key before submission. */
 export const GARUPA_CN_PASSWORD = process.env.GARUPA_CN_PASSWORD ?? "";
-/** Android package version code sent as the SDK version_code form field. */
+/** Android 安装包版本代码，作为 SDK 表单的 version_code 字段发送。 / Android package version code sent as the SDK version_code form field. */
 export const GARUPA_CN_VERSION_CODE = process.env.GARUPA_CN_VERSION_CODE || "105";
-/** Cooldown in milliseconds after login or authenticated-request failure; checked by the next request. */
+/** 登录或登录态请求失败后的冷却时间，单位为毫秒，由下一次请求检查。 / Cooldown in milliseconds after login or authenticated-request failure; checked by the next request. */
 export const GARUPA_CN_LOGIN_RETRY_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_RETRY_MS, 30_000));
-/** Per-login-request timeout in milliseconds; ranking requests use the shared downloader timeout. */
+/** 每个登录请求的超时上限，单位为毫秒；榜单请求使用统一下载器的超时配置。 / Per-login-request timeout in milliseconds; ranking requests use the shared downloader timeout. */
 export const GARUPA_CN_LOGIN_TIMEOUT_MS = Math.max(1000, toNumber(process.env.GARUPA_CN_LOGIN_TIMEOUT_MS, 30_000));
 
-// CN SDK endpoint and device profile. Device identifiers have no shared defaults.
-/** Base URL for SDK account authentication requests. */
+// 国服 SDK 地址及设备信息，设备标识不设置共用默认值。 / CN SDK endpoint and device profile. Device identifiers have no shared defaults.
+/** SDK 帐号认证请求的基础地址。 / Base URL for SDK account authentication requests. */
 export const GARUPA_CN_SDK_BASE = process.env.GARUPA_CN_SDK_BASE?.trim() || "https://line1-sdk-center-login-sh.biligame.net";
-/** Game device identifier; also used to derive BUVID when BUVID is empty. */
+/** 游戏设备标识，BUVID 留空时也用于生成 BUVID。 / Game device identifier; also used to derive BUVID when BUVID is empty. */
 export const GARUPA_CN_DEVICE_ID = process.env.GARUPA_CN_DEVICE_ID ?? "";
-/** SDK udid form field; empty values reuse the resolved BUVID. */
+/** SDK 表单中的 udid；留空时复用解析后的 BUVID。 / SDK udid form field; empty values reuse the resolved BUVID. */
 export const GARUPA_CN_SDK_UDID = process.env.GARUPA_CN_SDK_UDID ?? "";
-/** SDK BUVID override; empty values are derived from the device identifier. */
+/** 显式配置的 SDK BUVID；留空时根据设备标识生成。 / SDK BUVID override; empty values are derived from the device identifier. */
 export const GARUPA_CN_BUVID = process.env.GARUPA_CN_BUVID ?? "";
-/** SDK bd_id override; empty values are generated and reused within one client instance. */
+/** 显式配置的 SDK bd_id；留空时在当前客户端实例内生成并复用。 / SDK bd_id override; empty values are generated and reused within one client instance. */
 export const GARUPA_CN_BD_ID = process.env.GARUPA_CN_BD_ID ?? "";
-/** Device model included in the game login message. */
+/** 游戏登录消息中的设备型号。 / Device model included in the game login message. */
 export const GARUPA_CN_DEVICE_MODEL = process.env.GARUPA_CN_DEVICE_MODEL ?? "";
-/** Device operating-system description included in the game login message. */
+/** 游戏登录消息中的设备操作系统描述。 / Device operating-system description included in the game login message. */
 export const GARUPA_CN_DEVICE_OS = process.env.GARUPA_CN_DEVICE_OS ?? "";
-/** Advertising identifier included in the nested game login device message. */
+/** 游戏登录消息中嵌套设备信息的广告标识。 / Advertising identifier included in the nested game login device message. */
 export const GARUPA_CN_AD_ID = process.env.GARUPA_CN_AD_ID ?? "";
-/** Android package signing fingerprint sent as the SDK apk_sign form field. */
+/** Android 安装包签名指纹，作为 SDK 表单的 apk_sign 字段发送。 / Android package signing fingerprint sent as the SDK apk_sign form field. */
 export const GARUPA_CN_APK_SIGN = process.env.GARUPA_CN_APK_SIGN ?? "";
-/** SDK version sent as the sdk_ver form field. */
+/** SDK 版本号，作为 sdk_ver 表单字段发送。 / SDK version sent as the sdk_ver form field. */
 export const GARUPA_CN_SDK_VERSION = process.env.GARUPA_CN_SDK_VERSION || "6.19.5";
 
 // --- Garupa refresh scheduling ---

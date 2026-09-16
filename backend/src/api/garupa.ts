@@ -192,7 +192,7 @@ export const getGarupaServerIds = (): number[] =>
         .filter((entry) => entry.value && entry.value !== "-")
         .map((entry) => entry.index);
 
-/** Resolves CN login settings and the fourth entries of the shared per-server configuration. */
+/** 组装国服登录配置，并读取各服共用配置的第四项。 / Resolves CN login settings and the fourth entries of the shared per-server configuration. */
 const cnConfig = (): CnConfig => {
     return {
         encryptionKey: getCipherKey(3),
@@ -221,7 +221,7 @@ const cnConfig = (): CnConfig => {
         retryDelayMs: GARUPA_CN_LOGIN_RETRY_MS,
     };
 };
-/** Lazily created session shared by CN monthly and event ranking requests. */
+/** 按需创建并由国服月榜和活动榜共用的会话。 / Lazily created session shared by CN monthly and event ranking requests. */
 let cnClient: CnSessionClient | undefined;
 /**
  * Builds the HTTP request headers required by the Garupa API for a given server.
@@ -305,6 +305,7 @@ export const fetchJpSuiteMasterBuffer = async (clientVersion: string): Promise<B
 };
 
 /**
+ * 按区服选择认证流程并获取、解密榜单。国服由会话层管理登录和 Token/nonce，所有榜单请求使用统一下载器。
  * Fetches and decrypts ranking data using the appropriate server authentication path.
  * CN delegates login and token/nonce updates to the shared session; all ranking HTTP requests
  * use the common downloader. Other regions use their configured UID and request headers.

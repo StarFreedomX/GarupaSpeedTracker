@@ -3,7 +3,7 @@ import { GarupaParser } from "@/parsers/GarupaParser";
 import { applicationResponseSchema, loginResponseSchema, type GarupaApplicationResponse, type GarupaLoginResponse } from "@/types/garupaSchema";
 import { downloader } from "@/storage/downloader";
 
-/** SDK credentials, device profile, and game session settings resolved by the caller. */
+/** 由调用方提供的 SDK 帐号配置、设备信息和游戏会话参数。 / SDK credentials, device profile, and game session settings resolved by the caller. */
 export interface CnConfig {
     encryptionKey: Buffer;
     encryptionIv: Buffer;
@@ -34,6 +34,7 @@ const garupaParser = new GarupaParser();
 
 const md5 = (value: string) => crypto.createHash("md5").update(value).digest("hex");
 /**
+ * 按字段名排序、排除保留字段后，拼接字段值和配置的签名密钥，生成小写 MD5 表单签名。
  * Computes the SDK form signature from sorted parameter values and the configured app key.
  * Reserved fields are excluded case-insensitively; parameter names are not concatenated.
  * @param params - Form fields before URL encoding
@@ -50,6 +51,7 @@ export const signCnSdk = (params: Record<string, string>, appKey: string): strin
     );
 
 /**
+ * 将 protobuf 请求使用配置的 key、IV 进行 AES-128-CBC 加密，手动添加 ISO10126 填充。
  * Encrypts a game request with AES-128-CBC and ISO10126 padding.
  * @param plain - Encoded protobuf message
  * @param key - 16-byte key from configuration
@@ -63,6 +65,7 @@ export function encryptCn(plain: Buffer, key: Buffer, iv: Buffer): Buffer {
     return Buffer.concat([cipher.update(Buffer.concat([plain, crypto.randomBytes(count - 1), Buffer.from([count])])), cipher.final()]);
 }
 /**
+ * 解密游戏响应并按末尾长度字节去除 ISO10126 填充；密文长度或填充长度非法时抛出异常。
  * Decrypts a game response and removes its ISO10126 padding.
  * @param body - Non-empty ciphertext whose length is a multiple of 16
  * @param key - 16-byte key from configuration
@@ -80,7 +83,7 @@ export function decryptCn(body: Buffer, key: Buffer, iv: Buffer): Buffer {
     return plain.subarray(0, plain.length - count);
 }
 
-/** Encodes a non-negative integer for protobuf tags and byte lengths. */
+/** 为 protobuf 字段标签和字节长度编码非负整数。 / Encodes a non-negative integer for protobuf tags and byte lengths. */
 const varint = (input: number): Buffer => {
     let n = BigInt(input);
     const bytes: number[] = [];
@@ -92,6 +95,7 @@ const varint = (input: number): Buffer => {
     return Buffer.from(bytes);
 };
 /**
+ * 将字段编号和 UTF-8 字符串或嵌套消息编码为一个长度限定的 protobuf 字段。
  * Encodes one length-delimited protobuf field for a login request.
  * @param number - Protobuf field number
  * @param input - UTF-8 text or an already encoded nested message
@@ -102,6 +106,7 @@ export const cnField = (number: number, input: Buffer | string): Buffer => {
     return Buffer.concat([varint(number * 8 + 2), varint(value.length), value]);
 };
 /**
+ * 构造游戏请求的公共请求头；发送登录态请求时再添加 Token 和 RID，SDK 表单使用独立请求头。
  * Builds shared game headers; session token and request ID are added when sending authenticated requests.
  * @param config - Device, channel, platform, and client settings
  * @param version - Game client version string
@@ -120,7 +125,7 @@ export function cnHeaders(config: CnConfig, version: string): Record<string, str
         "X-ClientPlatform": config.clientPlatform,
     };
 }
-/** Stops SDK login when verification is required; retains only the numeric response code. */
+/** 遇到验证码要求时停止 SDK 登录，异常只保留数字响应码。 / Stops SDK login when verification is required; retains only the numeric response code. */
 export class CnVerificationRequired extends Error {
     constructor(readonly code: number) {
         super(`CN SDK verification required (code ${code}); CAPTCHA login is not supported; login stopped`);
@@ -129,25 +134,26 @@ export class CnVerificationRequired extends Error {
 }
 const CAPTCHA_CODES = new Set([200005, 200006, 200007, 200000, 200001]);
 
-/** Process-local game session; the game UID is distinct from the SDK account UID. */
+/** 仅在当前进程内保存的游戏会话；游戏 UID 与 SDK 帐号 UID 不同。 / Process-local game session; the game UID is distinct from the SDK account UID. */
 interface Session {
     uid: string;
     token: string;
-    /** Last server response nonce, used to derive the next outgoing request ID. */
+    /** 上一次服务端响应的 nonce，用于计算下一次请求的 RID。 / Last server response nonce, used to derive the next outgoing request ID. */
     nonce: string;
     version: string;
     base: string;
     headers: Record<string, string>;
 }
-/** Authenticated response passed to the existing ranking parsers. */
+/** 交给现有榜单解析器处理的登录态请求结果。 / Authenticated response passed to the existing ranking parsers. */
 export interface CnResponse {
     decrypted: Buffer;
     status: number;
-    /** Original encrypted response size in bytes. */
+    /** 原始加密响应的字节数。 / Original encrypted response size in bytes. */
     length: number;
 }
 
 /**
+ * 管理国服帐号密码登录和实例内的 Token/nonce 链。月榜与活动榜复用同一实例串行请求；数据下载使用统一下载器，榜单解析和入库由外层负责。
  * Manages CN password login and one in-memory token/nonce chain per client instance.
  * Authenticated data requests use the shared downloader; ranking parsing and storage remain external.
  * Reuse one instance for monthly and event requests so both advance the same serialized chain.
@@ -158,6 +164,7 @@ export class CnSessionClient {
     private queue: Promise<void> = Promise.resolve();
     private retryAfter = 0;
     /**
+     * 创建会话客户端；transport 仅负责登录请求，now 为 SDK 时间戳和重试冷却提供毫秒时钟。
      * @param config - SDK credentials and game session configuration
      * @param transport - HTTP transport for login requests; data requests use the shared downloader
      * @param now - Millisecond clock used for SDK timestamps and retry cooldowns
@@ -168,12 +175,13 @@ export class CnSessionClient {
         private readonly now = Date.now,
     ) {}
 
-    /** Discards the current session and starts the cooldown before another login attempt. */
+    /** 丢弃当前会话，并开始下一次登录前的冷却计时。 / Discards the current session and starts the cooldown before another login attempt. */
     private invalidate(): void {
         this.session = undefined;
         this.retryAfter = this.now() + this.config.retryDelayMs;
     }
     /**
+     * 按登录超时配置发送单个登录相关请求，响应体读取共用该中止信号；网络异常脱敏后抛出，会话失效由外层处理。
      * Sends one login-related HTTP request with the configured login timeout.
      * @param url - SDK or game login-flow URL
      * @param init - Method, headers, and optional request body
@@ -185,7 +193,7 @@ export class CnSessionClient {
         try {
             return await this.transport(url, { ...init, redirect: "error", signal: AbortSignal.timeout(this.config.loginTimeoutMs) });
         } catch (error) {
-            // Only expose known error codes; transport messages can contain credentials.
+            // 仅保留已知错误码，原始网络错误信息可能包含登录信息。 / Only expose known error codes; transport messages can contain credentials.
             const allowed = new Set([
                 "ECONNRESET",
                 "ECONNREFUSED",
@@ -227,6 +235,7 @@ export class CnSessionClient {
         }
     }
     /**
+     * 优先使用配置的设备标识；BUVID 留空时由 32 位十六进制设备 ID 生成，SDK UDID 留空时复用 BUVID。设备 ID 格式不符时拒绝生成。
      * Resolves SDK identifiers from explicit configuration or the device-ID fallback.
      * Empty BUVID is derived from a 32-digit hexadecimal device ID; empty SDK UDID reuses BUVID.
      * @throws If BUVID must be generated but the device ID has an incompatible format
@@ -242,6 +251,7 @@ export class CnSessionClient {
     }
 
     /**
+     * 优先使用配置的 BD ID，否则在当前实例内生成一次并复用；重新登录不改变该值，也不写入持久化存储。
      * Uses the configured BD ID or generates one once per client instance.
      * The generated value survives re-login within this instance and is never persisted.
      */
@@ -252,6 +262,7 @@ export class CnSessionClient {
     }
 
     /**
+     * 将服务端 hash 与配置的密码拼接，使用 RSA PKCS#1 v1.5 加密并输出 Base64；公钥接受 PEM 或其 Base64 内容。
      * Encrypts the server hash followed by the configured password using RSA PKCS#1 v1.5.
      * @param cipher - Server hash and public key, accepting PEM or its Base64 contents
      * @returns Base64 ciphertext for the SDK password field
@@ -272,6 +283,7 @@ export class CnSessionClient {
     }
 
     /**
+     * 组装、签名并提交 SDK 表单。登录返回 -662 且携带新的 RSA 材料时最多重试三次；需要验证码时直接报错停止。
      * Builds, signs, and submits an SDK form request.
      * Login responses with code -662 and replacement RSA material permit at most three retries.
      * Verification-required responses stop immediately; no CAPTCHA submission is implemented.
@@ -348,6 +360,7 @@ export class CnSessionClient {
         }
     }
     /**
+     * 获取游戏版本信息，通过 SDK 帐号密码认证，再交换游戏 UID、Token 和初始 nonce。配置缺失、版本不符或登录失败时抛出异常。
      * Establishes a new game session using the configured account and password.
      * Fetches game version metadata, authenticates with the SDK, then exchanges its credentials
      * for a game UID, token, and initial response nonce. No previous session is reused here.
@@ -405,7 +418,7 @@ export class CnSessionClient {
                 cnField(i + 1, v),
             ),
         );
-        // Game login starts the nonce chain from its response; no initial request ID is sent.
+        // 游戏登录从响应建立 nonce 链，请求不发送初始 RID。 / Game login starts the nonce chain from its response; no initial request ID is sent.
         const response = await this.request(new URL("user/login", base).toString(), {
             method: "POST",
             headers: { ...headers, "X-DataVersion": dataVersion },
@@ -422,6 +435,7 @@ export class CnSessionClient {
         return { uid: String(uid), token, nonce, version, base, headers: { ...headers, "X-DataVersion": dataVersion, "X-MasterDataVersion": masterVersion } };
     }
     /**
+     * 将登录、数据下载和会话更新放在同一个串行队列内执行。没有匹配会话时重新登录；成功响应更新非空 Token/nonce，失败响应丢弃会话。
      * Serializes an authenticated data request with login and token/nonce updates.
      * Logs in when no matching session exists, then uses the shared downloader for the data request.
      * Successful non-empty response headers advance the session; failed responses discard it.
@@ -437,7 +451,7 @@ export class CnSessionClient {
         this.queue = new Promise<void>((resolve) => {
             release = resolve;
         });
-        // Hold the queue through login, download, and response processing to avoid reusing a nonce.
+        // 锁覆盖登录、下载及响应处理，避免并发复用同一个 nonce。 / Hold the queue through login, download, and response processing to avoid reusing a nonce.
         await previous;
         try {
             if (this.now() < this.retryAfter) throw new Error("CN login is cooling down after a failed request");
@@ -452,7 +466,7 @@ export class CnSessionClient {
             const { body } = response;
             if (response.status < 200 || response.status >= 300) {
                 this.invalidate();
-                // Ignore every error-body/header nonce, including legacy 405 recovery hints.
+                // 失败响应中的 nonce 不用于更新会话。 / Ignore every error-body/header nonce, including legacy 405 recovery hints.
                 return { status: response.status, length: body.length, decrypted: Buffer.alloc(0) };
             }
             const nonce = response.headers["x-requestid"];
