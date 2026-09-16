@@ -84,10 +84,10 @@ class GarupaService {
             }
         }
 
-        void this.initializeClientVersions().catch((err) => logger("garupaService", `client version init failed: ${String(err)}`));
+        void this.initializeClientVersions().catch((err) => logger("garupaService", `client version init failed: ${String(err)}`, "error"));
         void this.initializeClientVersions()
             .then(() => this.ensureServersAvailableOnStart())
-            .catch((err) => logger("garupaService", `startup status check error: ${String(err)}`));
+            .catch((err) => logger("garupaService", `startup status check error: ${String(err)}`, "error"));
     }
 
     /**
@@ -190,7 +190,7 @@ class GarupaService {
         const timeoutMs = options?.timeoutMs ?? 2000;
         let status = await this.assessServerStatus(server, timeoutMs);
         if (status.disabled) {
-            logger("garupaService", `skipping request for server=${server} due to repeated unavailability (${status.unavailabilityCount})`);
+            logger("garupaService", `skipping request for server=${server} due to repeated unavailability (${status.unavailabilityCount})`, "warn");
             return undefined;
         }
 
@@ -203,6 +203,7 @@ class GarupaService {
                 logger(
                     "garupaService",
                     `[HTTP 426 Bypass] Server claims available, but business API rejected. Force refreshing version for server=${server}...`,
+                    "warn",
                 );
                 await this.refreshClientVersion(server, "business_426_fallback");
             }
@@ -280,7 +281,7 @@ class GarupaService {
                     await this.waitUntilAvailableWithLogging(server, 2000);
                 }
             } catch (err) {
-                logger("garupaService", `startup status check error server=${server}: ${String(err)}`);
+                logger("garupaService", `startup status check error server=${server}: ${String(err)}`, "error");
             }
         }
     }
@@ -384,8 +385,8 @@ class GarupaService {
             await this.refreshClientVersion(server, "recovery");
             await waitUntilGarupaAvailable(server, this.getClientVersion(server), getGarupaStatusPollIntervalMs(), timeoutMs);
             this.markServerAvailable(server);
-            logger("garupaService", `server=${server} is now available`);
-            logger("garupaService", `server=${server} recovered and will resume requests`);
+            logger("garupaService", `server=${server} is now available`, "success");
+            logger("garupaService", `server=${server} recovered and will resume requests`, "success");
         })();
 
         this.recoveryInFlight.set(server, task);
@@ -438,7 +439,7 @@ class GarupaService {
                 }
             }
         } catch (err) {
-            logger("garupaService", `failed to load cached versions: ${String(err)}`);
+            logger("garupaService", `failed to load cached versions: ${String(err)}`, "warn");
         }
 
         for (const server of this.getServerIds()) {
@@ -448,7 +449,7 @@ class GarupaService {
             const fallback = getGarupaFallbackClientVersion(server);
             if (fallback) {
                 this.serverClientVersions.set(server, fallback);
-                logger("garupaService", `server=${server} client version seeded from env fallback: ${fallback}`);
+                logger("garupaService", `server=${server} client version seeded from env fallback: ${fallback}`, "warn");
             }
         }
     }
@@ -497,7 +498,7 @@ class GarupaService {
                 });
                 const version = data?.results?.[0]?.version;
                 if (typeof version !== "string" || version.length === 0) {
-                    logger("garupaService", `server=${server} package lookup missing version (${reason})`);
+                    logger("garupaService", `server=${server} package lookup missing version (${reason})`, "warn");
                     return;
                 }
 
@@ -514,7 +515,7 @@ class GarupaService {
                 await garupaMetaCollection.updateOne({ server }, { $set: { server, clientVersion: version, updatedAt: Date.now() } }, { upsert: true });
             } catch (err: unknown) {
                 const e = err as { message?: string };
-                logger("garupaService", `checkGameVersion failed server=${server} (${reason}): ${e.message ?? String(err)}`);
+                logger("garupaService", `checkGameVersion failed server=${server} (${reason}): ${e.message ?? String(err)}`, "error");
             }
         })();
 
@@ -547,7 +548,7 @@ class GarupaService {
     private markServerAvailable(server: number): void {
         this.unavailabilityCounts.set(server, 0);
         if (this.disabledServers.delete(server)) {
-            logger("garupaService", `server=${server} became available and was re-enabled`);
+            logger("garupaService", `server=${server} became available and was re-enabled`, "success");
         }
     }
 }

@@ -180,7 +180,7 @@ class MonthlyRankingService {
             logger("monthlyRanking", "Renamed collection monthly_ranking_players → ranking_players successfully.");
         } catch (err) {
             const message = (err as { message?: string } | undefined)?.message ?? String(err);
-            logger("monthlyRanking", `Failed to rename collection: ${message}`);
+            logger("monthlyRanking", `Failed to rename collection: ${message}`, "error");
             throw err;
         }
 
@@ -222,7 +222,7 @@ class MonthlyRankingService {
                         try {
                             await this.refreshServer(server, missingId);
                         } catch (err) {
-                            logger("monthlyRanking", `Bootstrap error: Failed to fetch server=${server} monthly=${missingId}: ${err}`);
+                            logger("monthlyRanking", `Bootstrap error: Failed to fetch server=${server} monthly=${missingId}: ${err}`, "error");
                         }
                         // Throttle: 3s gap between each monthlyId to avoid CN rate limiting
                         await new Promise((resolve) => setTimeout(resolve, 3_000));
@@ -242,7 +242,7 @@ class MonthlyRankingService {
             } catch (err: unknown) {
                 const message = (err as { message?: string })?.message ?? String(err);
                 if (message.includes("Topology is closed") || message.includes("ECONNREFUSED") || message.includes("closed")) {
-                    logger("monthlyRanking", `${label} failed (${message}), waiting for DB recovery...`);
+                    logger("monthlyRanking", `${label} failed (${message}), waiting for DB recovery...`, "warn");
                     await database.ready();
                     continue;
                 }

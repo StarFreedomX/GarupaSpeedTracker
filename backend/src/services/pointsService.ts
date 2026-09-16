@@ -38,7 +38,7 @@ export const getPointTrack = async (params: PointsQueryParams): Promise<PointsTr
             );
         }
     } catch (error) {
-        logger("eventRanking", `local point track unavailable, falling back to Bestdori: ${String(error)}`);
+        logger("eventRanking", `local point track unavailable, falling back to Bestdori: ${String(error)}`, "warn");
     }
 
     const payload = await fetchBestdoriTopPoints(params, {

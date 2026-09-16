@@ -145,7 +145,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
             this.scheduleDiskCleanup();
         } catch (error: unknown) {
             const nodeError = error as { message?: string };
-            logger(this.logScope, `disk write failed ${key}: ${nodeError.message ?? "unknown error"}`);
+            logger(this.logScope, `disk write failed ${key}: ${nodeError.message ?? "unknown error"}`, "warn");
         }
 
         return {
@@ -264,7 +264,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger(this.logScope, `failed to remove cache file ${filePath}: ${nodeError.message ?? "unknown error"}`);
+                logger(this.logScope, `failed to remove cache file ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
             }
         }
     }
@@ -278,7 +278,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger(this.logScope, `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`);
+                logger(this.logScope, `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
             }
             return undefined;
         }
@@ -287,14 +287,14 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         try {
             parsed = JSON.parse(raw);
         } catch {
-            logger(this.logScope, `invalid disk cache json ${filePath}, deleting`);
+            logger(this.logScope, `invalid disk cache json ${filePath}, deleting`, "warn");
             await this.unlinkIfExists(filePath);
             return undefined;
         }
 
         const record = parsed as Partial<DiskCacheFile<TPayload>>;
         if (!record || typeof record !== "object" || !record.payload || !this.isPayloadShape(record.payload)) {
-            logger(this.logScope, `invalid disk cache shape ${filePath}, deleting`);
+            logger(this.logScope, `invalid disk cache shape ${filePath}, deleting`, "warn");
             await this.unlinkIfExists(filePath);
             return undefined;
         }
@@ -315,7 +315,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         }
 
         if (record.key && record.key !== key) {
-            logger(this.logScope, `disk key mismatch for ${filePath}, expected ${key}, got ${record.key}`);
+            logger(this.logScope, `disk key mismatch for ${filePath}, expected ${key}, got ${record.key}`, "warn");
         }
 
         return {
@@ -383,7 +383,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger(this.logScope, `disk cleanup scan failed: ${nodeError.message ?? "unknown error"}`);
+                logger(this.logScope, `disk cleanup scan failed: ${nodeError.message ?? "unknown error"}`, "warn");
             }
             return;
         }
@@ -416,7 +416,7 @@ export abstract class AbstractCacheStorage<TParams, TPayload> {
         this.diskCleanupPromise = this.cleanupDiskCache()
             .catch((error: unknown) => {
                 const nodeError = error as { message?: string };
-                logger(this.logScope, `disk cleanup failed: ${nodeError.message ?? "unknown error"}`);
+                logger(this.logScope, `disk cleanup failed: ${nodeError.message ?? "unknown error"}`, "warn");
             })
             .finally(() => {
                 this.diskCleanupPromise = undefined;

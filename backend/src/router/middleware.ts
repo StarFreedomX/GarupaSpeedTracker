@@ -9,7 +9,7 @@ export const errorHandlerMiddleware = async (ctx: Context, next: Next): Promise<
         const err = error as { status?: number; message?: string; errors?: unknown; code?: string };
 
         if (err.status === 422) {
-            logger("validation", `422 ${ctx.method} ${ctx.url} details=${JSON.stringify(err.errors ?? [])}`);
+            logger("validation", `422 ${ctx.method} ${ctx.url} details=${JSON.stringify(err.errors ?? [])}`, "warn");
             ctx.status = 422;
             ctx.body = {
                 status: 422,
@@ -20,7 +20,7 @@ export const errorHandlerMiddleware = async (ctx: Context, next: Next): Promise<
         }
 
         const status = err.status ?? 500;
-        logger("error", `${status} ${ctx.method} ${ctx.url} ${err.message ?? "Unknown error"}`);
+        logger("error", `${status} ${ctx.method} ${ctx.url} ${err.message ?? "Unknown error"}`, status >= 500 ? "error" : "warn");
 
         ctx.status = status;
         ctx.body = {

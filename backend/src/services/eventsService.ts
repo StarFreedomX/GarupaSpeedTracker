@@ -21,7 +21,7 @@ export const getEventList = async (): Promise<EventListResponse> => {
         ["database", local],
     ] as const) {
         if (result.status === "rejected") {
-            logger("eventInfo", `${source} event list unavailable: ${String(result.reason)}`);
+            logger("eventInfo", `${source} event list unavailable: ${String(result.reason)}`, "warn");
         }
     }
     const events = bestdori.status === "fulfilled" ? parser.buildEventList(bestdori.value) : {};

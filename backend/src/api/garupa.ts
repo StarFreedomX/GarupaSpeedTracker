@@ -360,7 +360,7 @@ export const fetchMonthlyRanking = async (server: number, monthlyId: number, cli
 
         const validation = validateMonthlyRanking(report, server);
         if (!validation.valid) {
-            logger("garupaApi", `monthlyId=${monthlyId} validation failed: ${validation.reason}, retrying once`);
+            logger("garupaApi", `monthlyId=${monthlyId} validation failed: ${validation.reason}, retrying once`, "warn");
             const { decrypted: dec2, status: st2 } = await fetchMonthlyRankingBuffer(server, monthlyId, clientVersion);
             if (st2 < 200 || st2 >= 300) {
                 throw new Error(`Monthly ranking HTTP ${st2}`);
@@ -380,7 +380,7 @@ export const fetchMonthlyRanking = async (server: number, monthlyId: number, cli
         const ts = Date.now();
         const binFile = path.join(diagDir, `monthly-parse-err-${server}-${monthlyId}-${ts}.bin`);
         await fs.writeFile(binFile, decrypted);
-        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`);
+        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`, "error");
         throw parseErr;
     }
 };
@@ -561,7 +561,7 @@ export const fetchEventRanking = async (
 
         const validation = validateEventRanking(report, server);
         if (!validation.valid) {
-            logger("garupaApi", `eventId=${eventId} validation failed: ${validation.reason}, retrying once`);
+            logger("garupaApi", `eventId=${eventId} validation failed: ${validation.reason}, retrying once`, "warn");
             const { decrypted: dec2, status: st2 } = await fetchEventRankingBuffer(server, eventId, eventType, clientVersion, mid);
             if (st2 < 200 || st2 >= 300) {
                 throw new Error(`Event ranking HTTP ${st2}`);
@@ -582,7 +582,7 @@ export const fetchEventRanking = async (
         const ts = Date.now();
         const binFile = path.join(diagDir, `event-parse-err-${server}-${eventId}-${ts}.bin`);
         await fs.writeFile(binFile, decrypted);
-        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`);
+        logger("garupaApi", `parse error buffer saved: ${binFile} (${decrypted.length}B) error=${(parseErr as Error)?.message}`, "error");
         throw parseErr;
     }
 };

@@ -145,7 +145,7 @@ class Downloader {
             return response.data;
         } catch (error: unknown) {
             const axiosError = error as { code?: string; message?: string };
-            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
+            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`, "error");
 
             const upstreamError = new Error("downloader upstream request failed") as Error & { status?: number };
             upstreamError.status = axiosError.code === "ECONNABORTED" ? 504 : 502;
@@ -190,7 +190,7 @@ class Downloader {
             };
         } catch (error: unknown) {
             const axiosError = error as { code?: string; message?: string };
-            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`);
+            logger("downloader", `upstream request failed: ${axiosError.message ?? "unknown error"}`, "error");
 
             const upstreamError = new Error("downloader upstream request failed") as Error & { status?: number };
             upstreamError.status = axiosError.code === "ECONNABORTED" ? 504 : 502;
@@ -251,7 +251,7 @@ class Downloader {
     private refreshInBackground<T>(key: string, options?: DownloadCacheOptions<T>): void {
         this.fetchAndStore<T>(key, options).catch((error: unknown) => {
             const err = error as { message?: string };
-            logger("cache", `background refresh failed ${key}: ${err.message ?? "unknown error"}`);
+            logger("cache", `background refresh failed ${key}: ${err.message ?? "unknown error"}`, "error");
         });
     }
 
@@ -271,7 +271,7 @@ class Downloader {
                     this.scheduleDiskCleanup();
                 } catch (error: unknown) {
                     const nodeError = error as { message?: string };
-                    logger("cache", `disk write failed ${key}: ${nodeError.message ?? "unknown error"}`);
+                    logger("cache", `disk write failed ${key}: ${nodeError.message ?? "unknown error"}`, "warn");
                 }
 
                 return entry;
@@ -416,7 +416,7 @@ class Downloader {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger("cache", `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`);
+                logger("cache", `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
             }
             return undefined;
         }
@@ -461,7 +461,7 @@ class Downloader {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger("cache", `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`);
+                logger("cache", `disk read failed ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
             }
             return undefined;
         }
@@ -537,7 +537,7 @@ class Downloader {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger("cache", `failed to remove cache file ${filePath}: ${nodeError.message ?? "unknown error"}`);
+                logger("cache", `failed to remove cache file ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
             }
         }
     }
@@ -592,7 +592,7 @@ class Downloader {
         } catch (error: unknown) {
             const nodeError = error as NodeJS.ErrnoException;
             if (nodeError.code !== "ENOENT") {
-                logger("cache", `disk cleanup scan failed: ${nodeError.message ?? "unknown error"}`);
+                logger("cache", `disk cleanup scan failed: ${nodeError.message ?? "unknown error"}`, "warn");
             }
             return;
         }
@@ -626,7 +626,7 @@ class Downloader {
         this.diskCleanupPromise = this.cleanupDiskCache()
             .catch((error: unknown) => {
                 const nodeError = error as { message?: string };
-                logger("cache", `disk cleanup failed: ${nodeError.message ?? "unknown error"}`);
+                logger("cache", `disk cleanup failed: ${nodeError.message ?? "unknown error"}`, "warn");
             })
             .finally(() => {
                 this.diskCleanupPromise = undefined;

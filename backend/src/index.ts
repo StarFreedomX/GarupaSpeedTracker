@@ -24,7 +24,7 @@ const app = createApp();
     // 2. Run startup migrations in background (may block if DB unavailable; non-fatal)
     migrateTimestampToTime().catch((error: unknown) => {
         const nodeError = error as { message?: string };
-        logger("migration", `timestamp-to-time failed: ${nodeError.message ?? "unknown error"}`);
+        logger("migration", `timestamp-to-time failed: ${nodeError.message ?? "unknown error"}`, "error");
     });
 
     // 3. Bootstrap historical data in parallel (may block if DB unavailable; non-fatal)
@@ -37,6 +37,6 @@ const app = createApp();
     monthlyRankingService.start();
 })().catch((error: unknown) => {
     const nodeError = error as { message?: string };
-    logger("mainAPI", `startup failed: ${nodeError.message ?? "unknown error"}`);
+    logger("mainAPI", `startup failed: ${nodeError.message ?? "unknown error"}`, "error");
     process.exit(1);
 });

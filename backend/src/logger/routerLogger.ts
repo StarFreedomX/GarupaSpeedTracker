@@ -1,4 +1,5 @@
 import type { Context } from "koa";
+import { logger } from "@/logger";
 
 /**
  * Koa middleware that logs every incoming HTTP request and its response.
@@ -9,13 +10,12 @@ import type { Context } from "koa";
  */
 export const loggerMiddleware = async (ctx: Context, next: () => Promise<void>) => {
     const start = Date.now();
-    const timeString = new Date().toLocaleTimeString("en-GB", { hour12: false });
 
-    console.log(`[${timeString}] [Request] ${ctx.ip} ${ctx.method} ${ctx.url}`);
+    logger("Request", `${ctx.ip} ${ctx.method} ${ctx.url}`);
 
     await next();
 
     const ms = Date.now() - start;
     const size = ctx.body ? (Buffer.byteLength(JSON.stringify(ctx.body)) / 1024).toFixed(2) : 0;
-    console.log(`[${timeString}] [Response] ${ctx.status} ${ms}ms ${size}KB`);
+    logger("Response", `${ctx.status} ${ms}ms ${size}KB`, ctx.status >= 500 ? "error" : ctx.status >= 400 ? "warn" : "success");
 };

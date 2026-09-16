@@ -104,7 +104,7 @@ const readJson = async <T>(filePath: string): Promise<T | undefined> => {
         return (await fs.readJson(filePath)) as T;
     } catch (error: unknown) {
         const nodeError = error as NodeJS.ErrnoException;
-        logger("bestdori", `failed to read ${filePath}: ${nodeError.message ?? "unknown error"}`);
+        logger("bestdori", `failed to read ${filePath}: ${nodeError.message ?? "unknown error"}`, "warn");
         return undefined;
     }
 };
@@ -226,7 +226,7 @@ export class BestdoriSongMetadataService {
             };
         } else {
             if (dataset) {
-                logger("bestdori", `detected corrupted metadata file at ${this.metadataPath}, re-generating...`);
+                logger("bestdori", `detected corrupted metadata file at ${this.metadataPath}, re-generating...`, "warn");
             }
             this.state = undefined;
         }
@@ -412,7 +412,7 @@ export class BestdoriSongMetadataService {
                 }
             } catch (error: unknown) {
                 const nodeError = error as { message?: string };
-                logger("bestdori", `chart fetch failed song=${songId} difficulty=${definition.name}: ${nodeError.message ?? "unknown error"}`);
+                logger("bestdori", `chart fetch failed song=${songId} difficulty=${definition.name}: ${nodeError.message ?? "unknown error"}`, "error");
                 continue;
             }
 

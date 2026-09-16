@@ -79,7 +79,7 @@ export class SongsService {
             try {
                 bestdori = await this.fetchSupplement();
             } catch (error) {
-                logger("songs", `Bestdori supplement unavailable: ${String(error)}`);
+                logger("songs", `Bestdori supplement unavailable: ${String(error)}`, "warn");
                 bestdori = this.snapshot?.songs ?? {};
             }
             const songs = supplementJpSongs(jp, bestdori);
@@ -91,7 +91,7 @@ export class SongsService {
             return songs;
         } catch (error) {
             if (!this.snapshot) throw error;
-            logger("songs", `JP refresh failed; retaining last JP snapshot: ${String(error)}`);
+            logger("songs", `JP refresh failed; retaining last JP snapshot: ${String(error)}`, "warn");
             return this.snapshot.songs;
         }
     }

@@ -119,14 +119,14 @@ class MongoDatabase implements Database {
         this.client.on("serverHeartbeatSucceeded", () => {
             if (!this.connected) {
                 this.connected = true;
-                logger("database", "mongodb connected.");
+                logger("database", "mongodb connected.", "success");
             }
         });
 
         this.client.on("serverHeartbeatFailed", () => {
             if (this.connected) {
                 this.connected = false;
-                logger("database", "mongodb connection lost.");
+                logger("database", "mongodb connection lost.", "warn");
                 // 连接断开后自动启动后台重试，防止 topology 进入 closed 后永久失效
                 this.startRecovery();
             }
@@ -166,7 +166,7 @@ class MongoDatabase implements Database {
         while (true) {
             try {
                 await this.connect();
-                logger("database", "mongodb ready for operations.");
+                logger("database", "mongodb ready for operations.", "success");
                 return;
             } catch (err: unknown) {
                 const elapsed = Date.now() - startTime;
@@ -178,10 +178,14 @@ class MongoDatabase implements Database {
 
                 // Topology closed — recreate the client. For ordinary connection failures (e.g. ECONNREFUSED) a simple retry is sufficient.
                 if (message.includes("Topology is closed")) {
-                    logger("database", `mongodb topology closed, recreating client. retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
+                    logger(
+                        "database",
+                        `mongodb topology closed, recreating client. retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`,
+                        "warn",
+                    );
                     this.initClient();
                 } else {
-                    logger("database", `mongodb not available (${message}), retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`);
+                    logger("database", `mongodb not available (${message}), retrying in ${interval}ms... (${Math.round(elapsed / 1000)}s elapsed)`, "warn");
                 }
 
                 await new Promise((resolve) => setTimeout(resolve, interval));
@@ -196,10 +200,10 @@ class MongoDatabase implements Database {
         }
         this.recoveryPromise = this.waitForReady()
             .then(() => {
-                logger("database", "mongodb recovery succeeded.");
+                logger("database", "mongodb recovery succeeded.", "success");
             })
             .catch((err: unknown) => {
-                logger("database", `mongodb recovery failed: ${(err as Error)?.message ?? String(err)}`);
+                logger("database", `mongodb recovery failed: ${(err as Error)?.message ?? String(err)}`, "error");
             })
             .finally(() => {
                 this.recoveryPromise = null;
