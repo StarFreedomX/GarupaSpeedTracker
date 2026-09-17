@@ -508,14 +508,11 @@ export const playerDeckService = {
             // Event bonuses
             if (event) {
                 const eventBonus = calcCardEventBonus(baseStat, chId, attr, pc.situationId, rarity, pc.limitBreakRank, event);
-                const { totalPct, hasCharAttr } = calcCardBonusPct(chId, attr, pc.situationId, rarity, pc.limitBreakRank, event);
-                const pbPct =
-                    hasCharAttr && event.eventCharacterParameterBonus
-                        ? (event.eventCharacterParameterBonus.performance ?? 0) +
-                          (event.eventCharacterParameterBonus.technique ?? 0) +
-                          (event.eventCharacterParameterBonus.visual ?? 0)
-                        : 0;
-                totalBonusPct += totalPct + pbPct;
+                const { totalPct } = calcCardBonusPct(chId, attr, pc.situationId, rarity, pc.limitBreakRank, event);
+                // eventCharacterParameterBonus affects event power only. It is
+                // not an event-point multiplier and must not be included in
+                // eventBonusPct, which is passed to PT calculations.
+                totalBonusPct += totalPct;
 
                 if (event.eventType === "versus" || event.eventType === "festival" || event.eventType === "medley") {
                     eventPower += cardNormal + statTotal(eventBonus);
