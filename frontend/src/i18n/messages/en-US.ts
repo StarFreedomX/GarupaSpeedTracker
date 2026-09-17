@@ -1,6 +1,32 @@
 import type { I18nMessages } from "@/i18n/messages/schema";
 
 const enUS = {
+    serviceStatus: {
+        stale: "Observation expired",
+        noRuns: "No runs yet",
+        disabled: "Not enabled",
+        monthlyRankingTask: "Monthly ranking collection",
+        eventRankingTask: "Event ranking collection",
+        availability: "Game server connectivity",
+        game: "Game services",
+        title: "Service status",
+        loading: "Fetching service status",
+        unavailable: "Latest status unavailable",
+        refresh: "Refresh now",
+        refreshing: "Refreshing…",
+        lastUpdated: "Last updated",
+        core: "Database connection",
+        operational: "Operational",
+        degraded: "Service issue",
+        unknown: "Unknown",
+        never: "No observation yet",
+        database: "Database",
+        garupa0: "Japan",
+        garupa1: "Global",
+        garupa2: "Taiwan",
+        garupa3: "China",
+        garupa4: "Korea",
+    },
     hourly: {
         title: "Hourly speed",
         empty: "No hourly records available.",

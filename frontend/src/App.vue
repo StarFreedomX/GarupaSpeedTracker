@@ -24,6 +24,7 @@ const menuItems = computed(() => [
     { key: "auto", label: t("menu.auto") },
     { key: "bonus", label: t("menu.bonus") },
     { key: "settings", label: t("menu.settings") },
+    { key: "serviceStatus", label: t("serviceStatus.title") },
     { key: "about", label: t("menu.about") },
 ]);
 

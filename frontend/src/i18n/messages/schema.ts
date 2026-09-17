@@ -1,4 +1,30 @@
 export interface I18nMessages {
+    serviceStatus: {
+        stale: string;
+        noRuns: string;
+        disabled: string;
+        monthlyRankingTask: string;
+        eventRankingTask: string;
+        availability: string;
+        game: string;
+        title: string;
+        loading: string;
+        unavailable: string;
+        refresh: string;
+        refreshing: string;
+        lastUpdated: string;
+        core: string;
+        operational: string;
+        degraded: string;
+        unknown: string;
+        never: string;
+        database: string;
+        garupa0: string;
+        garupa1: string;
+        garupa2: string;
+        garupa3: string;
+        garupa4: string;
+    };
     hourly: {
         title: string;
         empty: string;

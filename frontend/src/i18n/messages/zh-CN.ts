@@ -1,6 +1,32 @@
 import type { I18nMessages } from "@/i18n/messages/schema";
 
 const zhCN = {
+    serviceStatus: {
+        stale: "记录已过期",
+        noRuns: "尚无执行记录",
+        disabled: "未启用",
+        monthlyRankingTask: "月度排行榜采集",
+        eventRankingTask: "活动排行榜采集",
+        availability: "游戏服务器连通性",
+        game: "游戏服务",
+        title: "服务状态",
+        loading: "正在获取服务状态",
+        unavailable: "无法获取最新状态",
+        refresh: "立即刷新",
+        refreshing: "刷新中…",
+        lastUpdated: "最近更新",
+        core: "数据库连接",
+        operational: "运行正常",
+        degraded: "服务异常",
+        unknown: "状态未知",
+        never: "尚无检测记录",
+        database: "数据库",
+        garupa0: "日服",
+        garupa1: "国际服",
+        garupa2: "台服",
+        garupa3: "国服",
+        garupa4: "韩服",
+    },
     hourly: {
         title: "时速表",
         empty: "暂无可用的整点记录。",

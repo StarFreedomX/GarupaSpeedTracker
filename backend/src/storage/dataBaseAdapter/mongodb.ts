@@ -216,6 +216,10 @@ class MongoDatabase implements Database {
      * Services should `await database.ready()` before DB-dependent operations to avoid
      * errors due to an unavailable database at startup.
      */
+    isConnected(): boolean {
+        return this.connected;
+    }
+
     async ready(): Promise<void> {
         while (!this.connected) {
             if (!this.recoveryPromise) {

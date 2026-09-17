@@ -1,3 +1,4 @@
+import { statusService } from "@/services/statusService";
 import { compareVersions } from "compare-versions";
 import {
     checkGarupaGameStatus,
@@ -184,18 +185,20 @@ class GarupaService {
      * @param options.timeoutMs - Timeout for the availability health check (default 2000ms).
      * @returns The result of {@code action}, or {@code undefined} if the server is disabled.
      */
-    async runWithAvailability<T>(server: number, action: () => Promise<T>, options?: { timeoutMs?: number }): Promise<T | undefined> {
+    async runWithAvailability<T>(server: number, action: () => Promise<T>, options?: { timeoutMs?: number; statusTask?: string }): Promise<T | undefined> {
         this.start();
         await this.initializeClientVersions();
         const timeoutMs = options?.timeoutMs ?? 2000;
         let status = await this.assessServerStatus(server, timeoutMs);
         if (status.disabled) {
+            if (options?.statusTask) statusService.record(`${options.statusTask}:${server}`, "degraded", "game");
             logger("garupaService", `skipping request for server=${server} due to repeated unavailability (${status.unavailabilityCount})`, "warn");
             return undefined;
         }
 
+        const execute = () => options?.statusTask ? statusService.observeTask(options.statusTask, server, action) : action();
         try {
-            return await action();
+            return await execute();
         } catch (error) {
             const errorMsg = String(error);
 
@@ -210,7 +213,7 @@ class GarupaService {
             status = await this.assessServerStatus(server, timeoutMs);
             if (!status.available || status.thresholdReached || this.disabledServers.has(server)) {
                 await this.waitUntilAvailableWithLogging(server, timeoutMs);
-                return await action();
+                return await execute();
             }
             throw error;
         }
@@ -245,6 +248,7 @@ class GarupaService {
             // ignore and treat as unavailable
         }
 
+        statusService.record(`availability:${server}`, "degraded", "game");
         const prev = this.getUnavailabilityCount(server);
         const next = prev + 1;
         this.unavailabilityCounts.set(server, next);
@@ -546,6 +550,7 @@ class GarupaService {
      * @param server - The server ID to mark as available.
      */
     private markServerAvailable(server: number): void {
+        statusService.record(`availability:${server}`, "operational", "game");
         this.unavailabilityCounts.set(server, 0);
         if (this.disabledServers.delete(server)) {
             logger("garupaService", `server=${server} became available and was re-enabled`, "success");

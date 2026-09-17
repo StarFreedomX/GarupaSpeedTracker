@@ -298,7 +298,7 @@ class MonthlyRankingService {
                 logger("monthlyRanking", `stored monthly=${monthlyId} server=${server}`);
                 return;
             },
-            { timeoutMs: 2000 },
+            { timeoutMs: 2000, statusTask: "monthlyRankingTask" },
         );
     }
 
@@ -345,7 +345,7 @@ class MonthlyRankingService {
 
                 logger("monthlyRanking", `post-end stored monthly=${monthlyId} server=${server}`);
             },
-            { timeoutMs: 2000 },
+            { timeoutMs: 2000, statusTask: "monthlyRankingTask" },
         );
     }
 

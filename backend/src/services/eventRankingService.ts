@@ -291,7 +291,7 @@ class EventRankingService {
                 const eventType = await eventInfoService.getEventType(eventId);
                 if (!eventType) {
                     logger("eventRanking", `eventId=${eventId} has no eventType, skipping`, "warn");
-                    return;
+                    return false;
                 }
 
                 // 1. Fetch event point ranking (without mid)
@@ -327,7 +327,7 @@ class EventRankingService {
 
                 logger("eventRanking", `stored event=${eventId} server=${server} type=${eventType}`);
             },
-            { timeoutMs: 2000 },
+            { timeoutMs: 2000, statusTask: "eventRankingTask" },
         );
     }
 
@@ -371,7 +371,7 @@ class EventRankingService {
                 const eventType = await eventInfoService.getEventType(eventId);
                 if (!eventType) {
                     logger("eventRanking", `post-end: eventId=${eventId} has no eventType, skipping`, "warn");
-                    return;
+                    return false;
                 }
 
                 const raw = await fetchEventRanking(server, eventId, eventType, clientVersion);
@@ -403,7 +403,7 @@ class EventRankingService {
 
                 logger("eventRanking", `post-end stored event=${eventId} server=${server} type=${eventType}`);
             },
-            { timeoutMs: 2000 },
+            { timeoutMs: 2000, statusTask: "eventRankingTask" },
         );
     }
 

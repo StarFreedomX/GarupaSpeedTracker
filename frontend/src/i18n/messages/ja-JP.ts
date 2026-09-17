@@ -1,6 +1,32 @@
 import type { I18nMessages } from "@/i18n/messages/schema";
 
 const jaJP = {
+    serviceStatus: {
+        stale: "記録の期限切れ",
+        noRuns: "実行記録なし",
+        disabled: "無効",
+        monthlyRankingTask: "月間ランキング収集",
+        eventRankingTask: "イベントランキング収集",
+        availability: "ゲームサーバー疎通",
+        game: "ゲームサービス",
+        title: "サービス稼働状況",
+        loading: "稼働状況を取得中",
+        unavailable: "最新の状況を取得できません",
+        refresh: "今すぐ更新",
+        refreshing: "更新中…",
+        lastUpdated: "最終更新",
+        core: "データベース接続",
+        operational: "正常稼働",
+        degraded: "障害あり",
+        unknown: "不明",
+        never: "観測記録なし",
+        database: "データベース",
+        garupa0: "日本",
+        garupa1: "グローバル",
+        garupa2: "台湾",
+        garupa3: "中国",
+        garupa4: "韓国",
+    },
     hourly: {
         title: "時速表",
         empty: "毎正時の記録はまだありません。",
