@@ -1,8 +1,8 @@
 # --- 阶段 1: 构建 ---
 FROM node:22-alpine AS builder
 
-# 安装 pnpm
-RUN npm install -g pnpm
+# 与 package.json 的 packageManager 保持一致，避免自动切换版本时缺少 Alpine 原生二进制
+RUN npm install -g pnpm@10.28.2
 
 WORKDIR /app
 
