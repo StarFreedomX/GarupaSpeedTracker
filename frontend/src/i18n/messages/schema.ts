@@ -210,6 +210,8 @@ export interface I18nMessages {
         requestSecond: string;
         requestAutoRetryDelaySeconds: string;
         save: string;
+        unsavedChanges: string;
+        discardChanges: string;
     };
     about: {
         title: string;

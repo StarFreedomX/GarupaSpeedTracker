@@ -214,6 +214,8 @@ const jaJP = {
         requestSecond: "リクエスト秒",
         requestAutoRetryDelaySeconds: "自動リトライ遅延（秒）",
         save: "保存",
+        unsavedChanges: "未保存の変更があります",
+        discardChanges: "変更を破棄",
     },
     about: {
         title: "概要",

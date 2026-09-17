@@ -212,6 +212,8 @@ const zhCN = {
         requestSecond: "请求时刻（秒）",
         requestAutoRetryDelaySeconds: "自动重试延迟（秒）",
         save: "保存",
+        unsavedChanges: "有未保存的更改",
+        discardChanges: "放弃更改",
     },
     about: {
         title: "关于",

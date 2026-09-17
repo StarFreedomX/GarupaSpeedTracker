@@ -212,6 +212,8 @@ const enUS = {
         requestSecond: "Request Second",
         requestAutoRetryDelaySeconds: "Auto Retry Delay (s)",
         save: "Save",
+        unsavedChanges: "Unsaved changes",
+        discardChanges: "Discard changes",
     },
     about: {
         title: "About",

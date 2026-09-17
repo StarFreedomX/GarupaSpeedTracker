@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { clonePreferences, normalizeHue } from "@/composables/useUserPreferences";
 import {
     DEFAULT_AUTO_RETRY_DELAY_SECONDS,
@@ -133,6 +134,35 @@ const queryTime = computed({
 const hueValue = computed(() => normalizeHue(draft.theme.primaryHue));
 const hasChanges = computed(() => JSON.stringify(clonePreferences(draft)) !== JSON.stringify(clonePreferences(model.value)));
 const isFixedIntervalMode = computed(() => draft.query.requestMode === "fixed-interval");
+
+const discardChanges = () => syncDraft(model.value);
+
+const highlightActions = ref(false);
+let highlightTimer: ReturnType<typeof setTimeout> | undefined;
+
+const clearHighlight = () => {
+    clearTimeout(highlightTimer);
+    highlightActions.value = false;
+};
+
+onBeforeRouteLeave(() => {
+    if (!hasChanges.value) return true;
+
+    clearTimeout(highlightTimer);
+    highlightActions.value = true;
+    highlightTimer = setTimeout(clearHighlight, 1200);
+    return false;
+});
+
+watch(
+    hasChanges,
+    (dirty) => {
+        if (!dirty) clearHighlight();
+    },
+    { flush: "sync" },
+);
+
+onBeforeUnmount(clearHighlight);
 
 const save = () => {
     const next = clonePreferences(draft);
@@ -369,11 +399,25 @@ const onHueChange = (event: Event) => {
             </label>
         </section>
 
-        <div class="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border/80 bg-appbg/92 px-4 py-3 backdrop-blur-lg">
-            <div class="flex items-center justify-end gap-3">
+        <div
+            class="settings-actions sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border/80 bg-appbg/92 px-4 py-3 backdrop-blur-lg"
+            :class="{ 'settings-actions-highlight': highlightActions }"
+        >
+            <div class="flex flex-wrap items-center justify-end gap-3">
+                <span v-if="hasChanges" role="status" class="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    {{ t('settings.unsavedChanges') }}
+                </span>
                 <button
                     type="button"
-                    class="app-btn border border-border/80 bg-surface/90 px-4 py-2 text-sm text-text transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+                    class="app-btn border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors enabled:hover:border-rose-700 enabled:hover:bg-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    :disabled="!hasChanges"
+                    @click="discardChanges"
+                >
+                    {{ t('settings.discardChanges') }}
+                </button>
+                <button
+                    type="button"
+                    class="app-btn border border-green-600 bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors enabled:hover:border-green-700 enabled:hover:bg-green-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-500 disabled:cursor-not-allowed disabled:opacity-40"
                     :disabled="!hasChanges || !isApiBackendBaseUrlValid"
                     @click="save"
                 >
@@ -384,3 +428,18 @@ const onHueChange = (event: Event) => {
     </section>
 </template>
 
+<style scoped>
+.settings-actions .app-btn {
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.settings-actions-highlight .app-btn {
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 35%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-actions .app-btn {
+        transition: none;
+    }
+}
+</style>
