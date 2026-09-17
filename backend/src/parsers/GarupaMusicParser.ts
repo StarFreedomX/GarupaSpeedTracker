@@ -6,6 +6,9 @@ const difficultyKeys: Record<string, DifficultyKey> = { easy: "0", normal: "1", 
 const regionValue = (value?: number): (string | null)[] => [value === undefined ? null : String(value), null, null, null, null];
 const isLevel = (value: number | undefined): value is number => Number.isInteger(value) && Number(value) > 0;
 
+// Temporary compatibility fix: JP master currently exposes special song titles with internal prefixes.
+const normalizeMusicTitle = (title: string): string => title.replace(/^甅/, "[FULL]").replace(/^躄/, "[原曲]");
+
 /** Converts the JP masters into the existing public song format. */
 export function parseGarupaMusic(payload: Buffer): MusicDataResponse {
     const suite = new GarupaParser().decode<SuiteMusic>(payload, suiteMusicSchema);
@@ -44,7 +47,7 @@ export function parseGarupaMusic(payload: Buffer): MusicDataResponse {
             tag: (entry.tag ?? Tag.Normal) as Tag,
             bandId: entry.bandId,
             jacketImage: entry.jacketImage === undefined ? [] : [entry.jacketImage],
-            musicTitle: [entry.musicTitle, null, null, null, null],
+            musicTitle: [normalizeMusicTitle(entry.musicTitle), null, null, null, null],
             publishedAt: regionValue(entry.publishedAt),
             closedAt: regionValue(entry.closedAt),
             difficulty: difficulty as MusicItem["difficulty"],

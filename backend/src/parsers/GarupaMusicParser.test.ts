@@ -15,8 +15,8 @@ function field(id: number, value: number | string | Buffer): Buffer {
     const bytes = typeof value === "string" ? Buffer.from(value) : value;
     return Buffer.concat([varint(id * 8 + 2), varint(bytes.length), bytes]);
 }
-function fixture(scoreLevel?: number): Buffer {
-    const song = Buffer.concat([field(1, 782), field(2, "Game Changer"), field(7, "normal"), field(11, 1), field(16, 1774177200000), field(17, 4122068400000)]);
+function fixture(scoreLevel?: number, title = "Game Changer"): Buffer {
+    const song = Buffer.concat([field(1, 782), field(2, title), field(7, "normal"), field(11, 1), field(16, 1774177200000), field(17, 4122068400000)]);
     const diffs = ["easy", "normal", "hard", "expert", "special"].map((name, index) =>
         field(
             1,
@@ -46,6 +46,14 @@ test("reads scoreLevel field 13 independently from the displayed level", () => {
     expect(song.difficulty["1"]).toMatchObject({ playLevel: 16, scoreLevel: 16 });
     expect(song.difficulty["2"]).toMatchObject({ playLevel: 25, scoreLevel: 25 });
     expect(song.difficulty["4"]).toMatchObject({ playLevel: 30, scoreLevel: 30 });
+});
+
+test("normalizes the JP FULL title prefix", () => {
+    expect(parseGarupaMusic(fixture(undefined, "甅二重の虹(ダブル レインボウ)"))["782"].musicTitle[0]).toBe("[FULL]二重の虹(ダブル レインボウ)");
+});
+
+test("normalizes the JP original-song title prefix", () => {
+    expect(parseGarupaMusic(fixture(undefined, "躄final phase"))["782"].musicTitle[0]).toBe("[原曲]final phase");
 });
 
 test.each([undefined, 0])("uses playLevel for an unset protobuf scoreLevel (%s)", (value) => {
