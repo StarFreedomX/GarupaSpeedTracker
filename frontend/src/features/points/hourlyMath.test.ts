@@ -34,3 +34,14 @@ describe("hourly snapshots", () => {
         expect(toHourlySnapshots([])).toEqual([]);
     });
 });
+
+it("uses each hour's source ranking for ties, regardless of track order", () => {
+    const tracks = fixture();
+    tracks[3].uid = 8543205;
+    tracks[4].uid = 1214996;
+    tracks[3].points = tracks[3].points.map(p => ({ ...p, points: 650000, rank: p.time < base + 90 * 60000 ? 4 : 5 }));
+    tracks[4].points = tracks[4].points.map(p => ({ ...p, points: 650000, rank: p.time < base + 90 * 60000 ? 5 : 4 }));
+    const [latest, previous] = toHourlySnapshots(tracks.reverse());
+    expect(latest.rows.slice(3, 5).map(p => p.uid)).toEqual([1214996, 8543205]);
+    expect(previous.rows.slice(3, 5).map(p => p.uid)).toEqual([8543205, 1214996]);
+});

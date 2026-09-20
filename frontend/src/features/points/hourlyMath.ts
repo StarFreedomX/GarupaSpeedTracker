@@ -17,12 +17,18 @@ export interface HourlySnapshot {
  */
 export function toHourlySnapshots(tracks: PlayerTrack[], eventStart = 0, eventEnd = Number.POSITIVE_INFINITY): HourlySnapshot[] {
     const groups = new Map<number, Map<number, number>>();
+    const ranks = new Map<number, Map<number, number>>();
     for (const player of tracks) for (const point of player.points) {
         const time = toMs(point.time);
         if (time < eventStart || time > eventEnd || point.points < 0) continue;
         const group = groups.get(time) ?? new Map<number, number>();
         group.set(player.uid, point.points);
         groups.set(time, group);
+        if (point.rank !== undefined) {
+            const snapshotRanks = ranks.get(time) ?? new Map<number, number>();
+            snapshotRanks.set(player.uid, point.rank);
+            ranks.set(time, snapshotRanks);
+        }
     }
     const times = [...groups.keys()].filter(time => groups.get(time)?.size === 10).sort((a, b) => a - b);
     if (times.length < 2) return [];
@@ -41,7 +47,9 @@ export function toHourlySnapshots(tracks: PlayerTrack[], eventStart = 0, eventEn
         const old = groups.get(start);
         const current = groups.get(end);
         if (!old || !current) continue;
-        const ranking = [...current].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+        const snapshotRanks = ranks.get(end);
+        const ranking = [...current].sort((a, b) => b[1] - a[1]
+            || (snapshotRanks?.get(a[0]) ?? Number.MAX_SAFE_INTEGER) - (snapshotRanks?.get(b[0]) ?? Number.MAX_SAFE_INTEGER));
         const fallback = Math.min(...old.values());
         const rows: HourlyRow[] = ranking.map(([uid, points], index) => {
             const samples = times.slice(startIndex, endIndex + 1).map(time => ({ time, points: groups.get(time)?.get(uid) }));

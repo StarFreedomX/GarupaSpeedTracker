@@ -22,10 +22,10 @@ function getSortedTimesAsc(players: PlayerTrack[]): number[] {
  * 获取玩家轨迹中最后一个有效积分。
  *
  * @param points 按时间排列的积分点列表。
- * @returns 最后一个有效积分；没有则返回 `-1`。
+ * @returns 最后一个有效积分记录；没有则返回 `undefined`。
  */
-function lastRecordedPoints(points: PointsWithTs[]): number {
-    return points.findLast((p) => p.points !== -1)?.points ?? -1;
+function lastRecordedPoints(points: PointsWithTs[]): PointsWithTs | undefined {
+    return points.findLast((p) => p.points !== -1);
 }
 
 /**
@@ -41,9 +41,9 @@ function sortPlayersByRank(players: PlayerTrack[]): PlayerTrack[] {
             lastPoints: lastRecordedPoints(player.points),
         }))
         .sort((a, b) => {
-            const delta = b.lastPoints - a.lastPoints;
+            const delta = (b.lastPoints?.points ?? -1) - (a.lastPoints?.points ?? -1);
             if (delta !== 0) return delta;
-            return a.player.uid - b.player.uid;
+            return (a.lastPoints?.rank ?? Number.MAX_SAFE_INTEGER) - (b.lastPoints?.rank ?? Number.MAX_SAFE_INTEGER);
         })
         .map((item) => item.player);
 }
@@ -151,18 +151,18 @@ export function toTableModel(tracks: PlayerTrack[]): TableModel {
  * @returns 合并后的玩家轨迹列表。
  */
 export function mergeTracks(current: PlayerTrack[], incoming: PlayerTrack[]): PlayerTrack[] {
-    const merged = new Map<number, { info: PlayerTrack["info"]; points: Map<number, number> }>();
+    const merged = new Map<number, { info: PlayerTrack["info"]; points: Map<number, PointsWithTs> }>();
 
     const inject = (list: PlayerTrack[]) => {
         for (const player of list) {
             const previous = merged.get(player.uid) ?? {
                 info: player.info,
-                points: new Map<number, number>(),
+                points: new Map<number, PointsWithTs>(),
             };
 
             previous.info = player.info;
             for (const point of player.points) {
-                previous.points.set(point.time, point.points);
+                previous.points.set(point.time, { ...point });
             }
 
             merged.set(player.uid, previous);
@@ -175,8 +175,7 @@ export function mergeTracks(current: PlayerTrack[], incoming: PlayerTrack[]): Pl
     return Array.from(merged.entries()).map(([uid, payload]) => ({
         uid,
         info: payload.info,
-        points: Array.from(payload.points.entries())
-            .map(([time, points]) => ({ time, points }))
+        points: Array.from(payload.points.values())
             .sort((a, b) => toMs(a.time) - toMs(b.time)),
     }));
 }

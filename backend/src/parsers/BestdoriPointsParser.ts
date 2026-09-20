@@ -11,7 +11,7 @@ import { groupPointsByTime, toMs } from "@/utils";
  * - **Builds a time window** within the last N minutes, optionally incremental from a
  *   previous timestamp.
  * - **Constructs per-player point tracks** sorted by the last known point value (descending)
- *   then by UID.
+ *   then by the original snapshot order.
  */
 export class BestdoriPointsParser {
     /**
@@ -43,7 +43,7 @@ export class BestdoriPointsParser {
      * @param payload - Raw Bestdori top-points data
      * @param windowMinutes - Time window size in minutes
      * @param lastTimeStamp - Optional previous snapshot timestamp for incremental updates
-     * @returns Array of per-player point tracks sorted by latest point value (desc) then UID
+     * @returns Array of per-player point tracks sorted by latest point value (desc) then original snapshot order
      */
     public buildPointTrack(payload: BestdoriTopPointsRaw, windowMinutes: number, lastTimeStamp?: number): PointsTrackResponse {
         const validPoints = this.sanitizePoints(payload.points);
@@ -65,10 +65,13 @@ export class BestdoriPointsParser {
         const usersMap = new Map<number, BestdoriUserRaw>(payload.users.map((user) => [user.uid, user]));
 
         const uidSet = new Set<number>(filtered.map((point) => point.uid));
-        const pointsByUidTime = new Map<string, number>();
+        const pointsByUidTime = new Map<string, { points: number; rank: number }>();
+        const positionsByTime = new Map<number, number>();
 
         for (const row of filtered) {
-            pointsByUidTime.set(`${row.uid}-${row.time}`, row.value);
+            const rank = (positionsByTime.get(row.time) ?? 0) + 1;
+            positionsByTime.set(row.time, rank);
+            pointsByUidTime.set(`${row.uid}-${row.time}`, { points: row.value, rank });
         }
 
         const result: PlayerPointsData[] = [];
@@ -79,7 +82,7 @@ export class BestdoriPointsParser {
                 uid,
                 points: incrementalTimes.map((time) => ({
                     time,
-                    points: pointsByUidTime.get(`${uid}-${time}`) ?? -1,
+                    ...(pointsByUidTime.get(`${uid}-${time}`) ?? { points: -1 }),
                 })),
                 info: {
                     name: user?.name ?? `UID-${uid}`,
@@ -89,14 +92,12 @@ export class BestdoriPointsParser {
         }
 
         return result.sort((a, b) => {
-            const lastA = [...a.points].reverse().find((point) => point.points !== -1)?.points ?? -1;
-            const lastB = [...b.points].reverse().find((point) => point.points !== -1)?.points ?? -1;
+            const lastA = a.points.findLast((point) => point.points !== -1);
+            const lastB = b.points.findLast((point) => point.points !== -1);
 
-            if (lastA !== lastB) {
-                return lastB - lastA;
-            }
-
-            return a.uid - b.uid;
+            const delta = (lastB?.points ?? -1) - (lastA?.points ?? -1);
+            if (delta !== 0) return delta;
+            return (lastA?.rank ?? Number.MAX_SAFE_INTEGER) - (lastB?.rank ?? Number.MAX_SAFE_INTEGER);
         });
     }
 

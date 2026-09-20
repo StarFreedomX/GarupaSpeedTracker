@@ -22,6 +22,8 @@ export interface BestdoriTopPointsRaw {
 export interface PointsWithTs {
     time: number;
     points: number;
+    /** Original position in this timestamp’s ranking snapshot (1-based). */
+    rank?: number;
 }
 
 export interface PlayerPointsData {
