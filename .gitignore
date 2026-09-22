@@ -5,3 +5,4 @@ example/
 node_modules
 /.proxyai/
 /.playwright-mcp/
+.pnpm-store/

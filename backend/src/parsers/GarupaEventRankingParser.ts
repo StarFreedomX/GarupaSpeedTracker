@@ -118,7 +118,8 @@ const REPORT_BUILDERS: Record<string, ReportBuilder> = {
 /**
  * Parses Garupa event ranking protobuf responses for all 7 supported event types.
  *
- * **Supported event types:** medley, challenge, versus, live_try, story, mission_live, team_live_festival.
+ * **Supported event types:** medley, challenge, versus, live_try, story, mission_live, team_live_festival
+ * (also accepts the event metadata name `festival`).
  *
  * The parser selects the appropriate protobuf schema and report builder based on the
  * `eventType` string. Each event type has a dedicated schema (protobuf message descriptor)
@@ -131,18 +132,20 @@ export class GarupaEventRankingParser {
     /**
      * Parses a decrypted event ranking response buffer into a unified ranking report.
      * @param payload - Decrypted protobuf response from the Garupa API
-     * @param eventType - Protobuf event type string (one of the 7 supported types)
+     * @param eventType - Protobuf event type string or the event metadata alias `festival`
      * @returns Parsed and normalized event ranking data
      * @throws If the event type is not found in {@link SCHEMA_MAP} or the report builder
      */
     public parse(payload: Buffer, eventType: string): EventRankingBandoriRaw {
-        const schemaEntry = SCHEMA_MAP[eventType];
+        // Event metadata uses `festival`; the protobuf response is named TeamLiveFestival.
+        const schemaType = eventType === "festival" ? "team_live_festival" : eventType;
+        const schemaEntry = SCHEMA_MAP[schemaType];
         if (!schemaEntry) {
             throw new Error(`Unsupported event type: "${eventType}". Supported: ${SUPPORTED_TYPES.join(", ")}`);
         }
 
         const decoded = garupaParser.decode(payload, schemaEntry.schema);
-        const builder = REPORT_BUILDERS[eventType];
+        const builder = REPORT_BUILDERS[schemaType];
         if (!builder) {
             throw new Error(`No report builder for event type: "${eventType}"`);
         }
