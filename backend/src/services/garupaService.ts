@@ -201,18 +201,22 @@ class GarupaService {
             return await execute();
         } catch (error) {
             const errorMsg = String(error);
-
-            if (errorMsg.includes("426") || errorMsg.toLowerCase().includes("update_required")) {
+            const versionErrorCode = /\b(426|511)\b/.exec(errorMsg)?.[1] ?? (errorMsg.toLowerCase().includes("update_required") ? "426" : undefined);
+            const previousVersion = this.getClientVersion(server);
+            if (versionErrorCode) {
                 logger(
                     "garupaService",
-                    `[HTTP 426 Bypass] Server claims available, but business API rejected. Force refreshing version for server=${server}...`,
+                    `[HTTP ${versionErrorCode} Bypass] Server claims available, but business API rejected. Force refreshing version for server=${server}...`,
                     "warn",
                 );
-                await this.refreshClientVersion(server, "business_426_fallback");
+                await this.refreshClientVersion(server, `business_${versionErrorCode}_fallback`);
             }
             status = await this.assessServerStatus(server, timeoutMs);
             if (!status.available || status.thresholdReached || this.disabledServers.has(server)) {
                 await this.waitUntilAvailableWithLogging(server, timeoutMs);
+                return await execute();
+            }
+            if (versionErrorCode && this.getClientVersion(server) !== previousVersion) {
                 return await execute();
             }
             throw error;
@@ -387,7 +391,13 @@ class GarupaService {
             logger("garupaService", `waiting for server=${server} to become available`);
             await this.initializeClientVersions();
             await this.refreshClientVersion(server, "recovery");
-            await waitUntilGarupaAvailable(server, this.getClientVersion(server), getGarupaStatusPollIntervalMs(), timeoutMs);
+            await waitUntilGarupaAvailable(
+                server,
+                () => this.getClientVersion(server),
+                getGarupaStatusPollIntervalMs(),
+                timeoutMs,
+                (status) => this.refreshClientVersion(server, `recovery_http_${status}`),
+            );
             this.markServerAvailable(server);
             logger("garupaService", `server=${server} is now available`, "success");
             logger("garupaService", `server=${server} recovered and will resume requests`, "success");

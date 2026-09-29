@@ -410,40 +410,46 @@ export const fetchMonthlyRankingMasterListBuffer = async (
  * @param timeoutMs - HTTP request timeout in milliseconds (default 2000)
  * @returns `true` if the endpoint returns a 2xx response, `false` otherwise
  */
-export const checkGarupaGameStatus = async (server: number, clientVersion: string, timeoutMs: number = 2000): Promise<boolean> => {
+const getGarupaGameStatusCode = async (server: number, clientVersion: string, timeoutMs: number): Promise<number | undefined> => {
     const base = getGarupaBaseUrl(server);
     const url = new URL("application", base).toString();
     const headers = createGarupaHeaders(server, clientVersion);
     try {
         const { status } = await downloader.downloadRaw(url, headers, timeoutMs);
-        return status >= 200 && status < 300;
+        return status;
     } catch (_e) {
-        return false;
+        return undefined;
     }
+};
+
+export const checkGarupaGameStatus = async (server: number, clientVersion: string, timeoutMs: number = 2000): Promise<boolean> => {
+    const status = await getGarupaGameStatusCode(server, clientVersion, timeoutMs);
+    return status !== undefined && status >= 200 && status < 300;
 };
 
 /**
  * Polls the Garupa game API until the server becomes available (responds with HTTP 2xx).
  * Uses an infinite loop with configurable polling interval and timeout.
  * @param server - Server index
- * @param clientVersion - Client version string
+ * @param getClientVersion - Returns the current client version for each attempt
  * @param pollIntervalMs - Delay between status checks in milliseconds (default 5000)
  * @param timeoutMs - Per-request HTTP timeout in milliseconds (default 2000)
+ * @param refreshClientVersion - Rechecks the client version after HTTP 426 or 511
  */
 export const waitUntilGarupaAvailable = async (
     server: number,
-    clientVersion: string,
+    getClientVersion: () => string,
     pollIntervalMs: number = 5000,
     timeoutMs: number = 2000,
+    refreshClientVersion?: (status: 426 | 511) => Promise<void>,
 ): Promise<void> => {
     while (true) {
-        try {
-            const ok = await checkGarupaGameStatus(server, clientVersion, timeoutMs);
-            if (ok) {
-                return;
-            }
-        } catch {
-            // ignore and continue polling
+        const status = await getGarupaGameStatusCode(server, getClientVersion(), timeoutMs);
+        if (status !== undefined && status >= 200 && status < 300) {
+            return;
+        }
+        if ((status === 426 || status === 511) && refreshClientVersion) {
+            await refreshClientVersion(status);
         }
 
         await new Promise((resolve) => setTimeout(resolve, Math.max(1000, pollIntervalMs)));
