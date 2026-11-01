@@ -37,6 +37,9 @@ export default defineConfig(({ mode, command }) => {
 
     return {
         plugins: [runtimeConfigPlugin, vue()].filter(Boolean),
+        build: {
+            target: ["chrome107", "edge107", "firefox104", "safari16"],
+        },
         resolve: {
             alias: {
                 "@": fileURLToPath(new URL("./src", import.meta.url)),
