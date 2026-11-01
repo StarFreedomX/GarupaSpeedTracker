@@ -1,4 +1,3 @@
-import { statusService } from "@/services/statusService";
 import { compareVersions } from "compare-versions";
 import {
     checkGarupaGameStatus,
@@ -12,6 +11,7 @@ import {
 } from "@/api/garupa";
 import { GARUPA_REFRESH_AT_SECOND, GARUPA_REFRESH_INTERVAL_SECONDS, MONGODB_GARUPA_META_COLLECTION } from "@/config";
 import { logger } from "@/logger";
+import { statusService } from "@/services/statusService";
 import { database } from "@/storage/dataBaseAdapter/mongodb";
 import { downloader } from "@/storage/downloader";
 import type { GarupaMetaDocument } from "@/types/garupaMeta";
@@ -40,8 +40,8 @@ interface PollerEntry {
     fn: () => Promise<void>;
     /** Interval in milliseconds between polling executions. */
     intervalMs: number;
-    /** Timestamp (ms) of the last execution, used to determine if the interval has elapsed. */
-    lastRun: number;
+    /** Next scheduled execution time, advanced independently of callback delays. */
+    nextRunAt: number;
 }
 
 /**
@@ -56,6 +56,7 @@ interface PollerEntry {
 class GarupaService {
     private refreshTimeout: NodeJS.Timeout | undefined;
     private refreshInterval: NodeJS.Timeout | undefined;
+    private firstTickAt = 0;
     private started = false;
     private initTask: Promise<void> | undefined;
     private serverClientVersions = new Map<number, string>();
@@ -162,7 +163,7 @@ class GarupaService {
         this.pollers.set(key, {
             fn: callback,
             intervalMs: intervalMs ?? GARUPA_REFRESH_INTERVAL_SECONDS * 1000,
-            lastRun: 0,
+            nextRunAt: 0,
         });
         this.start();
         this.scheduleNextTick();
@@ -315,6 +316,7 @@ class GarupaService {
         }
 
         const delayMs = Math.max(0, next.getTime() - now.getTime());
+        this.firstTickAt = next.getTime();
         this.refreshTimeout = setTimeout(() => {
             void this.runPollers();
             this.startInterval();
@@ -344,8 +346,9 @@ class GarupaService {
     /**
      * Executes all registered poller tasks whose interval has elapsed.
      *
-     * Iterates over every registered poller, skipping those whose last run
-     * is still within their configured interval. All eligible pollers are
+     * Advances each poller's scheduled deadline rather than measuring from
+     * the previous callback, so timer jitter cannot skip an entire cycle.
+     * Missed deadlines are coalesced into one execution. All eligible pollers are
      * executed concurrently and their results are settled via
      * {@code Promise.allSettled} (individual failures do not block others).
      */
@@ -357,10 +360,12 @@ class GarupaService {
         const now = Date.now();
         const tasks: Promise<void>[] = [];
         for (const [, entry] of this.pollers) {
-            if (now - entry.lastRun < entry.intervalMs) {
+            if (now < entry.nextRunAt) {
                 continue;
             }
-            entry.lastRun = now;
+            const dueAt = entry.nextRunAt || this.firstTickAt;
+            const intervalMs = Math.max(1, entry.intervalMs);
+            entry.nextRunAt = dueAt + (Math.floor((now - dueAt) / intervalMs) + 1) * intervalMs;
             tasks.push(entry.fn());
         }
         await Promise.allSettled(tasks);
