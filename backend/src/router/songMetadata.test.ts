@@ -1,10 +1,11 @@
 ﻿import Koa from "koa";
 import request from "supertest";
+import { responseCompression } from "@/middleware/compression";
 import { createSongMetadataRouter } from "@/router/songMetadata";
 import type { SongChartMeta } from "@/types/songMetadata";
 
 describe("songMetadataRouter", () => {
-    it("gzips JSON when the client accepts gzip", async () => {
+    it.each(["gzip", "br"])("serves metadata JSON with %s compression", async (encoding) => {
         const dataset: SongChartMeta = {
             1: {
                 "0": {
@@ -125,13 +126,14 @@ describe("songMetadataRouter", () => {
             },
         };
         const app = new Koa();
+        app.use(responseCompression);
         const router = createSongMetadataRouter({ getSongMetadata: async () => dataset });
         app.use(router.routes());
         app.use(router.allowedMethods());
 
         const response = await request(app.callback())
             .get("/songMetadata.json")
-            .set("Accept-Encoding", "gzip")
+            .set("Accept-Encoding", encoding)
             .buffer(true)
             .parse((res, cb) => {
                 const chunks: Buffer[] = [];
@@ -140,7 +142,7 @@ describe("songMetadataRouter", () => {
             });
 
         expect(response.status).toEqual(200);
-        expect(response.headers["content-encoding"]).toEqual("gzip");
+        expect(response.headers["content-encoding"]).toEqual(encoding);
         expect(JSON.parse(response.body.toString("utf8"))).toEqual(dataset);
     });
 });
