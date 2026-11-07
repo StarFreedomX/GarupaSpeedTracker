@@ -11,8 +11,8 @@ GarupaSpeedTracker 是一个用于查看 Bestdori 榜线分速、查询玩家编
 - 后端服务：`5519`
 - 后端 API 基址：`/api`
 - 后端本地默认监听：`http://127.0.0.1:5519`
-- 前端默认 API 基址：`API_BASE_DEFAULT=/api`
-- 前端后端 API 地址：`BACKEND_API_URL=http://127.0.0.1:5519/api`
+- 浏览器默认 API 基址：`API_BASE_DEFAULT=/api`
+- 前端代理目标：本地开发默认 `http://127.0.0.1:5519/api`，本地静态启动默认 `http://localhost:5519/api`，Docker 默认 `http://grp-speed-backend:5519/api`
 - 前端浏览器请求默认走同源 `/api`
 - 前端容器启动时会把 `DEFAULT_*` / `API_BASE_DEFAULT` / `BACKEND_API_URL` 等环境变量写入 `runtime-config.js`，前端 `config.ts` 会在启动时读取这些值
 
@@ -84,7 +84,7 @@ grp-speed-backend:
         - API_PREFIX=/api
         - BESTDORI_API=https://bestdori.com/api/
         - MIN_POINTS_UPDATE_TIME=45
-        - BESTDORI_TIMEOUT_MS=10000
+        - DOWNLOADER_TIMEOUT_MS=10000
         - ENABLE_CORS=false
         - APP_PROXY=false
         - MONGODB_URI=mongodb://grp-speed-mongodb:27017
@@ -96,8 +96,8 @@ grp-speed-frontend:
         # 前端默认 API 基址；浏览器请求默认使用这个值
         - API_BASE_DEFAULT=/api
         # 指定后端 API 基址；前端请求会把 /api/... 后面的路径直接追加到这个地址后
-        # Docker环境默认值为http://grp-speed-backend:5519/api
-        # 其他环境默认值为http://localhost:5519/api
+        # Docker 默认值为 http://grp-speed-backend:5519/api
+        # 本地开发与静态启动分别默认使用 127.0.0.1 和 localhost，端口为 5519
         - BACKEND_API_URL=http://grp-speed-backend:5519/api
         # 默认查询设置
         - DEFAULT_SERVER=0
@@ -115,13 +115,15 @@ grp-speed-frontend:
         # - DEFAULT_API_BACKEND_BASE_URL=
 ```
 
+Compose 的环境变量填写在对应服务的 `environment` 中；如需从文件加载，在该服务添加 `env_file`。Compose 项目目录的 `.env` 用于变量替换，需通过 `environment` 或 `env_file` 将值传入容器。
+
 ### 后端环境变量说明
 
-详见[backend/README.md](backend/README.md#后端环境变量说明)
+配置项、加载顺序和国服登录要求见 [backend/README.md](backend/README.md#后端环境变量说明)。本地从 `backend/.env.example` 复制为 `backend/.env` 后填写。
 
 ### 前端环境变量说明
 
-详见[frontend/README.md](frontend/README.md#前端环境变量说明)
+本地开发、静态启动和 Docker 的配置方式见 [frontend/README.md](frontend/README.md#前端环境变量说明)。本地从 `frontend/.env.example` 复制为 `frontend/.env` 后填写。
 
 
 ## 本地开发

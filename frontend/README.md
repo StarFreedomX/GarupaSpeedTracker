@@ -2,7 +2,7 @@
 
 这是一个使用 Vue 3 + TypeScript + Tailwind 的单页分速查看前端。
 
-启用后端模式时，默认后端 API 地址为 `http://localhost:5519/api`。
+浏览器默认请求同源 `/api`，由前端服务代理到后端。设置页中的“后端 API 地址”初始为空。
 
 对外暴露端口：5913
 
@@ -56,35 +56,57 @@ pnpm preview
 
 ## 前端环境变量说明
 
-| 变量名                                | 默认值                                 | 作用                                         |
-|------------------------------------|-------------------------------------|--------------------------------------------|
-| `API_BASE_DEFAULT`                 | `/api`                              | 前端浏览器同源请求的默认 API 基址，也是 `config.ts` 的唯一默认来源 |
-| `PORT`                             | `5913`                              | `pnpm start` 本地静态启动时的监听端口                  |
-| `HOST`                             | `localhost`                         | `pnpm start` 本地静态启动时的监听主机                  |
-| `BACKEND_API_URL`                  | `http://grp-speed-backend:5519/api` | 指定后端 API 基址；本地 `/api/...` 会去掉前缀后直接追加到这个地址后 |
-| `DEFAULT_SERVER`                   | `0`                                 | 默认服务器                                      |
-| `DEFAULT_EVENT`                    | `328`                               | 默认活动 ID                                    |
-| `DEFAULT_SAMPLE_INTERVAL_SECONDS`  | `30`                                | 默认采样间隔（秒）                                  |
-| `DEFAULT_REQUEST_MODE`             | `smart-refresh`                     | 默认请求模式                                     |
-| `DEFAULT_REQUEST_INTERVAL_SECONDS` | `60`                                | 固定间隔模式默认请求间隔（秒）                            |
-| `DEFAULT_AUTO_RETRY_DELAY_SECONDS` | `30`                                | 智能刷新失败后的重试延迟（秒）                            |
-| `DEFAULT_REQUEST_MINUTE_INTERVAL`  | `1`                                 | 固定分钟模式默认分钟间隔                               |
-| `DEFAULT_REQUEST_SECOND`           | `0`                                 | 固定分钟模式默认请求秒数                               |
-| `DEFAULT_TIME_MINUTES`             | `60`                                | 默认时间窗口（分钟）                                 |
-| `DEFAULT_ROWS_PER_PAGE`            | `60`                                | 表格默认每页行数                                   |
-| `DEFAULT_PRIMARY_HUE`              | `340`                               | 默认主题色相                                     |
-| `DEFAULT_API_MODE`                 | `frontend`                          | 默认 API 模式                                  |
-| `DEFAULT_API_BACKEND_BASE_URL`     | 空                                   | 设置页“后端 API 地址”的初始值                         |
+### 按运行方式配置
 
-> 说明：这些前端环境变量既可以在本地 `pnpm start` 时读取，也可以通过 `docker-compose.yml` 传入容器；容器启动后会生成 `runtime-config.js`，前端 `config.ts` 会优先读取其中的值。
+| 运行方式 | 配置方式 | 生效时间 |
+| --- | --- | --- |
+| `pnpm dev` | 在 `frontend/.env` 中填写 `API_BASE_DEFAULT` 和 `BACKEND_API_URL`；Vite 也会加载 `.env.local` 和当前模式的 `.env` 文件 | 重启开发服务器 |
+| `pnpm build` 后运行 `pnpm start` | 从进程环境变量、`.env.local`、`.env`、`.env.example` 依次读取，先读到的值优先；支持下表全部运行时配置 | 重启静态服务器 |
+| Docker / Nginx | 在 Compose 前端服务的 `environment` 或 `env_file` 中填写，容器启动时生成 `runtime-config.js` | 重新创建前端容器，无需重新构建镜像 |
+| 单独托管 `dist/` | 修改 `dist/runtime-config.js` 中的 `window.__GARUPA_RUNTIME_CONFIG__` 对象 | 重新加载页面 |
 
+Vite 开发模式只注入 `API_BASE_DEFAULT`，`DEFAULT_*` 环境变量用于 `pnpm start` 和 Docker。开发时如需调整这些初始值，可在 `public/runtime-config.js` 中设置同名字段。单独执行 `pnpm build` 时，运行时配置仍取自该文件。
+
+### 服务与 API 地址
+
+| 变量名 | 默认值 | 作用 |
+| --- | --- | --- |
+| `API_BASE_DEFAULT` | `/api` | 浏览器请求使用的 API 基址 |
+| `BACKEND_API_URL` | 开发：`http://127.0.0.1:5519/api`；本地静态启动：`http://localhost:5519/api`；Docker：`http://grp-speed-backend:5519/api` | 前端服务的代理目标；`.env.example` 提供 `localhost` 地址 |
+| `PORT` | `5913` | 仅用于 `pnpm start` 的监听端口 |
+| `HOST` | `localhost` | 仅用于 `pnpm start` 的监听地址 |
+| `VITE_DEPLOY_TARGET` | 未设置 | 构建时设为 `github-pages`，浏览器默认 API 基址使用项目配置的公共后端；运行时 `API_BASE_DEFAULT` 可覆盖它 |
+
+`BACKEND_API_URL` 由前端服务器访问，Docker 中可使用后端服务名。`API_BASE_DEFAULT` 和 `DEFAULT_API_BACKEND_BASE_URL` 由浏览器访问，填写浏览器能访问的地址。代理会去掉请求路径开头的 `/api`，再将剩余路径追加到 `BACKEND_API_URL`。
+
+Vite 和 Nginx 的端口均为 `5913`，不读取上述 `PORT` / `HOST`。Docker 对外端口在 Compose 的 `ports` 中调整。跨域直连后端时，需在后端设置 `ENABLE_CORS=true`。
+
+### 查询与显示初始值
+
+以下是推荐填写的初始值，`.env.example` 已提供。Docker 部署时可复制到前端服务的 `environment` 中。
+
+| 变量名 | 建议值 | 作用与范围 |
+| --- | --- | --- |
+| `DEFAULT_SERVER` | `0` | 默认服务器，`0`–`4` 对应日服、国际服、台服、国服、韩服 |
+| `DEFAULT_EVENT` | `328` | 默认活动 ID，最小 `1` |
+| `DEFAULT_SAMPLE_INTERVAL_SECONDS` | `30` | 采样间隔（秒），最小 `1` |
+| `DEFAULT_REQUEST_MODE` | `smart-refresh` | 请求模式：`smart-refresh`、`fixed-interval`、`fixed-minute` |
+| `DEFAULT_REQUEST_INTERVAL_SECONDS` | `60` | 固定间隔模式的请求间隔（秒），最小 `1` |
+| `DEFAULT_AUTO_RETRY_DELAY_SECONDS` | `30` | 智能刷新失败后的重试延迟（秒），最小 `1` |
+| `DEFAULT_REQUEST_MINUTE_INTERVAL` | `1` | 固定分钟模式的分钟间隔，最小 `1` |
+| `DEFAULT_REQUEST_SECOND` | `0` | 固定分钟模式的触发秒数，`0`–`59` |
+| `DEFAULT_TIME_MINUTES` | `60` | 查询时间窗口（分钟），最小 `2` |
+| `DEFAULT_ROWS_PER_PAGE` | `60` | 表格每页行数，最小 `1` |
+| `DEFAULT_PRIMARY_HUE` | `340` | 主题色相，`0`–`359` |
+| `DEFAULT_API_MODE` | `frontend` | `frontend` 使用 `API_BASE_DEFAULT`；`backend` 使用设置页中的后端 API 地址 |
+| `DEFAULT_API_BACKEND_BASE_URL` | 空 | 设置页“后端 API 地址”的初始值，例如 `https://backend.example.com/api` |
+
+通过 `pnpm start` 或 Docker 注入数值配置时，请显式填写所需值。既未设置也未由 `.env.example` 补齐，或显式留空时，会写入空字符串，浏览器将其按 `0` 解析，再限制到表中范围的最小值。
+
+用户已保存的设置会覆盖部署时的初始值。需要重新应用初始值时，在浏览器开发者工具中删除本站的 `localStorage` 项 `garupa-speed-tracker:preferences`，再刷新页面；这会清除该浏览器保存的偏好。
 
 ## 说明
 
-- 浏览器侧请求默认使用同源 `/api`，应由前端代理/反向代理转发。
-- Vite 开发服务器会对 `/api/*` 进行代理：去掉开头的 `/api`，再将剩余路径追加到 `BACKEND_API_URL`（默认 `http://127.0.0.1:5519/api`）。
-- Docker/Nginx 模式遵循同样的规则：去掉本地请求中的 `/api` 前缀，然后将剩余部分追加到 `BACKEND_API_URL`。
-- Docker/`pnpm start` 会在应用启动前根据容器环境变量生成 `/runtime-config.js`，因此 `API_BASE_DEFAULT`、`DEFAULT_EVENT`、`DEFAULT_ROWS_PER_PAGE`、`DEFAULT_PRIMARY_HUE`、`BACKEND_API_URL` 等值都可以通过 `docker-compose.yml` 注入。
 - 当在设置页切换到后端 API 模式时，请输入你想要访问的完整 API 基址，例如 `http://backend.example.com/api` 或 `http://backend.example.com/api/v2`。
 - 设置页只提供主主题色配置；按钮圆角和页面内边距统一集中在 `style/main.css` 中管理。
 - 语言环境以中文优先，i18n 消息组织在 `src/i18n/messages` 下。
