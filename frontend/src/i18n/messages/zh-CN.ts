@@ -252,9 +252,9 @@ const zhCN = {
         step1: { title: "选择活动类型" },
         step2: { title: "配置队伍" },
         step3: {
-            title: "输入目标 PT",
-            targetPt: "目标PT",
-            placeholder: "输入目标 PT",
+            title: "输入需获取的 PT",
+            targetPt: "需获取 PT",
+            placeholder: "输入需获取的 PT",
         },
         step4: {
             title: "分析结果",
@@ -267,10 +267,10 @@ const zhCN = {
             songColName: "歌曲",
             songColDifficulty: "难度",
             songColPtRange: "PT范围",
-            noSolution: "无法在 5 次auto内达到目标 PT，请调整队伍配置。",
+            noSolution: "无法在 5 次auto内获取所需 PT，请调整队伍配置。",
             maxAchievable: "当前配置 5 次 3 火最多可达 {pt} PT",
             adjustBonus: "加成调整建议",
-            adjustBonusHint: "以下加成值可以精确达到目标 PT：",
+            adjustBonusHint: "以下加成值可以精确获取所需 PT：",
             bonusTableBonus: "加成 (%)",
             bonusTableScore: "分数区间",
             bonusTablePower: "推荐综合力",
@@ -306,8 +306,8 @@ const zhCN = {
         status: {
             noFixedSongs: "当前队伍配置下没有找到任何固定PT歌曲。",
             noFixedSongsHint: "请调整队伍参数（综合力、加成、技能等）以产生固定PT的歌曲，或降低 Auto 倍率。",
-            targetTooLow: "目标 PT 低于当前配置的最低固定 PT 歌曲。",
-            targetTooLowHint: "当前队伍配置下最低 PT 为 {min}，无法达到更低的目标。请调整队伍降低综合力、减少加成或更改活动类型。",
+            targetTooLow: "需获取的 PT 低于当前配置单曲可获取的最低固定 PT。",
+            targetTooLowHint: "当前队伍配置下最低 PT 为 {min}，无法获取更少的 PT。请调整队伍降低综合力、减少加成或更改活动类型。",
         },
         btn: {
             prev: "上一步",
@@ -316,7 +316,7 @@ const zhCN = {
             recalc: "重新计算",
         },
         error: {
-            invalidPt: "请输入有效的目标 PT（1 ~ 10,000,000）",
+            invalidPt: "请输入需获取的 PT（1 ~ 10,000,000）",
             noMetadata: "歌曲数据未加载，请刷新页面重试",
         },
     },

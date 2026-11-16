@@ -252,9 +252,9 @@ const enUS = {
         step1: { title: "Select Activity Type" },
         step2: { title: "Configure Team" },
         step3: {
-            title: "Enter Target PT",
-            targetPt: "Target PT",
-            placeholder: "Enter target PT",
+            title: "Enter PT to Earn",
+            targetPt: "PT to Earn",
+            placeholder: "Enter PT to earn",
         },
         step4: {
             title: "Analysis Results",
@@ -267,10 +267,10 @@ const enUS = {
             songColName: "Song",
             songColDifficulty: "Difficulty",
             songColPtRange: "PT Range",
-            noSolution: "Cannot reach target PT within 5 auto lives. Please adjust team configuration.",
+            noSolution: "Cannot earn the requested PT within 5 auto lives. Please adjust team configuration.",
             maxAchievable: "Max achievable with 5× 3-flame plays: {pt} PT",
             adjustBonus: "Bonus Adjustment Suggestions",
-            adjustBonusHint: "The following bonus values can exactly achieve the target PT:",
+            adjustBonusHint: "The following bonus values can earn exactly the requested PT:",
             bonusTableBonus: "Bonus (%)",
             bonusTableScore: "Score Range",
             bonusTablePower: "Rec. Power",
@@ -306,7 +306,7 @@ const enUS = {
         status: {
             noFixedSongs: "No fixed-PT songs found with current team config.",
             noFixedSongsHint: "Adjust team parameters (power, bonus, skills) to produce fixed-PT songs, or lower the auto rate.",
-            targetTooLow: "Target PT is below the minimum fixed-PT song.",
+            targetTooLow: "PT to earn is below the minimum fixed PT available from a single song with this config.",
             targetTooLowHint: "The lowest fixed-PT song with this config is {min}. Cannot score lower. Reduce power, bonus, or change activity type.",
         },
         btn: {
@@ -316,7 +316,7 @@ const enUS = {
             recalc: "Recalculate",
         },
         error: {
-            invalidPt: "Please enter a valid target PT (1 ~ 10,000,000)",
+            invalidPt: "Please enter a valid amount of PT to earn (1 ~ 10,000,000)",
             noMetadata: "Song data not loaded. Please refresh the page.",
         },
     },

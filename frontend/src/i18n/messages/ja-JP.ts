@@ -254,9 +254,9 @@ const jaJP = {
         step1: { title: "イベント種別を選択" },
         step2: { title: "編成を設定" },
         step3: {
-            title: "目標PTを入力",
-            targetPt: "目標PT",
-            placeholder: "目標PTを入力",
+            title: "獲得したいPTを入力",
+            targetPt: "獲得したいPT",
+            placeholder: "獲得したいPTを入力",
         },
         step4: {
             title: "分析結果",
@@ -269,10 +269,10 @@ const jaJP = {
             songColName: "楽曲",
             songColDifficulty: "難易度",
             songColPtRange: "PT範囲",
-            noSolution: "5回オート以内に目標PTに到達できません。編成を調整してください。",
+            noSolution: "5回オート以内に指定したPTを獲得できません。編成を調整してください。",
             maxAchievable: "現在の編成で5回×3ブーストの最大到達PT：{pt}",
             adjustBonus: "ボーナス調整案",
-            adjustBonusHint: "以下のボーナス値で目標PTに正確に到達できます：",
+            adjustBonusHint: "以下のボーナス値で指定したPTをちょうど獲得できます：",
             bonusTableBonus: "ボーナス (%)",
             bonusTableScore: "スコア範囲",
             bonusTablePower: "推奨総合力",
@@ -308,9 +308,9 @@ const jaJP = {
         status: {
             noFixedSongs: "現在の編成では固定PT楽曲が見つかりません。",
             noFixedSongsHint: "編成パラメータ（総合力、ボーナス、スキルなど）を調整して固定PT楽曲を生成するか、オート倍率を下げてください。",
-            targetTooLow: "目標PTが現在の編成の最低固定PT楽曲を下回っています。",
+            targetTooLow: "獲得したいPTが現在の編成で1曲から獲得できる最低固定PTを下回っています。",
             targetTooLowHint:
-                "現在の編成での最低PTは{min}です。これより低い目標は達成できません。総合力を下げる、ボーナスを減らす、またはイベント種別を変更してください。",
+                "現在の編成での最低PTは{min}です。これより少ないPTは獲得できません。総合力を下げる、ボーナスを減らす、またはイベント種別を変更してください。",
         },
         btn: {
             prev: "戻る",
@@ -319,7 +319,7 @@ const jaJP = {
             recalc: "再計算",
         },
         error: {
-            invalidPt: "有効な目標PTを入力してください（1 ~ 10,000,000）",
+            invalidPt: "獲得したいPTを入力してください（1 ~ 10,000,000）",
             noMetadata: "楽曲データが読み込まれていません。ページを更新してください。",
         },
     },
