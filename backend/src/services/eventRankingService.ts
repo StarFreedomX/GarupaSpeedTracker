@@ -47,8 +47,8 @@ const playerCollection = database.collection<RankingPlayerDocument>(MONGODB_RANK
 // Tier validation
 // ============================================================================
 
-const EVENT_RANKING_BORDER_TIERS: EventRankingBorderTier[] = [
-    20, 30, 40, 50, 100, 200, 300, 500, 1000, 1500, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000,
+export const EVENT_RANKING_BORDER_TIERS: readonly EventRankingBorderTier[] = [
+    20, 30, 40, 50, 100, 200, 300, 400, 500, 1000, 1500, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000,
 ];
 const EVENT_BORDER_TIER_SET = new Set<number>(EVENT_RANKING_BORDER_TIERS);
 

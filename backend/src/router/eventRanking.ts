@@ -1,6 +1,12 @@
 import Router from "@koa/router";
 import { queryToNumber, queryToOptionalNumber, validationError } from "@/router/utils";
-import { eventRankingService, getEventServerCount, isEventRankingBorderTier, isMusicRankingBorderTier } from "@/services/eventRankingService";
+import {
+    EVENT_RANKING_BORDER_TIERS,
+    eventRankingService,
+    getEventServerCount,
+    isEventRankingBorderTier,
+    isMusicRankingBorderTier,
+} from "@/services/eventRankingService";
 
 /**
  * Router for event ranking endpoints — event top snapshots and border point cutoffs.
@@ -126,10 +132,7 @@ eventRankingRouter.get("/tracker/data", async (ctx) => {
         result = await eventRankingService.getMusicBorderPoints(server, event, mid, tier);
     } else {
         if (!isEventRankingBorderTier(tier)) {
-            throw validationError(
-                "tier",
-                "tier must be one of: 20,30,40,50,100,200,300,500,1000,1500,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000",
-            );
+            throw validationError("tier", `tier must be one of: ${EVENT_RANKING_BORDER_TIERS.join(",")}`);
         }
         result = await eventRankingService.getEventBorderPoints(server, event, tier);
     }

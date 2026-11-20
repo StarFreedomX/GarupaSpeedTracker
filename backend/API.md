@@ -437,14 +437,14 @@ This endpoint accepts both `/tracker/data` and `/tracker/data.json`. When no loc
   - When provided, returns music score border for the specified music ID instead of event point border. Same semantics as `/api/eventtop/data#mid`.
   - The valid `tier` values differ between event borders and music borders (see below).
 
-**Event tier supported values:** `20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000`
+**Event tier supported values:** `20, 30, 40, 50, 100, 200, 300, 400, 500, 1000, 1500, 2000, 3000, 4000, 5000, 10000, 20000, 30000, 40000, 50000, 100000`
 
 **Music tier supported values:** `20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000`
 
 Example (event border):
 
 ```http
-GET /api/tracker/data?server=0&event=321&tier=100
+GET /api/tracker/data?server=3&event=322&tier=400
 ```
 
 Example (music border):
@@ -480,7 +480,7 @@ GET /api/tracker/data?server=0&event=321&tier=100&mid=184
   "message": "Validation Failed",
   "details": [
     {
-      "message": "tier must be one of: 20,30,40,50,100,200,300,500,1000,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000",
+      "message": "tier must be one of: 20,30,40,50,100,200,300,400,500,1000,1500,2000,3000,4000,5000,10000,20000,30000,40000,50000,100000",
       "code": "invalid",
       "field": "tier"
     }
