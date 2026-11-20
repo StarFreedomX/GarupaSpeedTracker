@@ -193,6 +193,7 @@ export type EventRankingBorderTier =
     | 100
     | 200
     | 300
+    | 400
     | 500
     | 1000
     | 1500
